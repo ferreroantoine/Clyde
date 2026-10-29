@@ -127,6 +127,9 @@ export class AgentManager {
       ask: (question: Parameters<ApprovalBroker['ask']>[1], signal: AbortSignal) => this.broker.ask(id, question, signal)
     }
 
+    if (profile.kind === 'codex' || profile.kind === 'antigravity') {
+      throw new AppError('not_allowed', `${profile.name} cannot run agents yet.`)
+    }
     const session: AgentSession = isApiKind(profile.kind)
       ? await this.apiSession(profile, apiKey, info, req.systemPrompt, allowed, platform, common)
       : await this.claudeCodeSession(profile, apiKey, info, req.systemPrompt, allowed, common)

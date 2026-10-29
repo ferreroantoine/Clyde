@@ -11,12 +11,15 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Gem,
+  Orbit,
   Sparkles,
+  SquareTerminal,
   Trash2,
   UserRound,
   type LucideIcon
 } from 'lucide-react'
-import { PROFILE_KIND_LABELS, type Profile } from '@shared/profiles'
+import { type Profile } from '@shared/profiles'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -67,18 +70,24 @@ function ConnectionLine({ profile }: { profile: Profile }) {
 }
 
 function kindLine(profile: Profile): { icon: LucideIcon; text: string } {
-  if (profile.kind === 'claude-code') {
-    return profile.auth === 'subscription'
-      ? { icon: UserRound, text: 'Claude Code · subscription' }
-      : { icon: KeyRound, text: 'Claude Code · API key' }
+  switch (profile.kind) {
+    case 'claude-code':
+      return profile.auth === 'subscription'
+        ? { icon: UserRound, text: 'Claude Code · subscription' }
+        : { icon: KeyRound, text: 'Claude Code · API key' }
+    case 'codex':
+      return { icon: SquareTerminal, text: 'Codex CLI · ChatGPT subscription' }
+    case 'antigravity':
+      return { icon: Orbit, text: 'Antigravity CLI · Google account' }
+    case 'ollama':
+      return { icon: Cpu, text: `Ollama · ${profile.baseUrl}` }
+    case 'anthropic':
+      return { icon: Sparkles, text: 'Anthropic API · API key' }
+    case 'openai':
+      return { icon: Bot, text: 'OpenAI API · API key' }
+    case 'gemini':
+      return { icon: Gem, text: 'Gemini API · API key' }
   }
-  const icons: Record<Exclude<Profile['kind'], 'claude-code'>, LucideIcon> = {
-    anthropic: Sparkles,
-    openai: Bot,
-    ollama: Cpu
-  }
-  const text = profile.kind === 'ollama' ? `Ollama · ${profile.baseUrl}` : `${PROFILE_KIND_LABELS[profile.kind]} · API key`
-  return { icon: icons[profile.kind], text }
 }
 
 function ProfileCard({
@@ -94,7 +103,7 @@ function ProfileCard({
 }) {
   const test = useProfiles((s) => s.test)
   const testing = useProfiles((s) => s.tests[profile.id] === 'testing')
-  const subscription = profile.kind === 'claude-code' && profile.auth === 'subscription'
+  const subscription = profile.auth === 'subscription'
   const { icon: KindIcon, text: kindText } = kindLine(profile)
 
   return (
@@ -180,7 +189,7 @@ export function AccountsPage() {
   }, [])
 
   const onCreated = (profile: Profile) => {
-    if (profile.kind === 'claude-code' && profile.auth === 'subscription') setLoginFor(profile)
+    if (profile.auth === 'subscription') setLoginFor(profile)
     else void test(profile.id)
   }
 
@@ -204,7 +213,7 @@ export function AccountsPage() {
             <EmptyState
               icon={KeyRound}
               title="No account yet"
-              description="Add a Claude subscription, an API key for Anthropic or OpenAI, or a local Ollama."
+              description="Add a Claude, ChatGPT or Google subscription, an API key for Anthropic, OpenAI or Gemini, or a local Ollama."
               action={
                 <Button size="sm" variant="outline" onClick={() => setEditing('new')}>
                   <Plus /> Add account
@@ -227,8 +236,9 @@ export function AccountsPage() {
         )}
 
         <p className="mt-8 text-xs leading-relaxed text-muted-foreground">
-          Claude subscription accounts sign in through Claude Code’s own login and are meant for personal use: Anthropic does
-          not allow third-party products to offer claude.ai login without approval.
+          Subscription accounts sign in through each CLI’s own login (Claude Code, Codex, Antigravity) and are meant for
+          personal use: Atelier never sees the credentials, and Anthropic does not allow third-party products to offer
+          claude.ai login without approval.
           {distribution && ' This build only allows API key accounts.'}
         </p>
       </div>

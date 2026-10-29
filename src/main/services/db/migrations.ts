@@ -218,5 +218,56 @@ export const migrations: Migration[] = [
       DELETE FROM pricing WHERE kind = 'mistral';
     `,
     up: removeMistral
+  },
+  {
+    version: 8,
+    name: 'openai and gemini prices',
+    sql: `
+      -- Standard-tier list prices from developers.openai.com/api/docs/pricing (short context) and
+      -- ai.google.dev/gemini-api/docs/pricing (prompts up to 200k), read on 29 October 2026.
+      -- Google announced increases: gemini-4-argon on 1 December 2026, the 3.6 and 3.8 Flash models on 1 January 2027.
+      -- OR IGNORE keeps any price the user already entered for the same prefix.
+      INSERT OR IGNORE INTO pricing (id, kind, model_prefix, input_per_mtok, output_per_mtok, source, updated_at) VALUES
+        ('seed-gpt-6.1-sol', 'openai', 'gpt-6.1-sol', 2, 10, 'seed', 0),
+        ('seed-gpt-6.1-terra', 'openai', 'gpt-6.1-terra', 1, 5, 'seed', 0),
+        ('seed-gpt-6-astra', 'openai', 'gpt-6-astra', 10, 50, 'seed', 0),
+        ('seed-gpt-6-sol', 'openai', 'gpt-6-sol', 2, 10, 'seed', 0),
+        ('seed-gpt-6-luna', 'openai', 'gpt-6-luna', 0.1, 0.5, 'seed', 0),
+        ('seed-gpt-5.6-sol', 'openai', 'gpt-5.6-sol', 4, 20, 'seed', 0),
+        ('seed-gpt-5.6-terra', 'openai', 'gpt-5.6-terra', 2, 12, 'seed', 0),
+        ('seed-gpt-5.6-luna', 'openai', 'gpt-5.6-luna', 0.2, 1.2, 'seed', 0),
+        ('seed-gpt-5.5-pro', 'openai', 'gpt-5.5-pro', 30, 180, 'seed', 0),
+        ('seed-gpt-5.5', 'openai', 'gpt-5.5', 5, 30, 'seed', 0),
+        ('seed-gpt-5.4-pro', 'openai', 'gpt-5.4-pro', 30, 180, 'seed', 0),
+        ('seed-gpt-5.4-mini', 'openai', 'gpt-5.4-mini', 0.75, 4.5, 'seed', 0),
+        ('seed-gpt-5.4-nano', 'openai', 'gpt-5.4-nano', 0.2, 1.25, 'seed', 0),
+        ('seed-gpt-5.4', 'openai', 'gpt-5.4', 2.5, 15, 'seed', 0),
+        ('seed-gpt-5.3-codex', 'openai', 'gpt-5.3-codex', 1.75, 14, 'seed', 0),
+        ('seed-gpt-5.2-pro', 'openai', 'gpt-5.2-pro', 21, 168, 'seed', 0),
+        ('seed-gpt-5.2', 'openai', 'gpt-5.2', 1.75, 14, 'seed', 0),
+        ('seed-gpt-5.1', 'openai', 'gpt-5.1', 1.25, 10, 'seed', 0),
+        ('seed-gpt-5-pro', 'openai', 'gpt-5-pro', 15, 120, 'seed', 0),
+        ('seed-gpt-5-mini', 'openai', 'gpt-5-mini', 0.25, 2, 'seed', 0),
+        ('seed-gpt-5-nano', 'openai', 'gpt-5-nano', 0.05, 0.4, 'seed', 0),
+        ('seed-gpt-5', 'openai', 'gpt-5', 1.25, 10, 'seed', 0),
+        ('seed-gpt-4.1-mini', 'openai', 'gpt-4.1-mini', 0.4, 1.6, 'seed', 0),
+        ('seed-gpt-4.1-nano', 'openai', 'gpt-4.1-nano', 0.1, 0.4, 'seed', 0),
+        ('seed-gpt-4.1', 'openai', 'gpt-4.1', 2, 8, 'seed', 0),
+        ('seed-gpt-4o-mini', 'openai', 'gpt-4o-mini', 0.15, 0.6, 'seed', 0),
+        ('seed-gpt-4o', 'openai', 'gpt-4o', 2.5, 10, 'seed', 0),
+        ('seed-o4-mini', 'openai', 'o4-mini', 1.1, 4.4, 'seed', 0),
+        ('seed-o3-pro', 'openai', 'o3-pro', 20, 80, 'seed', 0),
+        ('seed-o3', 'openai', 'o3', 2, 8, 'seed', 0),
+        ('seed-gemini-4-argon', 'gemini', 'gemini-4-argon', 2, 10, 'seed', 0),
+        ('seed-gemini-3.8-flash', 'gemini', 'gemini-3.8-flash', 0.75, 3.75, 'seed', 0),
+        ('seed-gemini-3.6-flash', 'gemini', 'gemini-3.6-flash', 0.75, 3.75, 'seed', 0),
+        ('seed-gemini-3.5-flash-lite', 'gemini', 'gemini-3.5-flash-lite', 0.3, 2.5, 'seed', 0),
+        ('seed-gemini-3.1-flash-lite', 'gemini', 'gemini-3.1-flash-lite', 0.25, 1.5, 'seed', 0),
+        ('seed-gemini-3.1-pro', 'gemini', 'gemini-3.1-pro', 2, 12, 'seed', 0),
+        ('seed-gemini-3-flash', 'gemini', 'gemini-3-flash', 0.5, 3, 'seed', 0),
+        ('seed-gemini-2.5-pro', 'gemini', 'gemini-2.5-pro', 1.25, 10, 'seed', 0),
+        ('seed-gemini-2.5-flash-lite', 'gemini', 'gemini-2.5-flash-lite', 0.1, 0.4, 'seed', 0),
+        ('seed-gemini-2.5-flash', 'gemini', 'gemini-2.5-flash', 0.3, 2.5, 'seed', 0);
+    `
   }
 ]

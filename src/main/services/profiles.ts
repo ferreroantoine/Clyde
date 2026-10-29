@@ -4,11 +4,14 @@ import { join } from 'node:path'
 import { AppError } from '@shared/errors'
 import {
   DEFAULT_OLLAMA_URL,
+  isCliKind,
   KIND_AUTH,
   PROFILE_KIND_LABELS,
+  SINGLE_PROFILE_KINDS,
   profileCreateSchema,
   profileUpdateSchema,
   type AuthMode,
+  type CliProfileKind,
   type Profile,
   type ProfileCreate,
   type ProfileKind,
@@ -33,9 +36,18 @@ interface Row {
   updated_at: number
 }
 
+/** Folder, under the data root, that holds each CLI's per-profile config dirs. */
+export const PROFILE_DIRS: Record<CliProfileKind, string> = {
+  'claude-code': 'claude-profiles',
+  codex: 'codex-profiles',
+  antigravity: 'antigravity-profiles'
+}
+
+const SUBSCRIPTION_DISABLED = 'Subscription sign-in is disabled in this build. Use an API key profile.'
+
 export interface ProfilesOptions {
-  /** Parent of the per-profile Claude Code config dirs. */
-  profilesRoot: string
+  /** Parent of the per-CLI folders of profile config dirs (the app's data folder). */
+  dataRoot: string
   distribution: boolean
   onChanged?: (profiles: Profile[]) => void
 }
@@ -81,7 +93,7 @@ export class ProfilesService {
   requireUsable(id: string): Profile {
     const profile = this.get(id)
     if (!profile.usable) {
-      throw new AppError('not_allowed', 'Claude subscription profiles are disabled in this build. Use an API key profile.')
+      throw new AppError('not_allowed', SUBSCRIPTION_DISABLED)
     }
     return profile
   }
@@ -91,8 +103,12 @@ export class ProfilesService {
     if (!KIND_AUTH[data.kind].includes(data.auth)) {
       throw new AppError('invalid_request', `${PROFILE_KIND_LABELS[data.kind]} accounts cannot use ${data.auth} sign-in`)
     }
-    if (data.auth === 'subscription' && this.opts.distribution) {
-      throw new AppError('not_allowed', 'Claude subscription profiles are disabled in this build. Use an API key profile.')
+    if (data.auth === 'subscription' && this.opts.distribution) throw new AppError('not_allowed', SUBSCRIPTION_DISABLED)
+    if (SINGLE_PROFILE_KINDS.includes(data.kind) && this.list().some((p) => p.kind === data.kind)) {
+      throw new AppError(
+        'not_allowed',
+        `There is already a ${PROFILE_KIND_LABELS[data.kind]} account. It signs in once per Windows user, so a second one would use the same account.`
+      )
     }
     if (data.auth === 'api-key' && !data.apiKey) throw new AppError('invalid_request', 'An API key is required')
     if (data.auth !== 'api-key' && data.apiKey) {
@@ -110,7 +126,7 @@ export class ProfilesService {
         .run(id, data.kind, data.name, data.label, data.color, data.auth, data.defaultModel, baseUrl, now, now)
       if (data.apiKey) this.secrets.set(id, API_KEY, data.apiKey)
     })()
-    if (data.kind === 'claude-code') this.configDir(id)
+    if (isCliKind(data.kind)) this.configDir(id)
     this.changed()
     return this.get(id)
   }
@@ -143,31 +159,33 @@ export class ProfilesService {
     return this.get(data.id)
   }
 
-  /** Removes the profile, its secrets and its config dir, which holds that account's Claude Code login. */
+  /** Removes the profile, its secrets and its config dir, which may hold that account's CLI login. */
   delete(id: string): void {
-    this.get(id)
+    const profile = this.get(id)
     this.db.prepare('DELETE FROM profiles WHERE id = ?').run(id)
-    const dir = this.dirOf(id)
-    if (isInside(this.opts.profilesRoot, dir) && dir !== this.opts.profilesRoot) {
-      rmSync(dir, { recursive: true, force: true, maxRetries: 3 })
+    if (isCliKind(profile.kind)) {
+      const parent = join(this.opts.dataRoot, PROFILE_DIRS[profile.kind])
+      const dir = join(parent, id)
+      if (isInside(parent, dir) && dir !== parent) rmSync(dir, { recursive: true, force: true, maxRetries: 3 })
     }
     this.changed()
   }
 
-  /** The profile's own CLAUDE_CONFIG_DIR, created on demand. Only Claude Code profiles use it. */
+  /**
+   * The profile's own config dir, created on demand: CLAUDE_CONFIG_DIR for Claude Code,
+   * CODEX_HOME for Codex, the home folder Antigravity sees. Only CLI profiles have one.
+   */
   configDir(id: string): string {
-    const dir = this.dirOf(id)
+    const profile = this.get(id)
+    if (!isCliKind(profile.kind)) throw new AppError('invalid_request', 'API accounts have no config folder')
+    // Ids are UUIDs generated here, so they are always a single safe path segment.
+    const dir = join(this.opts.dataRoot, PROFILE_DIRS[profile.kind], id)
     mkdirSync(dir, { recursive: true })
     return dir
   }
 
   apiKey(id: string): string | null {
     return this.secrets.get(id, API_KEY)
-  }
-
-  private dirOf(id: string): string {
-    // Ids are UUIDs generated here, so they are always a single safe path segment.
-    return join(this.opts.profilesRoot, id)
   }
 
   private changed(): void {

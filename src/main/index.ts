@@ -109,7 +109,7 @@ if (!app.requestSingleInstanceLock()) {
     // Without the app database, profiles live in memory for this session, like settings.
     const profileDb = db ?? memoryDatabase()
     const profiles = new ProfilesService(profileDb, new SecretsService(profileDb, safeStorageCipher), {
-      profilesRoot: join(app.getPath('userData'), 'claude-profiles'),
+      dataRoot: app.getPath('userData'),
       distribution: DISTRIBUTION,
       onChanged: (list) => broadcast('profiles:changed', list)
     })

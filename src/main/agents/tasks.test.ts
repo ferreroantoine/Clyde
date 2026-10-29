@@ -29,7 +29,7 @@ function setup() {
   db.pragma('foreign_keys = ON')
   migrate(db)
   const profiles = new ProfilesService(db, new SecretsService(db, { available: () => false, encrypt: () => Buffer.alloc(0), decrypt: () => '' }), {
-    profilesRoot: mkdtempSync(join(tmpdir(), 'atelier-p-')),
+    dataRoot: mkdtempSync(join(tmpdir(), 'atelier-p-')),
     distribution: false
   })
   const profile = profiles.create({ kind: 'ollama', name: 'Local', color: '#64748b', auth: 'none' })

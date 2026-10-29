@@ -29,8 +29,8 @@ export function PricesSection() {
       <h2 className="text-sm font-medium">Prices</h2>
       <p className="mt-0.5 text-xs text-muted-foreground">
         USD per million tokens, to estimate what API agents cost. A model uses the longest prefix that matches its id.
-        Anthropic prices were filled in from the providers’ pages in October 2026; check them, and add the
-        models you use.
+        Anthropic, OpenAI and Gemini list prices were filled in from the providers’ pages in October 2026; check them
+        (Google announced increases for some Gemini models), and add the models you use.
       </p>
       <table className="mt-3 w-full text-xs">
         <thead className="text-left text-[11px] text-muted-foreground">
