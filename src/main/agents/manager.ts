@@ -25,7 +25,10 @@ import type { Logger } from '../logger'
 import { CodexSession } from './codex/session'
 import { buildCodexEnv, codexMcpServers } from './codex/runtime'
 import { spawnCli, type SpawnCli } from './cli/process'
-import { resolveCodexBinary } from './cli/resolve'
+import { resolveAntigravityBinary, resolveCodexBinary } from './cli/resolve'
+import { spawnPty, type SpawnPty } from './cli/pty-process'
+import { AntigravitySession } from './antigravity/session'
+import { buildAgyEnv } from './antigravity/runtime'
 
 /** Default cap on agents running at once (plan: "agent CPU guard"). */
 export const MAX_ACTIVE_SESSIONS = 4
@@ -40,6 +43,13 @@ export interface AgentManagerDeps {
   resolveCodex?: (override: string) => string
   /** Starts CLIs with piped stdio (Codex). */
   spawnCli?: SpawnCli
+  /** Antigravity executable from Settings; empty means agy from PATH. */
+  antigravityPath?: () => string
+  resolveAntigravity?: (override: string) => string
+  /** Starts CLIs in a pseudo-terminal (Antigravity). */
+  spawnPty?: SpawnPty
+  /** Detected CLI versions, for the session header. */
+  cliVersion?: (kind: 'codex' | 'antigravity') => string
   workspaceRoot: () => string | null
   query: () => Promise<QueryFn>
   createAdapter: (target: ApiTarget) => ChatAdapter
@@ -145,7 +155,8 @@ export class AgentManager {
     } else if (profile.kind === 'codex') {
       session = this.codexSession(profile, info, req.systemPrompt, allowed, platform, common)
     } else {
-      throw new AppError('not_allowed', `${profile.name} cannot run agents yet.`)
+      this.checkAntigravityConflict(profile.id, info)
+      session = this.antigravitySession(profile, info, req.systemPrompt, allowed, platform, common.emit)
     }
 
     const entry: Entry = { info, session, seq: 0 }
@@ -217,6 +228,54 @@ export class AgentManager {
         clientVersion: this.deps.clientApp.split('/')[1] ?? '0.0.0'
       },
       { ...common, spawn: this.deps.spawnCli ?? spawnCli, log: (line) => log.debug(`[${info.id}] ${line}`) }
+    )
+  }
+
+  /**
+   * Antigravity reads its rules and MCP config from the profile's home when each run starts.
+   * Two sessions of one account with different rules would overwrite each other's, so a second
+   * one must match the first.
+   */
+  private checkAntigravityConflict(profileId: string, info: AgentSessionInfo): void {
+    const same = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join('\n') === [...b].sort().join('\n')
+    const other = this.list().find(
+      (s) =>
+        s.profileId === profileId &&
+        !ENDED.includes(s.status) &&
+        (s.permissionLevel !== info.permissionLevel || !same(s.mcpTools, info.mcpTools))
+    )
+    if (other) {
+      throw new AppError(
+        'not_allowed',
+        'Another Antigravity session of this account runs with a different permission level or MCP tools. Stop it first, or use the same settings.'
+      )
+    }
+  }
+
+  private antigravitySession(
+    profile: Profile,
+    info: AgentSessionInfo,
+    systemPrompt: string,
+    allowed: ReadonlySet<string>,
+    platform: NodeJS.Platform,
+    emit: (event: AgentEvent) => void
+  ): AgentSession {
+    const binary = (this.deps.resolveAntigravity ?? resolveAntigravityBinary)(this.deps.antigravityPath?.() ?? '')
+    const home = this.deps.profiles.configDir(profile.id)
+    const log = this.deps.log
+    return new AntigravitySession(
+      {
+        binary,
+        env: buildAgyEnv(this.deps.baseEnv ?? process.env, home, platform),
+        home,
+        cwd: info.cwd,
+        model: info.model,
+        permissionLevel: info.permissionLevel,
+        instructions: systemPrompt,
+        servers: this.deps.mcp.agentServers(allowed),
+        cliVersion: this.deps.cliVersion?.('antigravity') ?? ''
+      },
+      { spawn: this.deps.spawnPty ?? spawnPty, emit, log: (line) => log.debug(`[${info.id}] ${line}`) }
     )
   }
 

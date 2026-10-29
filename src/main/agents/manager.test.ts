@@ -26,6 +26,9 @@ function fakeMcp() {
   return {
     toolSpecs: vi.fn((allowed: ReadonlySet<string>) => [tool('search'), tool('delete')].filter((t) => allowed.has(t.qualifiedName))),
     callTool: vi.fn(async (name: string) => ({ content: `ran ${name}`, isError: false })),
+    agentServers: vi.fn((allowed: ReadonlySet<string>) =>
+      allowed.size ? [{ slug: 'docs', transport: 'stdio' as const, command: 'docs-mcp', args: [], env: {}, tools: ['search'] }] : []
+    ),
     claudeCodeConfig: vi.fn((allowed: ReadonlySet<string>) => ({
       servers: allowed.size ? { docs: { type: 'stdio' as const, command: 'docs-mcp', args: [], env: {} } } : {},
       disallowed: allowed.size ? ['mcp__docs__delete'] : []
@@ -52,8 +55,24 @@ function setup(
   const sessions: AgentSessionInfo[] = []
   const { query, calls } = fakeQuery(script as never)
   const mcp = fakeMcp()
+  const cliSpawns: Array<{ file: string; args: string[]; env: Record<string, string>; cwd: string }> = []
   const manager = new AgentManager({
     profiles,
+    resolveCodex: () => '/bin/codex',
+    resolveAntigravity: () => '/bin/agy',
+    // A Codex that never answers is enough to see how the manager starts it.
+    spawnCli: (opts) => {
+      cliSpawns.push(opts)
+      return {
+        transport: { write: () => undefined, onLine: () => undefined, onClose: () => undefined },
+        exited: new Promise(() => undefined),
+        stderrTail: () => '',
+        kill: () => undefined
+      }
+    },
+    spawnPty: () => {
+      throw new Error('no agy in this test')
+    },
     mcp: mcp as unknown as AgentManagerDeps['mcp'],
     createAdapter: () => {
       if (!adapter) throw new Error('no adapter in this test')
@@ -76,7 +95,7 @@ function setup(
       .filter((s) => s.id === id)
       .map((s) => s.status)
       .filter((status, i, all) => status !== all[i - 1])
-  return { manager, profile, profiles, events, calls, statuses, repo, mcp }
+  return { manager, profile, profiles, events, calls, statuses, repo, mcp, cliSpawns }
 }
 
 async function* idle(ctx: FakeContext) {
@@ -184,5 +203,24 @@ describe('AgentManager', () => {
       { type: 'tool_result', toolUseId: 'c2', content: expect.stringMatching(/not in this agent's MCP tools/), isError: true }
     ])
     manager.stop(info.id)
+  })
+
+  it('starts Codex accounts in the profile’s own CODEX_HOME', async () => {
+    const { manager, profiles, cliSpawns, repo } = setup(idle as never)
+    const codex = profiles.create({ kind: 'codex', name: 'ChatGPT', color: '#22c55e', auth: 'subscription' })
+    const info = await manager.start({ profileId: codex.id, mcpTools: ['mcp__docs__search'] })
+    expect(info).toMatchObject({ kind: 'codex', status: 'idle' })
+    expect(cliSpawns[0]).toEqual({ file: '/bin/codex', args: ['app-server'], env: { PATH: '/usr/bin', CODEX_HOME: profiles.configDir(codex.id) }, cwd: repo })
+    manager.stop(info.id)
+  })
+
+  it('keeps two Antigravity sessions of one account from using different rules', async () => {
+    const { manager, profiles } = setup(idle as never)
+    const agy = profiles.create({ kind: 'antigravity', name: 'Google', color: '#0ea5e9', auth: 'subscription' })
+    expect(() => profiles.create({ kind: 'antigravity', name: 'Google 2', color: '#0ea5e9', auth: 'subscription' })).toThrow(/already/)
+    const first = await manager.start({ profileId: agy.id, permissionLevel: 'files-auto' })
+    await expect(manager.start({ profileId: agy.id, permissionLevel: 'autonomous' })).rejects.toThrow(/different permission level/)
+    await expect(manager.start({ profileId: agy.id, permissionLevel: 'files-auto' })).resolves.toMatchObject({ kind: 'antigravity' })
+    manager.stop(first.id)
   })
 })
