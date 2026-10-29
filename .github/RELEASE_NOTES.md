@@ -8,7 +8,7 @@ Preview of Clyde, an agent-centric desktop IDE for Windows: several AI accounts 
 
 ### Portable version
 
-Prefer not to install? Download **Clyde-<version>-portable.exe** instead and run it from any folder, a USB stick included. It unpacks itself at each start, so it opens a few seconds slower than the installed version, and it keeps its data in a `Clyde-data` folder next to the exe. API keys are encrypted for your Windows account: on another computer or account, enter them again in *Accounts*.
+Prefer not to install? Download **Clyde-<version>-portable.exe** instead and run it from any folder, a USB stick included. It unpacks itself (about 600 MB) at each start, so it is slow to open (37 seconds on GitHub's Windows test machine; the installed version opens in a few seconds), and it keeps its data in a `Clyde-data` folder next to the exe. API keys are encrypted for your Windows account: on another computer or account, enter them again in *Accounts*.
 
 Install [Git for Windows](https://git-scm.com/download/win) to use the task board (each task gets its own branch and worktree).
 

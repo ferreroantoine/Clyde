@@ -10,7 +10,7 @@
 
 Get **Clyde-Setup-&lt;version&gt;.exe** from the [releases page](https://github.com/ferreroantoine/clyde/releases) and run it. It installs for your user without admin rights, adds Start menu and desktop shortcuts, and starts Clyde. The installer is not code-signed yet: if SmartScreen says "Windows protected your PC", click **More info**, then **Run anyway**.
 
-No install wanted? Take **Clyde-&lt;version&gt;-portable.exe** from the same page: one file that runs from any folder or a USB stick and keeps its data in `Clyde-data` next to it. It unpacks itself at each start, so it opens a few seconds slower. API keys are encrypted for your Windows account, so on another computer you enter them again.
+No install wanted? Take **Clyde-&lt;version&gt;-portable.exe** from the same page: one file that runs from any folder or a USB stick and keeps its data in `Clyde-data` next to it. It unpacks itself (about 600 MB) at each start, so it is slow to open: 37 seconds on GitHub's Windows test machine, against a few seconds for the installed version. API keys are encrypted for your Windows account, so on another computer you enter them again.
 
 Then open a folder and add an account in **Accounts**. The task board also needs [Git for Windows](https://git-scm.com/download/win).
 
