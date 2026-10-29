@@ -1,0 +1,76 @@
+# Builds the Windows installer on Windows, installs it, checks that the installed app works, and
+# publishes it. A tag v* publishes a GitHub release (a prerelease when the version has a "-").
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $version"
+            exit 1
+          fi
+
+      # Native modules ship prebuilt binaries, so no compiler is needed (see README).
+      - name: Install dependencies
+        run: |
+          npm ci --ignore-scripts
+          npx install-electron
+
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: Build the installer
+        run: |
+          npx electron-vite build
+          npx electron-builder --win --x64 --publish never
+
+      - name: Install it silently, then check the installed app
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem release\Clyde-Setup-*.exe | Select-Object -First 1
+          Start-Process -FilePath $installer.FullName -ArgumentList '/S' -Wait
+          $exe = Join-Path $env:LOCALAPPDATA 'Programs\clyde\Clyde.exe'
+          if (-not (Test-Path $exe)) { Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs') -Recurse -Filter Clyde.exe | Select-Object -First 1 -ExpandProperty FullName | Set-Variable exe }
+          Write-Host "Installed at $exe"
+          node scripts/smoke-packaged.mjs "$exe" release/smoke.png
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: clyde-windows
+          path: |
+            release/Clyde-Setup-*.exe
+            release/smoke.png
+          if-no-files-found: ignore
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Clyde ${{ github.ref_name }}
+          body_path: .github/RELEASE_NOTES.md
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: release/Clyde-Setup-*.exe
