@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "lint": "eslint .",
     "test": "vitest run",
-    "install:prebuilt": "npm install --ignore-scripts",
+    "postinstall": "install-electron",
+    "install:prebuilt": "npm install --ignore-scripts && install-electron",
     "drive": "node scripts/drive.mjs"
   },
   "dependencies": {
