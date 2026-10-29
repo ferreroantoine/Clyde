@@ -10,7 +10,7 @@ export function DiffView({ diff }: { diff: TaskFileDiff }) {
   const container = useRef<HTMLDivElement>(null)
   const editor = useRef<monaco.editor.IStandaloneDiffEditor | null>(null)
   const theme = useResolvedTheme((s) => s.theme)
-  const fontSize = useSettings((s) => s.settings.editorFontSize)
+  const fontSize = useSettings((s) => s.settings.editor.fontSize)
 
   useEffect(() => {
     if (!container.current) return

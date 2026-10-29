@@ -7,7 +7,7 @@ import { useWorkspace } from '@/stores/workspace'
 const shortName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? path
 
 export function NoWorkspace() {
-  const recent = useSettings((s) => s.settings.recentWorkspaces)
+  const recent = useSettings((s) => s.settings.general.recentWorkspaces)
   const pick = useWorkspace((s) => s.pick)
   const open = useWorkspace((s) => s.open)
 

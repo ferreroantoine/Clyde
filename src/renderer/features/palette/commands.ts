@@ -42,12 +42,12 @@ export function buildCommands(): Command[] {
     { id: 'view.terminal', title: 'Toggle terminal', group: 'View', shortcut: 'Ctrl+J', run: layout.toggleTerminal },
     { id: 'view.agent', title: 'Toggle agent panel', group: 'View', shortcut: 'Ctrl+Alt+B', run: layout.toggleAgentPanel },
     ...(['light', 'dark', 'system'] as const)
-      .filter((t) => t !== settings.settings.theme)
+      .filter((t) => t !== settings.settings.appearance.theme)
       .map((t): Command => ({
         id: `view.theme.${t}`,
         title: `Use the ${t === 'system' ? 'system' : t} theme`,
         group: 'View',
-        run: () => void settings.update('theme', t)
+        run: () => void settings.update('appearance.theme', t)
       })),
 
     { id: 'ws.open', title: 'Open folder…', group: 'Workspace', shortcut: 'Ctrl+O', run: () => void useWorkspace.getState().pick() },

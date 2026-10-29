@@ -97,14 +97,14 @@ if (!app.requestSingleInstanceLock()) {
         onData: (id, data) => broadcast('pty:data', { id, data }),
         onExit: (id, exitCode) => broadcast('pty:exit', { id, exitCode })
       },
-      () => settings.getAll().terminalShell
+      () => settings.getAll().terminal.shell
     )
     registerAppHandlers(settings)
     registerWorkspaceHandlers(workspace)
     registerTerminalHandlers(ptys, workspace)
 
     const clientApp = `atelier/${app.getVersion()}`
-    const claudeCodePath = () => settings.getAll().claudeCodePath
+    const claudeCodePath = () => settings.getAll().cli.claudeCodePath
     // Without the app database, profiles live in memory for this session, like settings.
     const profileDb = db ?? memoryDatabase()
     const profiles = new ProfilesService(profileDb, new SecretsService(profileDb, safeStorageCipher), {
@@ -171,7 +171,7 @@ if (!app.requestSingleInstanceLock()) {
     })
 
     // Reopen the last workspace before the window asks for it.
-    const [last] = settings.getAll().recentWorkspaces
+    const [last] = settings.getAll().general.recentWorkspaces
     if (last) await workspace.open(last).catch((err) => log.warn('could not reopen last workspace', err))
 
     createMainWindow()

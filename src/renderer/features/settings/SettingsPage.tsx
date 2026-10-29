@@ -17,7 +17,7 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   )
 }
 
-const THEMES: Array<{ value: Settings['theme']; label: string }> = [
+const THEMES: Array<{ value: Settings['appearance']['theme']; label: string }> = [
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
   { value: 'system', label: 'System' }
@@ -27,16 +27,16 @@ export function SettingsPage() {
   const settings = useSettings((s) => s.settings)
   const update = useSettings((s) => s.update)
 
-  const numberField = (key: 'editorFontSize' | 'terminalFontSize') => (
+  const numberField = (path: 'editor.fontSize' | 'terminal.fontSize', value: number) => (
     <Input
       type="number"
       min={9}
       max={32}
       className="h-8 w-20"
-      value={settings[key]}
+      value={value}
       onChange={(e) => {
         const value = Number(e.target.value)
-        if (Number.isInteger(value) && value >= 9 && value <= 32) void update(key, value)
+        if (Number.isInteger(value) && value >= 9 && value <= 32) void update(path, value)
       }}
     />
   )
@@ -54,10 +54,10 @@ export function SettingsPage() {
                 <button
                   key={t.value}
                   type="button"
-                  onClick={() => void update('theme', t.value)}
+                  onClick={() => void update('appearance.theme', t.value)}
                   className={cn(
                     'rounded-md px-3 py-1 text-xs transition-colors',
-                    settings.theme === t.value
+                    settings.appearance.theme === t.value
                       ? 'bg-background font-medium text-foreground shadow-xs'
                       : 'text-muted-foreground hover:text-foreground'
                   )}
@@ -67,22 +67,22 @@ export function SettingsPage() {
               ))}
             </div>
           </Row>
-          <Row label="Editor font size">{numberField('editorFontSize')}</Row>
-          <Row label="Terminal font size">{numberField('terminalFontSize')}</Row>
+          <Row label="Editor font size">{numberField('editor.fontSize', settings.editor.fontSize)}</Row>
+          <Row label="Terminal font size">{numberField('terminal.fontSize', settings.terminal.fontSize)}</Row>
           <Row label="Terminal shell" hint="Leave empty to use pwsh, falling back to Windows PowerShell.">
             <Input
               className="h-8 w-64 font-mono text-xs"
               placeholder="auto"
-              defaultValue={settings.terminalShell}
-              onBlur={(e) => void update('terminalShell', e.target.value.trim())}
+              defaultValue={settings.terminal.shell}
+              onBlur={(e) => void update('terminal.shell', e.target.value.trim())}
             />
           </Row>
           <Row label="Claude Code executable" hint="Leave empty to use the one bundled with Atelier.">
             <Input
               className="h-8 w-64 font-mono text-xs"
               placeholder="bundled"
-              defaultValue={settings.claudeCodePath}
-              onBlur={(e) => void update('claudeCodePath', e.target.value.trim())}
+              defaultValue={settings.cli.claudeCodePath}
+              onBlur={(e) => void update('cli.claudeCodePath', e.target.value.trim())}
             />
           </Row>
         </section>

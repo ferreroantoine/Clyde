@@ -14,5 +14,5 @@ export function registerAppHandlers(settings: SettingsService): void {
     distribution: DISTRIBUTION
   }))
   handle('settings:getAll', () => settings.getAll())
-  handle('settings:set', ({ key, value }) => settings.set(key, value))
+  handle('settings:set', ({ path, value }) => settings.set(path, value))
 }
