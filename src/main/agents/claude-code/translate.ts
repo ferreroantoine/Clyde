@@ -88,7 +88,7 @@ export class MessageTranslator {
       case 'system':
         if (msg.subtype === 'init') {
           return [
-            { type: 'init', model: msg.model, claudeCodeVersion: msg.claude_code_version, cwd: msg.cwd, tools: msg.tools }
+            { type: 'init', model: msg.model, cliVersion: msg.claude_code_version, cwd: msg.cwd, tools: msg.tools }
           ]
         }
         if (msg.subtype === 'permission_denied') {

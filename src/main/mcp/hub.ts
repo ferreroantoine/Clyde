@@ -13,6 +13,12 @@ import { clip, type ToolOutput } from '../agents/api/tools'
 import type { Logger } from '../logger'
 import type { McpServerRecord, McpStore } from './store'
 
+/** One MCP server as an agent's CLI should load it, limited to the agent's tools. */
+export type AgentMcpServer = { slug: string; tools: string[] } & (
+  | { transport: 'stdio'; command: string; args: string[]; env: Record<string, string> }
+  | { transport: 'http'; url: string; headers: Record<string, string> }
+)
+
 const CALL_TIMEOUT_MS = 10 * 60_000
 const CONNECT_TIMEOUT_MS = 30_000
 
@@ -259,6 +265,26 @@ export class McpHub {
       disallowed.push(...known.filter((name) => !allowed.has(name)))
     }
     return { servers, disallowed }
+  }
+
+  /**
+   * The servers an agent may use, with the raw names of its allowed tools, for CLIs that take
+   * their own MCP config (Codex, Antigravity). Each provider writes it in its own format.
+   */
+  agentServers(allowed: ReadonlySet<string>): AgentMcpServer[] {
+    const out: AgentMcpServer[] = []
+    for (const record of this.store.list()) {
+      if (!record.enabled) continue
+      const prefix = `mcp__${record.slug}__`
+      const tools = [...allowed].filter((name) => name.startsWith(prefix)).map((name) => name.slice(prefix.length))
+      if (tools.length === 0) continue
+      out.push(
+        record.transport === 'stdio'
+          ? { slug: record.slug, transport: 'stdio', command: record.command, args: record.args, env: record.env, tools }
+          : { slug: record.slug, transport: 'http', url: record.url, headers: record.headers, tools }
+      )
+    }
+    return out
   }
 
   private state(id: string): State {

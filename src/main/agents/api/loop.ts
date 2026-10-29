@@ -50,7 +50,7 @@ export class ApiSession {
     this.deps.emit({
       type: 'init',
       model: this.cfg.model,
-      claudeCodeVersion: '',
+      cliVersion: '',
       cwd: '',
       tools: this.cfg.tools.map((t) => t.name)
     })

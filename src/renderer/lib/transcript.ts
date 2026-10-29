@@ -45,7 +45,7 @@ export interface SessionView {
   info: AgentSessionInfo
   items: TranscriptItem[]
   lastSeq: number
-  claudeCodeVersion: string | null
+  cliVersion: string | null
   rateLimit: RateLimit | null
   totals: { costUsd: number; inputTokens: number; outputTokens: number }
 }
@@ -55,7 +55,7 @@ export function emptyView(info: AgentSessionInfo): SessionView {
     info,
     items: [],
     lastSeq: 0,
-    claudeCodeVersion: null,
+    cliVersion: null,
     rateLimit: null,
     totals: { costUsd: 0, inputTokens: 0, outputTokens: 0 }
   }
@@ -86,7 +86,12 @@ function reduce(view: SessionView, event: AgentEvent, seq: number): SessionView 
     case 'status':
       return { ...view, info: { ...view.info, status: event.status } }
     case 'init':
-      return { ...view, claudeCodeVersion: event.claudeCodeVersion, info: { ...view.info, model: event.model || view.info.model } }
+      // Sessions recorded before the rename carry `claudeCodeVersion`.
+      return {
+        ...view,
+        cliVersion: event.cliVersion ?? (event as { claudeCodeVersion?: string }).claudeCodeVersion ?? null,
+        info: { ...view.info, model: event.model || view.info.model }
+      }
     case 'user':
       return { ...view, items: [...items, { kind: 'user', id: event.id, text: event.text }] }
     case 'text_delta':
