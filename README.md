@@ -177,7 +177,7 @@ You sign in to a subscription account through Claude Code's own login, and the I
 
 `npm run smoke:packaged -- <app executable>` launches a packaged app and checks the parts that only break once packaged: the database, the terminal, search and the bundled Claude Code binary.
 
-Releases are built by `.github/workflows/release.yml` on a Windows runner: pushing a tag `v<version>` (matching `package.json`) builds the installer, installs it silently, runs the smoke test on the installed app and publishes a GitHub release with `.github/RELEASE_NOTES.md` as its text. Versions with a `-` (such as `0.1.0-beta.1`) are published as prereleases.
+`.github/workflows/release.yml` runs on every push, on a Windows runner: it builds the installer, installs it silently and runs the smoke test on the installed app. To publish, bump the version in `package.json` (and update `.github/RELEASE_NOTES.md`): the first push that carries a version without a release creates the tag `v<version>` and a GitHub release with the installer. Versions with a `-` (such as `0.1.0-beta.1`) are published as prereleases. Pushing a tag `v<version>` also publishes it.
 
 ## Known limits
 
