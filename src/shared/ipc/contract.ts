@@ -18,6 +18,8 @@ import { priceInputSchema, type PriceRow } from '../pricing'
 import type { Dashboard, SessionTranscript } from '../metrics'
 import type { AppNotice } from '../notices'
 import type { CliStatus } from '../cli'
+import type { VoiceProgress, VoiceStatus } from '../voice'
+import { WHISPER_MODEL_IDS } from '../settings'
 import {
   chatEditSchema,
   chatSendSchema,
@@ -131,6 +133,14 @@ export const requestSchemas = {
   'chat:live': z.object({ id: conversationIdSchema }),
   'chat:continueInProject': z.object({ id: conversationIdSchema }),
   'chat:attachment': z.object({ id: conversationIdSchema, attachmentId: z.uuid() }),
+  'voice:status': z.undefined(),
+  'voice:installBinary': z.undefined(),
+  'voice:downloadModel': z.object({ id: z.enum(WHISPER_MODEL_IDS) }),
+  'voice:deleteModel': z.object({ id: z.enum(WHISPER_MODEL_IDS) }),
+  'voice:cancel': z.object({ id: z.string().max(64) }),
+  /** A 16 kHz mono WAV, base64; ten minutes at most. */
+  'voice:transcribe': z.object({ audio: z.string().max(30_000_000) }),
+  'voice:micAccess': z.undefined(),
   'metrics:dashboard': z.object({ range: z.enum(['24h', '7d', '30d']).default('7d') }),
   'metrics:transcript': z.object({ sessionId: z.string().min(1).max(64) }),
   'limits:list': z.undefined(),
@@ -217,6 +227,14 @@ export interface InvokeResponses {
   'chat:continueInProject': AgentSessionInfo
   /** An attachment's bytes, base64, for image previews. */
   'chat:attachment': { mime: string; data: string }
+  'voice:status': VoiceStatus
+  'voice:installBinary': null
+  'voice:downloadModel': null
+  'voice:deleteModel': VoiceStatus
+  'voice:cancel': null
+  'voice:transcribe': { text: string; raw: string }
+  /** Whether the system lets Atelier use the microphone (asks on macOS). */
+  'voice:micAccess': boolean
   'metrics:dashboard': Dashboard
   'metrics:transcript': SessionTranscript
   'limits:list': ProfileLimits[]
@@ -244,6 +262,7 @@ export interface EventPayloads {
   'chat:changed': Conversation[]
   'chat:message': ChatMessage
   'chat:live': ChatLive
+  'voice:progress': VoiceProgress
   'limits:changed': ProfileLimits
   'limits:sessionChanged': { sessionId: string; usage: SessionLimitUsage[] }
   'limits:alert': LimitAlert

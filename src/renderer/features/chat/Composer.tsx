@@ -9,6 +9,7 @@ import { notify } from '@/stores/notifications'
 import type { PendingAttachment } from '@/stores/chat'
 import { enter } from '@/lib/motion'
 import { cn } from '@/lib/utils'
+import { DictationHint, MicButton } from '@/components/MicButton'
 
 const IMAGE_SET = new Set<string>(IMAGE_MIMES)
 
@@ -198,6 +199,7 @@ export function Composer({
                 e.target.value = ''
               }}
             />
+            <MicButton inputRef={area} setValue={setText} />
           </div>
           {busy ? (
             <Button type="button" size="icon-sm" variant="outline" aria-label={t('Stop the answer')} onClick={onStop} className="rounded-full">
@@ -217,6 +219,7 @@ export function Composer({
           )}
         </div>
       </div>
+      <DictationHint className="mt-1.5 text-center" />
       <p className="mt-1.5 text-center text-[11px] text-muted-foreground">{t('Enter to send, Shift+Enter for a new line.')}</p>
     </div>
   )

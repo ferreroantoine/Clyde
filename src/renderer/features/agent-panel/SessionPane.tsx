@@ -9,6 +9,7 @@ import type { SessionView, TranscriptItem } from '@/lib/transcript'
 import { ENDED_STATUSES, useAgents } from '@/stores/agents'
 import { profileById, useProfiles } from '@/stores/profiles'
 import { cn } from '@/lib/utils'
+import { MicButton } from '@/components/MicButton'
 import { RichText } from './RichText'
 import { SessionLimitLine } from '@/features/limits/LimitGauge'
 import { useLimits } from '@/stores/limits'
@@ -145,6 +146,7 @@ function Composer({ view }: { view: SessionView }) {
           aria-label={t('Message to the agent')}
           className="max-h-[200px] min-h-6 flex-1 resize-none bg-transparent py-0.5 text-[13px] outline-none placeholder:text-muted-foreground"
         />
+        <MicButton inputRef={area} setValue={setText} size="xs" />
         {busy ? (
           <Button type="button" size="icon-xs" variant="outline" aria-label={t('Interrupt the agent')} onClick={() => void interrupt()}>
             <Square className="fill-current" />

@@ -8,6 +8,7 @@ import {
   Info,
   KeyRound,
   Keyboard,
+  Mic,
   Palette,
   Plug,
   Settings2,
@@ -16,7 +17,10 @@ import {
 } from 'lucide-react'
 import { PERMISSION_LEVELS, PERMISSION_LEVEL_LABELS } from '@shared/agent'
 import { t, tk } from '@shared/i18n'
-import { ACCENTS, type SettingPath, type Settings, type SettingValue } from '@shared/settings'
+import { ACCENTS, VOICE_LANGUAGES, type SettingPath, type Settings, type SettingValue } from '@shared/settings'
+import type { ProfileKind } from '@shared/profiles'
+import { useProfiles } from '@/stores/profiles'
+import { HesitationsField, MicrophoneSelect, WhisperBinaryBlock, WhisperModelsBlock } from './VoiceBlocks'
 import type { SettingsSection } from '@/stores/layout'
 import { NumberField, PathField, Segmented, Select, TextField, Toggle } from './controls'
 import { AccountsPage } from '@/features/accounts/AccountsPage'
@@ -95,6 +99,30 @@ function ShellControl({ s, set }: Ctx) {
       />
       {!preset && <PathField kind="file" label={t('Shell program')} value={s.terminal.shell} onChange={(v) => set('terminal.shell', v)} />}
     </span>
+  )
+}
+
+const VOICE_LANGUAGE_LABELS: Record<(typeof VOICE_LANGUAGES)[number], string> = {
+  auto: tk('Detect automatically'),
+  fr: tk('French'),
+  en: tk('English'),
+  de: tk('German'),
+  es: tk('Spanish'),
+  it: tk('Italian'),
+  pt: tk('Portuguese'),
+  nl: tk('Dutch')
+}
+
+/** Accounts of the given kinds, by name. */
+function ApiProfileSelect({ value, onChange, kinds, empty }: { value: string; onChange: (v: string) => void; kinds: ProfileKind[]; empty?: string }) {
+  const profiles = useProfiles((s) => s.profiles).filter((p) => kinds.includes(p.kind) && p.usable)
+  return (
+    <Select
+      label={t('Account')}
+      value={value}
+      options={[{ value: '', label: empty ?? t('None') }, ...profiles.map((p) => ({ value: p.id, label: p.name }))]}
+      onChange={onChange}
+    />
   )
 }
 
@@ -487,6 +515,111 @@ export const SECTIONS: SectionSpec[] = [
         hint: t('Lines each terminal keeps.'),
         control: ({ s, set }) => (
           <NumberField label={t('Scrollback')} min={100} max={100_000} suffix={t('lines')} value={s.terminal.scrollback} onChange={(v) => set('terminal.scrollback', v)} />
+        )
+      }
+    ]
+  },
+  {
+    id: 'voice',
+    label: tk('Voice'),
+    icon: Mic,
+    resets: 'voice',
+    entries: () => [
+      {
+        id: 'voice.engine',
+        label: t('Transcription engine'),
+        hint: t('Local keeps the audio on this computer. With an API account, the audio is sent to OpenAI or Google.'),
+        keywords: 'dictation whisper speech microphone dictée',
+        control: ({ s, set }) => (
+          <Segmented
+            label={t('Transcription engine')}
+            value={s.voice.engine}
+            options={[
+              { value: 'local', label: t('Local (whisper.cpp)') },
+              { value: 'api', label: t('API account') }
+            ]}
+            onChange={(v) => set('voice.engine', v)}
+          />
+        )
+      },
+      {
+        id: 'voice.apiProfileId',
+        label: t('Account for transcription'),
+        hint: t('OpenAI uses gpt-4o-mini-transcribe; Gemini uses the account’s model. The audio of each dictation is sent to that provider.'),
+        control: ({ s, set }) => <ApiProfileSelect value={s.voice.apiProfileId} onChange={(v) => set('voice.apiProfileId', v)} kinds={['openai', 'gemini']} />
+      },
+      { id: 'voice.binary', label: t('whisper.cpp'), keywords: 'download binary vulkan gpu', block: () => <WhisperBinaryBlock /> },
+      { id: 'voice.model', label: t('Whisper model'), keywords: 'tiny base small medium large turbo download', block: () => <WhisperModelsBlock /> },
+      {
+        id: 'voice.language',
+        label: t('Language'),
+        hint: t('Automatic detection works, but naming the language is faster and more reliable.'),
+        control: ({ s, set }) => (
+          <Select
+            label={t('Language')}
+            value={s.voice.language}
+            options={VOICE_LANGUAGES.map((l) => ({ value: l, label: t(VOICE_LANGUAGE_LABELS[l]) }))}
+            onChange={(v) => set('voice.language', v)}
+          />
+        )
+      },
+      {
+        id: 'voice.mode',
+        label: t('Mode'),
+        hint: t('The shortcut is in Settings › Keyboard shortcuts ("Start or stop dictation").'),
+        control: ({ s, set }) => (
+          <Segmented
+            label={t('Mode')}
+            value={s.voice.mode}
+            options={[
+              { value: 'toggle', label: t('Click to start and stop') },
+              { value: 'hold', label: t('Hold the shortcut to talk') }
+            ]}
+            onChange={(v) => set('voice.mode', v)}
+          />
+        )
+      },
+      {
+        id: 'voice.microphone',
+        label: t('Microphone'),
+        control: ({ s, set }) => <MicrophoneSelect value={s.voice.microphone} onChange={(v) => set('voice.microphone', v)} />
+      },
+      {
+        id: 'voice.useGpu',
+        label: t('Use the GPU'),
+        hint: t('When whisper.cpp was built with GPU support (Vulkan, CUDA, Metal). The downloaded build runs on the CPU.'),
+        control: ({ s, set }) => <Toggle label={t('Use the GPU')} checked={s.voice.useGpu} onChange={(v) => set('voice.useGpu', v)} />
+      },
+      {
+        id: 'voice.whisperPath',
+        label: t('whisper-cli executable'),
+        hint: t('Leave empty to use the one Atelier downloads. Point to your own build to use Vulkan or CUDA.'),
+        control: ({ s, set }) => <PathField kind="file" label={t('whisper-cli executable')} value={s.voice.whisperPath} onChange={(v) => set('voice.whisperPath', v)} />
+      },
+      {
+        id: 'voice.removeHesitations',
+        label: t('Remove hesitations'),
+        hint: t('Deletes the words below (and the commas around them) by simple rules; the rest of the text is left alone.'),
+        keywords: 'euh hum filler',
+        control: ({ s, set }) => <Toggle label={t('Remove hesitations')} checked={s.voice.removeHesitations} onChange={(v) => set('voice.removeHesitations', v)} />
+      },
+      {
+        id: 'voice.hesitations',
+        label: t('Hesitation words'),
+        hint: t('Separated by commas. A word also matches when stretched ("euuuh").'),
+        control: ({ s, set }) => <HesitationsField key={s.voice.hesitations.join(',')} value={s.voice.hesitations} onChange={(v) => set('voice.hesitations', v)} />
+      },
+      {
+        id: 'voice.rewrite',
+        label: t('Rewrite cleanly'),
+        hint: t('A light model fixes punctuation, repetitions and false starts without changing the meaning. Slower; an Ollama account by default.'),
+        control: ({ s, set }) => <Toggle label={t('Rewrite cleanly')} checked={s.voice.rewrite} onChange={(v) => set('voice.rewrite', v)} />
+      },
+      {
+        id: 'voice.rewriteProfileId',
+        label: t('Account for rewriting'),
+        control: ({ s, set }) => (
+          <ApiProfileSelect value={s.voice.rewriteProfileId} onChange={(v) => set('voice.rewriteProfileId', v)} kinds={['ollama', 'openai', 'anthropic', 'gemini']} empty={t('First Ollama account')} />
         )
       }
     ]

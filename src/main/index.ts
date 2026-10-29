@@ -38,6 +38,8 @@ import { TaskService } from './agents/tasks'
 import { ChatStore } from './chat/store'
 import { ChatService } from './chat/service'
 import { registerChatHandlers } from './ipc/chat'
+import { VoiceService } from './voice/service'
+import { registerVoiceHandlers } from './ipc/voice'
 import { loadQuery, type QueryFn } from './agents/claude-code/provider'
 import { DISTRIBUTION } from './build-flags'
 
@@ -215,6 +217,17 @@ if (!app.requestSingleInstanceLock()) {
       onLive: (live) => broadcast('chat:live', live)
     })
     registerChatHandlers(chat)
+    registerVoiceHandlers(
+      new VoiceService({
+        root: join(app.getPath('userData'), 'whisper'),
+        settings: () => settings.getAll().voice,
+        profiles: () => profiles.list(),
+        apiKey: (id) => profiles.apiKey(id),
+        fetch,
+        createAdapter: (target) => createAdapter(target, fetch),
+        onProgress: (progress) => broadcast('voice:progress', progress)
+      })
+    )
 
     const metrics: MetricsService = new MetricsService(profileDb, {
       profiles: () => profiles.list(),

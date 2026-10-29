@@ -15,6 +15,13 @@ export const ACCENTS = ['indigo', 'blue', 'teal', 'green', 'orange', 'rose', 'vi
 export const ANIMATION_LEVELS = ['full', 'reduced', 'off'] as const
 export type AnimationLevel = (typeof ANIMATION_LEVELS)[number]
 const PERMISSION_LEVELS = ['validate-all', 'files-auto', 'autonomous'] as const
+export const VOICE_ENGINES = ['local', 'api'] as const
+/** Whisper models Atelier can download (ggml files of the whisper.cpp repository on Hugging Face). */
+export const WHISPER_MODEL_IDS = ['tiny', 'base', 'small', 'medium', 'large-v3-turbo-q5_0', 'large-v3-turbo'] as const
+export type WhisperModelId = (typeof WHISPER_MODEL_IDS)[number]
+export const VOICE_LANGUAGES = ['auto', 'fr', 'en', 'de', 'es', 'it', 'pt', 'nl'] as const
+/** Fillers removed from transcripts by default, French and English. */
+export const DEFAULT_HESITATIONS = ['euh', 'heu', 'hum', 'hmm', 'bah', 'beh', 'um', 'uh', 'erm', 'uhm'] as const
 
 const DEFAULT_MONO = "'JetBrains Mono Variable', 'Cascadia Code', Consolas, monospace"
 
@@ -83,6 +90,28 @@ export const settingsSchema = z.object({
   /** Keyboard shortcuts changed by the user: command id → combo ("" removes the shortcut). */
   shortcuts: section({
     bindings: z.record(z.string().max(64), z.string().max(64)).default({})
+  }),
+  /** Dictation. Audio stays on the machine with the local engine (whisper.cpp). */
+  voice: section({
+    engine: z.enum(VOICE_ENGINES).default('local'),
+    /** Whisper model for the local engine; downloaded from Settings › Voice. */
+    model: z.enum(WHISPER_MODEL_IDS).default('base'),
+    /** Spoken language, or "auto" to detect it. */
+    language: z.enum(VOICE_LANGUAGES).default('fr'),
+    /** An OpenAI or Gemini account, for the API engine. */
+    apiProfileId: z.string().max(64).default(''),
+    mode: z.enum(['toggle', 'hold']).default('toggle'),
+    /** Microphone device id; empty means the system default. */
+    microphone: z.string().max(512).default(''),
+    removeHesitations: z.boolean().default(true),
+    hesitations: z.array(z.string().trim().min(1).max(30)).max(100).default([...DEFAULT_HESITATIONS]),
+    /** Rewrite the transcript with a light model (punctuation, repetitions, false starts). */
+    rewrite: z.boolean().default(false),
+    /** The account that rewrites; empty means the first Ollama account. */
+    rewriteProfileId: z.string().max(64).default(''),
+    /** A whisper-cli built by the user (e.g. with Vulkan); empty means the one Atelier downloads. */
+    whisperPath: path.default(''),
+    useGpu: z.boolean().default(true)
   }),
   /** Executables of the coding CLIs. Empty means the bundled one (Claude Code) or the one on PATH. */
   cli: section({

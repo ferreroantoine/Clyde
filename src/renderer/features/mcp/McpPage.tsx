@@ -158,7 +158,7 @@ function ImportDialog({ preview, onClose }: { preview: McpImportPreview | null; 
                   <span className="block truncate font-mono text-[11px] text-muted-foreground">{s.summary}</span>
                   {s.envKeys.length > 0 && (
                     <span className="block text-[11px] text-muted-foreground">
-                      {t(s.transport === 'stdio' ? 'Environment: {keys} (stored encrypted)' : 'Headers: {keys} (stored encrypted)', { keys: s.envKeys.join(', ') })}
+                      {s.transport === 'stdio' ? t('Environment: {keys} (stored encrypted)', { keys: s.envKeys.join(', ') }) : t('Headers: {keys} (stored encrypted)', { keys: s.envKeys.join(', ') })}
                     </span>
                   )}
                 </span>
