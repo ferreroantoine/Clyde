@@ -9,6 +9,8 @@ import { useAgents } from '@/stores/agents'
 import { profileById, useProfiles } from '@/stores/profiles'
 import { ProfileBadge } from '@/components/ProfileBadge'
 import { STATUS_LABELS } from '@/features/agent-panel/SessionPane'
+import { MiniGauge } from '@/features/limits/LimitGauge'
+import { useLimits } from '@/stores/limits'
 
 function ActiveAgent() {
   const info = useAgents((s) => (s.activeId ? s.sessions[s.activeId]?.info : undefined))
@@ -27,6 +29,21 @@ function ActiveAgent() {
       <ProfileBadge profile={profile} />
       <span className="opacity-70">{STATUS_LABELS[info.status]}</span>
       {running > 1 && <span className="opacity-70">· {running - 1} more running</span>}
+      <ProfileGauges profileId={profile.id} color={profile.color} />
+    </span>
+  )
+}
+
+/** 5-hour and weekly use of the active agent's plan, in the account's color. */
+function ProfileGauges({ profileId, color }: { profileId: string; color: string }) {
+  const limits = useLimits((s) => s.profiles[profileId])
+  const enabled = useSettings((s) => s.settings.usage.statusBarGauges)
+  if (!enabled || !limits) return null
+  const [five, week] = limits.windows
+  return (
+    <span className="ml-1 flex items-center gap-2 border-l border-foreground/10 pl-2" aria-label="Plan usage">
+      {five && <MiniGauge state={five} color={color} short="5h" />}
+      {week && <MiniGauge state={week} color={color} short="Week" />}
     </span>
   )
 }

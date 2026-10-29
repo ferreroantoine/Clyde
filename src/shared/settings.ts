@@ -32,6 +32,16 @@ export const settingsSchema = z.object({
       shell: path.default('')
     })
     .default({ fontSize: 13, shell: '' }),
+  usage: z
+    .object({
+      /** How often subscription limits are read when no agent of the account is running. */
+      refreshMinutes: z.number().int().min(1).max(240).default(10),
+      statusBarGauges: z.boolean().default(true),
+      /** Percentages that raise an alert, per window. */
+      fiveHourAlerts: z.array(z.number().int().min(1).max(100)).max(5).default([75, 90]),
+      sevenDayAlerts: z.array(z.number().int().min(1).max(100)).max(5).default([85, 95])
+    })
+    .default({ refreshMinutes: 10, statusBarGauges: true, fiveHourAlerts: [75, 90], sevenDayAlerts: [85, 95] }),
   /** Executables of the coding CLIs. Empty means the bundled one (Claude Code) or the one on PATH. */
   cli: z
     .object({

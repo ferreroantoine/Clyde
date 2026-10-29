@@ -1,6 +1,9 @@
-import { useEffect, useMemo } from 'react'
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { CircleAlert, Gauge, History, RefreshCw, TriangleAlert } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { CircleAlert, CircleCheck, Gauge, History, LoaderCircle, RefreshCw, Stethoscope } from 'lucide-react'
+import type { Billing, LimitDiagnostic } from '@shared/limits'
+import { LimitGauge, SessionLimitLine, useNow } from '@/features/limits/LimitGauge'
+import { useLimits } from '@/stores/limits'
 import { daysIn, type Dashboard, type MetricsRange, type ProfileUsage, type SessionRecord } from '@shared/metrics'
 import { kindLabel } from '@shared/profiles'
 import { Button } from '@/components/ui/button'
@@ -19,9 +22,9 @@ const RANGES: Array<{ value: MetricsRange; label: string }> = [
   { value: '30d', label: '30 days' }
 ]
 
-/** "Local" for Ollama, "—" when nothing could be priced, "~" before estimates. */
-function cost(value: number, estimated: boolean, kind: ProfileUsage['kind'], unpriced = false): string {
-  if (kind === 'ollama') return 'Local'
+/** "Local" for local models, "—" when nothing could be priced, "~" before estimates. */
+function cost(value: number, estimated: boolean, billing: Billing, unpriced = false): string {
+  if (billing === 'local') return 'Local'
   if (estimated && value === 0 && unpriced) return '—'
   return `${estimated ? '~' : ''}${usd(value)}`
 }
@@ -29,55 +32,90 @@ function cost(value: number, estimated: boolean, kind: ProfileUsage['kind'], unp
 const shortDate = (ms: number) =>
   new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
-function RateLimit({ limit }: { limit: NonNullable<ProfileUsage['rateLimit']> }) {
-  const pct = limit.utilization !== null ? Math.round(limit.utilization * 100) : null
-  const label =
-    limit.status === 'rejected' ? 'Limit reached' : limit.status === 'allowed_warning' ? 'Close to the limit' : 'Within limits'
+/** Every source of an account's limits, raw, so a missing value can be explained. */
+function DiagnosticDialog({ profileId, onClose }: { profileId: string | null; onClose: () => void }) {
+  const diagnose = useLimits((s) => s.diagnose)
+  const [results, setResults] = useState<LimitDiagnostic[] | null>(null)
+  useEffect(() => {
+    if (!profileId) return
+    let live = true
+    void diagnose(profileId).then((r) => live && setResults(r ?? []))
+    return () => {
+      live = false
+      setResults(null)
+    }
+  }, [profileId, diagnose])
   return (
-    <div className="space-y-1" aria-label={`Usage limit: ${label}`}>
-      <div className="flex items-center justify-between text-[11px]">
-        <span className="flex items-center gap-1">
-          {limit.status !== 'allowed' && (
-            <TriangleAlert className={cn('size-3', limit.status === 'rejected' ? 'text-destructive' : 'text-warning')} />
-          )}
-          {label}
-          {limit.limitType && <span className="text-muted-foreground">· {limit.limitType.replace(/_/g, ' ')}</span>}
-        </span>
-        {pct !== null && <span className="tabular-nums">{pct}%</span>}
+    <Dialog open={!!profileId} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Usage limits diagnostic</DialogTitle>
+          <DialogDescription>What each source answered for this account. Keys and tokens are masked.</DialogDescription>
+        </DialogHeader>
+        {results === null ? (
+          <p className="flex items-center gap-2 py-6 text-xs text-muted-foreground">
+            <LoaderCircle className="size-4 animate-spin" /> Asking the CLI… (it starts without sending a prompt)
+          </p>
+        ) : (
+          <div className="max-h-[60vh] space-y-3 overflow-y-auto">
+            {results.map((r) => (
+              <section key={r.source} className="space-y-1">
+                <h3 className="flex items-center gap-1.5 text-xs font-medium">
+                  {r.ok ? <CircleCheck className="size-3.5 text-success" /> : <CircleAlert className="size-3.5 text-destructive" />}
+                  {r.source}
+                </h3>
+                <pre className="max-h-64 overflow-auto rounded-lg bg-muted p-2 font-mono text-[11px] whitespace-pre-wrap">{r.output}</pre>
+              </section>
+            ))}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function PlanLimits({ usage, onDiagnose }: { usage: ProfileUsage; onDiagnose: () => void }) {
+  const limits = useLimits((s) => s.profiles[usage.profileId])
+  const refresh = useLimits((s) => s.refresh)
+  const refreshing = useLimits((s) => s.refreshing)
+  const windows = limits?.windows ?? []
+  return (
+    <div className="space-y-2.5" aria-label="Plan limits">
+      {windows.length === 0 ? (
+        <p className="text-[11px] text-muted-foreground">No reading yet.</p>
+      ) : (
+        windows.map((w) => <LimitGauge key={w.window} state={w} color={usage.color} />)
+      )}
+      <div className="flex items-center gap-1">
+        <Button size="xs" variant="ghost" disabled={refreshing} onClick={() => void refresh(usage.profileId)}>
+          <RefreshCw className={refreshing ? 'animate-spin' : undefined} /> Read now
+        </Button>
+        <Button size="xs" variant="ghost" onClick={onDiagnose}>
+          <Stethoscope /> Diagnostic
+        </Button>
       </div>
-      {pct !== null && (
-        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-          <div
-            className={cn(
-              'h-full rounded-full',
-              limit.status === 'rejected' ? 'bg-destructive' : limit.status === 'allowed_warning' ? 'bg-warning' : 'bg-success'
-            )}
-            style={{ width: `${Math.min(100, pct)}%` }}
-          />
-        </div>
-      )}
-      {limit.resetsAt && (
-        <p className="text-[11px] text-muted-foreground">Resets {new Date(limit.resetsAt * 1000).toLocaleString()}</p>
-      )}
     </div>
   )
 }
 
-function ProfileCard({ usage }: { usage: ProfileUsage }) {
+function ProfileCard({ usage, onDiagnose }: { usage: ProfileUsage; onDiagnose: () => void }) {
   return (
     <article className="relative space-y-3 overflow-hidden rounded-xl border bg-card p-4 pl-5 shadow-xs" aria-label={`Usage of ${usage.name}`}>
       <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: usage.color }} />
       <header className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="truncate text-sm font-semibold">{usage.name}</h3>
-          <p className="text-[11px] text-muted-foreground">{kindLabel(usage.kind)}</p>
+          <p className="text-[11px] text-muted-foreground">
+            {kindLabel(usage.kind)}
+            {usage.billing === 'subscription' && ' · subscription'}
+          </p>
         </div>
         <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
           <StatusDot status={usage.activeSessions ? 'running' : 'stopped'} />
           {usage.activeSessions} active
         </span>
       </header>
-      <dl className="grid grid-cols-3 gap-2">
+      <dl className={cn('grid gap-2', usage.billing === 'subscription' ? 'grid-cols-2' : 'grid-cols-3')}>
         <div className="min-w-0">
           <dt className="text-[11px] text-muted-foreground">Sessions</dt>
           <dd className="text-lg font-semibold tabular-nums">{usage.sessions}</dd>
@@ -89,12 +127,12 @@ function ProfileCard({ usage }: { usage: ProfileUsage }) {
             {tokens(usage.inputTokens)} in · {tokens(usage.outputTokens)} out
           </dd>
         </div>
-        <div className="min-w-0">
-          <dt className="text-[11px] text-muted-foreground">{usage.costEstimated && usage.kind !== 'ollama' ? 'Est. cost' : 'Cost'}</dt>
-          <dd className="text-lg font-semibold tabular-nums">
-            {cost(usage.costUsd, usage.costEstimated, usage.kind, usage.unpricedTurns > 0)}
-          </dd>
-        </div>
+        {usage.billing !== 'subscription' && (
+          <div className="min-w-0">
+            <dt className="text-[11px] text-muted-foreground">{usage.costEstimated && usage.billing === 'api' ? 'Est. cost' : 'Cost'}</dt>
+            <dd className="text-lg font-semibold tabular-nums">{cost(usage.costUsd, usage.costEstimated, usage.billing, usage.unpricedTurns > 0)}</dd>
+          </div>
+        )}
       </dl>
       {usage.unpricedTurns > 0 && (
         <p className="flex items-start gap-1 text-[11px] text-muted-foreground">
@@ -102,8 +140,74 @@ function ProfileCard({ usage }: { usage: ProfileUsage }) {
           {usage.unpricedTurns} turn{usage.unpricedTurns > 1 ? 's' : ''} without a known price. Add the model in Settings › Prices.
         </p>
       )}
-      {usage.rateLimit && <RateLimit limit={usage.rateLimit} />}
+      {usage.billing === 'subscription' && <PlanLimits usage={usage} onDiagnose={onDiagnose} />}
     </article>
+  )
+}
+
+/** The 5-hour and weekly use of one plan over the last 7 days. */
+function LimitHistoryChart({ usage }: { usage: ProfileUsage }) {
+  const history = useLimits((s) => s.history[usage.profileId])
+  const loadHistory = useLimits((s) => s.loadHistory)
+  useEffect(() => {
+    void loadHistory(usage.profileId)
+  }, [usage.profileId, loadHistory])
+  const data = useMemo(() => {
+    const points = new Map<number, Record<string, number>>()
+    for (const serie of history?.series ?? []) {
+      for (const p of serie.points) points.set(p.at, { ...(points.get(p.at) ?? { at: p.at }), [serie.window]: p.usedPct })
+    }
+    return [...points.values()].sort((a, b) => (a['at'] as number) - (b['at'] as number))
+  }, [history])
+  const now = useNow(60_000)
+  // One tick per local midnight, so each day shows once.
+  const dayTicks = useMemo(() => {
+    const ticks: number[] = []
+    const d = new Date(now)
+    d.setHours(0, 0, 0, 0)
+    for (let i = 0; i < 7; i++) ticks.unshift(d.getTime() - i * 86_400_000)
+    return ticks
+  }, [now])
+  return (
+    <figure className="rounded-xl border bg-card p-4 shadow-xs">
+      <figcaption className="mb-3 flex items-center gap-1.5 text-xs font-medium">
+        <ProfileDot color={usage.color} /> {usage.name} · plan use, last 7 days
+      </figcaption>
+      {data.length === 0 ? (
+        <p className="py-10 text-center text-xs text-muted-foreground">No reading in the last 7 days.</p>
+      ) : (
+        <div className="h-48" role="img" aria-label={`5-hour and weekly use of ${usage.name} over 7 days`}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+              <CartesianGrid vertical={false} stroke="var(--border)" />
+              <XAxis
+                dataKey="at"
+                type="number"
+                scale="time"
+                domain={[now - 7 * 86_400_000, now]}
+                ticks={dayTicks}
+                tickFormatter={(ms: number) => new Date(ms).toLocaleDateString([], { weekday: 'short' })}
+                tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
+                axisLine={{ stroke: 'var(--border)' }}
+                tickLine={false}
+              />
+              <YAxis domain={[0, 100]} tickFormatter={(n: number) => `${n}%`} tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} width={40} />
+              <Tooltip
+                labelFormatter={(ms) => new Date(Number(ms)).toLocaleString()}
+                formatter={(value, name) => [`${value}%`, name === 'five_hour' ? '5-hour window' : 'Weekly']}
+                contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--popover-foreground)' }}
+              />
+              <Legend
+                formatter={(id) => <span style={{ color: 'var(--muted-foreground)', fontSize: 11 }}>{id === 'five_hour' ? '5-hour window' : 'Weekly'}</span>}
+                iconType="plainline"
+              />
+              <Line dataKey="five_hour" stroke={usage.color} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+              <Line dataKey="seven_day" stroke={usage.color} strokeWidth={2} strokeDasharray="5 4" dot={false} connectNulls isAnimationActive={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </figure>
   )
 }
 
@@ -119,7 +223,8 @@ function DailyChart({
   title: string
   format: (n: number) => string
 }) {
-  const series = dashboard.profiles.filter((p) => p.sessions > 0)
+  // Plans have no per-token price: the cost chart only shows API accounts.
+  const series = dashboard.profiles.filter((p) => p.sessions > 0 && (metric === 'tokens' || p.billing === 'api'))
   const data = useMemo(() => {
     const rows = daysIn(dashboard.range, dashboard.generatedAt).map((day) => ({ day, ...Object.fromEntries(series.map((p) => [p.profileId, 0])) }) as Record<string, number | string>)
     for (const d of dashboard.daily) {
@@ -222,7 +327,9 @@ function Transcript() {
         </DialogHeader>
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1" aria-label="Transcript">
           {view?.items.length === 0 && <p className="text-xs text-muted-foreground">No message in this session.</p>}
-          {view?.items.map((item) => <Item key={itemKey(item)} item={item} cwd={view.info.cwd} ended />)}
+          {view?.items.map((item) => (
+            <Item key={itemKey(item)} item={item} cwd={view.info.cwd} ended subscription={transcript?.session.billing === 'subscription'} />
+          ))}
         </div>
       </DialogContent>
     </Dialog>
@@ -244,7 +351,7 @@ function SessionsTable({ sessions }: { sessions: SessionRecord[] }) {
             <th className="px-2 py-2 font-medium">Model</th>
             <th className="px-2 py-2 text-right font-medium">Turns</th>
             <th className="px-2 py-2 text-right font-medium">Tokens</th>
-            <th className="px-2 py-2 text-right font-medium">Cost</th>
+            <th className="px-2 py-2 text-right font-medium">Use</th>
             <th className="px-4 py-2 font-medium">Status</th>
           </tr>
         </thead>
@@ -274,7 +381,9 @@ function SessionsTable({ sessions }: { sessions: SessionRecord[] }) {
                 <td className="px-2 py-2 font-mono text-[11px] whitespace-nowrap">{s.model || 'default'}</td>
                 <td className="px-2 py-2 text-right tabular-nums">{s.turns}</td>
                 <td className="px-2 py-2 text-right whitespace-nowrap tabular-nums">{tokens(s.inputTokens + s.outputTokens)}</td>
-                <td className="px-2 py-2 text-right whitespace-nowrap tabular-nums">{cost(s.costUsd, s.costEstimated, s.kind, true)}</td>
+                <td className="px-2 py-2 text-right whitespace-nowrap tabular-nums">
+                  {s.billing === 'subscription' ? <SessionLimitLine usage={s.limits} className="justify-end" /> : cost(s.costUsd, s.costEstimated, s.billing, true)}
+                </td>
                 <td className="px-4 py-2 whitespace-nowrap">
                   <span className="flex items-center gap-1.5">
                     <StatusDot status={s.status} />
@@ -295,6 +404,7 @@ export function SupervisionPage() {
   const range = useSupervision((s) => s.range)
   const loading = useSupervision((s) => s.loading)
   const load = useSupervision((s) => s.load)
+  const [diagnosing, setDiagnosing] = useState<string | null>(null)
 
   useEffect(() => {
     void load()
@@ -325,8 +435,8 @@ export function SupervisionPage() {
           <div>
             <h1 className="text-lg font-semibold tracking-tight">Supervision</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Sessions, tokens, cost and usage limits per account. Claude Code reports its cost; API costs are estimates from
-              Settings › Prices.
+              Sessions and tokens per account; plan limits for subscriptions, cost for API accounts (estimates from Settings ›
+              Prices). Each value says whether the CLI reported it or Atelier computed it.
             </p>
           </div>
           <div className="flex items-center gap-2" role="group" aria-label="Period">
@@ -359,15 +469,24 @@ export function SupervisionPage() {
         ) : (
           dashboard && (
             <>
-              <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-label="Accounts">
+              <section className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-3" aria-label="Accounts">
                 {dashboard.profiles.map((p) => (
-                  <ProfileCard key={p.profileId} usage={p} />
+                  <ProfileCard key={p.profileId} usage={p} onDiagnose={() => setDiagnosing(p.profileId)} />
                 ))}
               </section>
+              {dashboard.profiles.some((p) => p.billing === 'subscription') && (
+                <section className="grid grid-cols-[repeat(auto-fill,minmax(22rem,1fr))] gap-3" aria-label="Plan limits history">
+                  {dashboard.profiles
+                    .filter((p) => p.billing === 'subscription')
+                    .map((p) => (
+                      <LimitHistoryChart key={p.profileId} usage={p} />
+                    ))}
+                </section>
+              )}
               {hasUsage ? (
                 <section className="grid gap-3 lg:grid-cols-2" aria-label="Charts">
                   <DailyChart dashboard={dashboard} metric="tokens" title="Tokens per day" format={tokens} />
-                  <DailyChart dashboard={dashboard} metric="cost" title="Cost per day (USD)" format={(n) => usd(n)} />
+                  <DailyChart dashboard={dashboard} metric="cost" title="API cost per day (USD)" format={(n) => usd(n)} />
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed py-10">
@@ -386,6 +505,7 @@ export function SupervisionPage() {
         )}
       </div>
       <Transcript />
+      <DiagnosticDialog profileId={diagnosing} onClose={() => setDiagnosing(null)} />
     </div>
   )
 }

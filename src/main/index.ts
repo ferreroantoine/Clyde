@@ -25,6 +25,8 @@ import { registerMcpHandlers } from './ipc/mcp'
 import { registerTaskHandlers } from './ipc/tasks'
 import { registerMetricsHandlers } from './ipc/metrics'
 import { MetricsService } from './metrics/metrics'
+import { setupLimits } from './limits/setup'
+import { registerLimitsHandlers } from './ipc/limits'
 import { AgentDefinitionsService } from './services/agent-definitions'
 import { WorktreeService } from './services/worktrees'
 import { TaskService } from './agents/tasks'
@@ -115,10 +117,16 @@ if (!app.requestSingleInstanceLock()) {
     void cli.status().catch((err) => log.warn('could not detect the coding CLIs', err))
     // Without the app database, profiles live in memory for this session, like settings.
     const profileDb = db ?? memoryDatabase()
+    // Declared before the services whose callbacks use it; assigned once they exist.
+    // eslint-disable-next-line prefer-const -- assigned below, after the agent manager it needs
+    let limitsSetup: ReturnType<typeof setupLimits>
     const profiles = new ProfilesService(profileDb, new SecretsService(profileDb, safeStorageCipher), {
       dataRoot: app.getPath('userData'),
       distribution: DISTRIBUTION,
-      onChanged: (list) => broadcast('profiles:changed', list)
+      onChanged: (list) => {
+        broadcast('profiles:changed', list)
+        limitsSetup.syncProfiles(list)
+      }
     })
     const mcp = new McpHub(new McpStore(profileDb, safeStorageCipher), {
       onChanged: (list) => broadcast('mcp:changed', list),
@@ -141,7 +149,9 @@ if (!app.requestSingleInstanceLock()) {
         broadcast('agent:event', envelope)
         metrics.onEvent(envelope)
         tasks.onAgentEvent(envelope)
+        limitsSetup.onAgentEvent(envelope)
       },
+      onLimits: (profileId, sessionId, readings) => limitsSetup.ingest(profileId, readings, sessionId),
       onSession: (info) => {
         broadcast('agent:session', info)
         metrics.onSession(info)
@@ -149,6 +159,15 @@ if (!app.requestSingleInstanceLock()) {
       },
       clientApp,
       log: createLogger('agents')
+    })
+    limitsSetup = setupLimits({
+      db: profileDb,
+      profiles,
+      sessions: () => agents.list(),
+      settings: () => settings.getAll(),
+      query,
+      clientApp,
+      log: createLogger('limits')
     })
     registerProfileHandlers({ profiles, ptys, claudeCodePath, codexPath, antigravityPath, cli, query, clientApp, fetch })
     registerAgentHandlers(agents)
@@ -168,13 +187,18 @@ if (!app.requestSingleInstanceLock()) {
 
     const metrics: MetricsService = new MetricsService(profileDb, {
       profiles: () => profiles.list(),
-      activeSessions: () => agents.list()
+      activeSessions: () => agents.list(),
+      sessionLimits: (id) => limitsSetup.limits.sessionUsage(id)
     })
     metrics.recover()
     registerMetricsHandlers(metrics)
+    registerLimitsHandlers({ limits: limitsSetup.limits, poller: limitsSetup.poller, diagnose: limitsSetup.diagnose })
+    limitsSetup.syncProfiles(profiles.list())
+    limitsSetup.poller.start()
 
     app.on('will-quit', () => {
       agents.stopAll()
+      void limitsSetup.dispose()
       void mcp.dispose()
       ptys.killAll()
       void workspace.dispose()

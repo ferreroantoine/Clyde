@@ -3,7 +3,7 @@ import type { AgentMcpServer } from '../../mcp/hub'
 import { withoutAccountVars } from '../claude-code/runtime'
 import type { SpawnCli } from '../cli/process'
 import { RpcConnection, RpcRequestError } from './rpc'
-import type { GetAccountResponse, InitializeResponse, ModelListResponse, RateLimitSnapshot } from './protocol'
+import type { GetAccountRateLimitsResponse, GetAccountResponse, InitializeResponse, ModelListResponse } from './protocol'
 import { versionFromUserAgent } from './translate'
 
 /** Environment for a Codex process: the app's, minus every account variable, plus the profile's CODEX_HOME. */
@@ -32,7 +32,7 @@ export interface CodexProbe {
   version: string
   account: GetAccountResponse
   models: ModelOption[]
-  rateLimits: RateLimitSnapshot | null
+  rateLimits: GetAccountRateLimitsResponse | null
 }
 
 /** Starts `codex app-server` for one profile, reads account and models, and stops it. No model call. */
@@ -52,12 +52,9 @@ export async function probeCodex(
     rpc.notify('initialized')
     const account = await rpc.request<GetAccountResponse>('account/read', {})
     const models = await rpc.request<ModelListResponse>('model/list', {})
-    let rateLimits: RateLimitSnapshot | null = null
+    let rateLimits: GetAccountRateLimitsResponse | null = null
     if (account.account) {
-      rateLimits = await rpc
-        .request<{ rateLimits: RateLimitSnapshot }>('account/rateLimits/read')
-        .then((r) => r.rateLimits)
-        .catch(() => null)
+      rateLimits = await rpc.request<GetAccountRateLimitsResponse>('account/rateLimits/read').catch(() => null)
     }
     return {
       version: versionFromUserAgent(init.userAgent),

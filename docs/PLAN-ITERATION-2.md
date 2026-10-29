@@ -101,3 +101,10 @@ Je travaille dans un conteneur Linux sans compte Claude Pro/Max, ChatGPT ou Goog
 - Antigravity : `agy -p` en pty, un processus par message, `--conversation` pour enchaîner. **Non vérifié avec `agy --help`** (installation refusée dans mon conteneur) : flags tirés de la doc officielle. Identifiants dans le trousseau Windows → un seul compte Antigravity. Pas d'approbation possible en headless → niveaux traduits en règles (`permissions` dans le `settings.json` du HOME du profil).
 - Gemini API : endpoint OpenAI-compatible ; `extra_content` des appels d'outils (signatures de pensée Gemini 3) conservé et renvoyé.
 - Coût : Codex et Antigravity comptés à 0 $ (abonnement) en attendant le chantier 1.
+
+### Chantier 1 — fait
+- Claude : trois sources, la plus récente gagne. `usage_EXPERIMENTAL…()` du SDK après chaque tour (5 h, hebdo, Opus/Sonnet, limites par modèle) ; pont status line (script PowerShell sous Windows, sh ailleurs ; une status line existante est chaînée) ; `rate_limit_event` sert seulement de déclencheur (son échelle d'`utilization` n'est pas documentée).
+- Codex : `account/rateLimits/read` après chaque tour et sur `account/rateLimits/updated` ; fenêtre identifiée par sa durée (300 min = 5 h, 10 080 min = hebdo).
+- Antigravity : rien de lisible de façon fiable → « indisponible », bouton Diagnostic qui affiche la sortie brute de `agy -p "/usage"` pour la prochaine itération.
+- Attribution : à chaque relevé, la hausse depuis le relevé précédent va aux sessions ayant tourné entre-temps (une seule → officiel ; plusieurs → prorata tokens, estimé). Une utilisation hors de l'IDE pendant ce temps (claude.ai dans le navigateur) est attribuée aux sessions : limite connue.
+- Relevés en arrière-plan toutes les 10 min (réglable) pour les comptes sans agent actif, sans envoyer de prompt.

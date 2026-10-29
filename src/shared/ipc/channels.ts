@@ -51,6 +51,11 @@ export const INVOKE_CHANNELS = [
   'tasks:delete',
   'metrics:dashboard',
   'metrics:transcript',
+  'limits:list',
+  'limits:session',
+  'limits:history',
+  'limits:refresh',
+  'limits:diagnose',
   'pricing:list',
   'pricing:save',
   'pricing:delete',
@@ -67,7 +72,10 @@ export const EVENT_CHANNELS = [
   'agent:event',
   'mcp:changed',
   'agents:changed',
-  'tasks:changed'
+  'tasks:changed',
+  'limits:changed',
+  'limits:sessionChanged',
+  'limits:alert'
 ] as const
 
 export type InvokeChannel = (typeof INVOKE_CHANNELS)[number]

@@ -18,6 +18,7 @@ import { priceInputSchema, type PriceRow } from '../pricing'
 import type { Dashboard, SessionTranscript } from '../metrics'
 import type { AppNotice } from '../notices'
 import type { CliStatus } from '../cli'
+import type { LimitAlert, LimitDiagnostic, LimitHistory, ProfileLimits, SessionLimitUsage } from '../limits'
 import { mcpIdSchema, mcpServerInputSchema, mcpServerUpdateSchema, type McpImportPreview, type McpServer } from '../mcp'
 import {
   agentStartSchema,
@@ -97,6 +98,11 @@ export const requestSchemas = {
   'tasks:delete': z.object({ id: taskIdSchema }),
   'metrics:dashboard': z.object({ range: z.enum(['24h', '7d', '30d']).default('7d') }),
   'metrics:transcript': z.object({ sessionId: z.string().min(1).max(64) }),
+  'limits:list': z.undefined(),
+  'limits:session': z.object({ sessionId: z.string().min(1).max(64) }),
+  'limits:history': z.object({ profileId: profileIdSchema, days: z.number().int().min(1).max(30).default(7) }),
+  'limits:refresh': z.object({ profileId: profileIdSchema.optional() }),
+  'limits:diagnose': z.object({ profileId: profileIdSchema }),
   'pricing:list': z.undefined(),
   'pricing:save': priceInputSchema.extend({ id: z.string().min(1).max(64).optional() }),
   'pricing:delete': z.object({ id: z.string().min(1).max(64) }),
@@ -154,6 +160,11 @@ export interface InvokeResponses {
   'tasks:delete': null
   'metrics:dashboard': Dashboard
   'metrics:transcript': SessionTranscript
+  'limits:list': ProfileLimits[]
+  'limits:session': SessionLimitUsage[]
+  'limits:history': LimitHistory
+  'limits:refresh': ProfileLimits[]
+  'limits:diagnose': LimitDiagnostic[]
   'pricing:list': PriceRow[]
   'pricing:save': PriceRow[]
   'pricing:delete': PriceRow[]
@@ -171,6 +182,9 @@ export interface EventPayloads {
   'mcp:changed': McpServer[]
   'agents:changed': AgentDefinition[]
   'tasks:changed': Task[]
+  'limits:changed': ProfileLimits
+  'limits:sessionChanged': { sessionId: string; usage: SessionLimitUsage[] }
+  'limits:alert': LimitAlert
 }
 
 export type InvokeRequest<C extends InvokeChannel> = z.input<(typeof requestSchemas)[C]>

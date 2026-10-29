@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { SessionLimitLine } from '@/features/limits/LimitGauge'
+import { useLimits } from '@/stores/limits'
+import { useEffect, useState } from 'react'
 import {
   Bot,
   CircleAlert,
@@ -28,7 +30,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/EmptyState'
 import { ProfileBadge, ProfileDot } from '@/components/ProfileBadge'
-import { StatusDot } from '@/features/agent-panel/SessionPane'
+import { StatusDot, usd } from '@/features/agent-panel/SessionPane'
 import { useAgents } from '@/stores/agents'
 import { useBoard } from '@/stores/board'
 import { useLayout } from '@/stores/layout'
@@ -44,6 +46,17 @@ function relativeTime(ms: number): string {
   if (s < 3600) return `${Math.round(s / 60)} min ago`
   if (s < 86400) return `${Math.round(s / 3600)} h ago`
   return new Date(ms).toLocaleDateString()
+}
+
+/** What the task's agent session used: plan points on a subscription, cost on an API account. */
+function TaskUse({ sessionId, subscription, costUsd }: { sessionId: string; subscription: boolean; costUsd: number }) {
+  const usage = useLimits((s) => s.sessions[sessionId])
+  const load = useLimits((s) => s.loadSession)
+  useEffect(() => {
+    if (subscription) void load(sessionId)
+  }, [subscription, sessionId, load])
+  if (!subscription) return costUsd > 0 ? <p className="text-[11px] text-muted-foreground tabular-nums">{usd(costUsd)}</p> : null
+  return <SessionLimitLine usage={usage ?? []} className="text-[11px] text-muted-foreground" />
 }
 
 function TaskCard({ task }: { task: Task }) {
@@ -107,6 +120,7 @@ function TaskCard({ task }: { task: Task }) {
         </span>
         <span>· {relativeTime(task.updatedAt)}</span>
       </div>
+      {task.sessionId && <TaskUse sessionId={task.sessionId} subscription={profile?.auth === 'subscription'} costUsd={session?.totals.costUsd ?? 0} />}
       {task.note && (
         <p className="flex items-start gap-1 text-[11px] text-warning">
           <CircleAlert className="mt-px size-3 shrink-0" />

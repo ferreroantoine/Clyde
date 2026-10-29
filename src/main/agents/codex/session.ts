@@ -7,6 +7,7 @@ import type {
   AskForApproval,
   CommandApprovalParams,
   FileChangeApprovalParams,
+  GetAccountRateLimitsResponse,
   InitializeResponse,
   Notifications,
   PermissionsApprovalParams,
@@ -16,6 +17,7 @@ import type {
   TurnStartResponse
 } from './protocol'
 import { CodexTranslator, shellToolName, versionFromUserAgent } from './translate'
+import { parseCodexRateLimits, type LimitReading } from '@shared/limits'
 
 /** Notifications Atelier never reads; opting out keeps the pipe quiet. */
 const QUIET = [
@@ -72,8 +74,8 @@ export interface CodexSessionDeps {
   emit: (event: AgentEvent) => void
   decide: (tool: ToolRequest) => PermissionDecision
   ask: (question: ApprovalQuestion, signal: AbortSignal) => Promise<ApprovalOutcome>
-  /** Plan usage, as Codex reports it after each response. */
-  onRateLimits?: (snapshot: Notifications['account/rateLimits/updated']['rateLimits']) => void
+  /** Plan limits, read after each turn and whenever Codex says they changed. */
+  onLimits?: (readings: LimitReading[]) => void
   log?: (line: string) => void
 }
 
@@ -200,17 +202,33 @@ export class CodexSession {
       const id = (params as Notifications['turn/started']).turn.id
       if (this.turn === 'starting' || this.turn === null) this.turn = id
     }
-    if (method === 'account/rateLimits/updated') {
-      this.deps.onRateLimits?.((params as Notifications['account/rateLimits/updated']).rateLimits)
-    }
+    // Updates are sparse; a full read gives every window and bucket.
+    if (method === 'account/rateLimits/updated') this.readLimits()
     if (method === 'configWarning' || method === 'warning') {
       this.deps.log?.(`codex ${method}: ${JSON.stringify(params).slice(0, 500)}`)
     }
     for (const event of this.translator.translate(method, params)) this.deps.emit(event)
     if (method === 'turn/completed') {
       this.turn = null
+      this.readLimits()
       this.pump()
     }
+  }
+
+  private limitsReading = false
+
+  private readLimits(): void {
+    const rpc = this.rpc
+    if (!this.deps.onLimits || !rpc || this.limitsReading || this.stopped) return
+    this.limitsReading = true
+    rpc
+      .request<GetAccountRateLimitsResponse>('account/rateLimits/read')
+      .then((res) => {
+        const readings = parseCodexRateLimits(res.rateLimits, res.rateLimitsByLimitId)
+        if (readings.length) this.deps.onLimits?.(readings)
+      })
+      .catch((err: Error) => this.deps.log?.(`could not read rate limits: ${err.message}`))
+      .finally(() => (this.limitsReading = false))
   }
 
   private async serverRequest(method: string, params: unknown): Promise<unknown> {

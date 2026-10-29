@@ -5,6 +5,7 @@ import type { Dashboard, DailyUsage, MetricsRange, ProfileUsage, SessionRecord, 
 import { localDay, RANGE_DAYS } from '@shared/metrics'
 import { estimateCost, priceInputSchema, type PriceInput, type PriceRow, type PricedKind } from '@shared/pricing'
 import type { Profile, ProfileKind } from '@shared/profiles'
+import type { Billing, SessionLimitUsage } from '@shared/limits'
 import type { Db } from '../services/db/database'
 
 const DAY = 24 * 60 * 60 * 1000
@@ -30,9 +31,10 @@ interface SessionRow {
   output_tokens: number
   cost_usd: number
   cost_estimated: number
+  billing: string
 }
 
-const toRecord = (r: SessionRow): SessionRecord => ({
+const toRecord = (r: SessionRow, limits: SessionLimitUsage[] = []): SessionRecord => ({
   id: r.id,
   profileId: r.profile_id,
   profileName: r.profile_name,
@@ -49,8 +51,16 @@ const toRecord = (r: SessionRow): SessionRecord => ({
   inputTokens: r.input_tokens,
   outputTokens: r.output_tokens,
   costUsd: r.cost_usd,
-  costEstimated: r.cost_estimated === 1
+  costEstimated: r.cost_estimated === 1,
+  billing: r.billing as Billing,
+  limits
 })
+
+/** How a profile's sessions are paid. */
+export function billingOf(profile: Pick<Profile, 'auth' | 'kind'>): Billing {
+  if (profile.auth === 'subscription') return 'subscription'
+  return profile.kind === 'ollama' ? 'local' : 'api'
+}
 
 /**
  * Records sessions, their transcripts, token usage, costs and rate limits, and answers the
@@ -62,6 +72,8 @@ export class MetricsService {
     private readonly deps: {
       profiles: () => Profile[]
       activeSessions: () => AgentSessionInfo[]
+      /** Plan points each session used, from the limits service. */
+      sessionLimits?: (sessionId: string) => SessionLimitUsage[]
       now?: () => number
     }
   ) {}
@@ -127,8 +139,8 @@ export class MetricsService {
     const ended = ENDED.includes(info.status) ? this.now() : null
     this.db
       .prepare(
-        `INSERT INTO sessions (id, profile_id, profile_name, kind, model, agent_id, task_id, cwd, status, started_at, ended_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO sessions (id, profile_id, profile_name, kind, model, agent_id, task_id, cwd, status, started_at, ended_at, billing)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET model = excluded.model, status = excluded.status,
            ended_at = COALESCE(sessions.ended_at, excluded.ended_at)`
       )
@@ -143,7 +155,8 @@ export class MetricsService {
         info.cwd,
         info.status,
         info.createdAt,
-        ended
+        ended,
+        profile ? billingOf(profile) : info.kind === 'ollama' ? 'local' : info.kind === 'codex' || info.kind === 'antigravity' ? 'subscription' : 'api'
       )
   }
 
@@ -200,43 +213,31 @@ export class MetricsService {
     const since = this.now() - RANGE_DAYS[range] * DAY
     const usage = this.db
       .prepare(
-        `SELECT profile_id, COUNT(DISTINCT session_id) AS sessions, SUM(input_tokens) AS input, SUM(output_tokens) AS output,
-                SUM(COALESCE(cost_usd, 0)) AS cost, MAX(estimated) AS estimated, SUM(cost_usd IS NULL) AS unpriced
-         FROM usage_events WHERE at >= ? GROUP BY profile_id`
+        `SELECT u.profile_id, COUNT(DISTINCT u.session_id) AS sessions, SUM(u.input_tokens) AS input, SUM(u.output_tokens) AS output,
+                SUM(CASE WHEN s.billing = 'api' THEN COALESCE(u.cost_usd, 0) ELSE 0 END) AS cost,
+                MAX(CASE WHEN s.billing = 'api' THEN u.estimated ELSE 0 END) AS estimated,
+                SUM(CASE WHEN s.billing = 'api' AND u.cost_usd IS NULL THEN 1 ELSE 0 END) AS unpriced
+         FROM usage_events u LEFT JOIN sessions s ON s.id = u.session_id WHERE u.at >= ? GROUP BY u.profile_id`
       )
       .all(since) as Array<{ profile_id: string; sessions: number; input: number; output: number; cost: number; estimated: number; unpriced: number }>
     const byProfile = new Map(usage.map((u) => [u.profile_id, u]))
     const active = this.deps.activeSessions().filter((s) => !ENDED.includes(s.status))
 
-    const latestLimit = this.db.prepare(
-      'SELECT status, utilization, resets_at, limit_type, at FROM rate_limit_events WHERE profile_id = ? ORDER BY at DESC, id DESC LIMIT 1'
-    )
     const profiles: ProfileUsage[] = this.deps.profiles().map((p) => {
       const u = byProfile.get(p.id)
-      const limit = latestLimit.get(p.id) as
-        | { status: string; utilization: number | null; resets_at: number | null; limit_type: string | null; at: number }
-        | undefined
       return {
         profileId: p.id,
         name: p.name,
         color: p.color,
         kind: p.kind,
+        billing: billingOf(p),
         activeSessions: active.filter((s) => s.profileId === p.id).length,
         sessions: u?.sessions ?? 0,
         inputTokens: u?.input ?? 0,
         outputTokens: u?.output ?? 0,
         costUsd: u?.cost ?? 0,
         costEstimated: (u?.estimated ?? 0) === 1 || (u?.unpriced ?? 0) > 0,
-        unpricedTurns: u?.unpriced ?? 0,
-        rateLimit: limit
-          ? {
-              status: limit.status as 'allowed' | 'allowed_warning' | 'rejected',
-              utilization: limit.utilization,
-              resetsAt: limit.resets_at,
-              limitType: limit.limit_type,
-              at: limit.at
-            }
-          : null
+        unpricedTurns: u?.unpriced ?? 0
       }
     })
 
@@ -256,7 +257,7 @@ export class MetricsService {
 
     const sessions = (
       this.db.prepare('SELECT * FROM sessions WHERE started_at >= ? ORDER BY started_at DESC LIMIT 100').all(since) as SessionRow[]
-    ).map(toRecord)
+    ).map((r) => toRecord(r, this.deps.sessionLimits?.(r.id) ?? []))
     return { range, generatedAt: this.now(), profiles, daily: [...daily.values()], sessions }
   }
 
@@ -269,6 +270,6 @@ export class MetricsService {
         event: string
       }>
     ).map((e) => ({ sessionId, seq: e.seq, event: JSON.parse(e.event) }))
-    return { session: toRecord(row), events }
+    return { session: toRecord(row, this.deps.sessionLimits?.(row.id) ?? []), events }
   }
 }

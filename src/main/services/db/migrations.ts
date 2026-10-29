@@ -269,5 +269,47 @@ export const migrations: Migration[] = [
         ('seed-gemini-2.5-flash-lite', 'gemini', 'gemini-2.5-flash-lite', 0.1, 0.4, 'seed', 0),
         ('seed-gemini-2.5-flash', 'gemini', 'gemini-2.5-flash', 0.3, 2.5, 'seed', 0);
     `
+  },
+  {
+    version: 9,
+    name: 'usage limits',
+    sql: `
+      -- How a session is paid: a plan's limits (subscription), per token (api), or not at all (local).
+      ALTER TABLE sessions ADD COLUMN billing TEXT NOT NULL DEFAULT 'api';
+      UPDATE sessions SET billing = 'local' WHERE kind = 'ollama';
+      UPDATE sessions SET billing = 'subscription'
+        WHERE kind IN ('codex', 'antigravity') OR profile_id IN (SELECT id FROM profiles WHERE auth = 'subscription');
+      -- Every limit reading, for the history chart and to measure each session's share.
+      CREATE TABLE limit_snapshots (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        profile_id TEXT NOT NULL,
+        session_id TEXT,
+        at         INTEGER NOT NULL,
+        source     TEXT NOT NULL,
+        window     TEXT NOT NULL,
+        label      TEXT NOT NULL,
+        used_pct   REAL NOT NULL,
+        resets_at  INTEGER
+      );
+      CREATE INDEX limit_snapshots_profile ON limit_snapshots(profile_id, window, at);
+      CREATE TABLE session_limit_usage (
+        session_id TEXT NOT NULL,
+        window     TEXT NOT NULL,
+        label      TEXT NOT NULL,
+        delta_pct  REAL NOT NULL,
+        -- 'estimated' as soon as one share was split with another session.
+        badge      TEXT NOT NULL,
+        PRIMARY KEY (session_id, window)
+      );
+      -- Alerts already raised, so each threshold fires once per window period.
+      CREATE TABLE limit_alerts (
+        profile_id TEXT NOT NULL,
+        window     TEXT NOT NULL,
+        period     INTEGER NOT NULL,
+        threshold  INTEGER NOT NULL,
+        at         INTEGER NOT NULL,
+        PRIMARY KEY (profile_id, window, period, threshold)
+      );
+    `
   }
 ]
