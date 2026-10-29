@@ -1,7 +1,11 @@
+import type { Db } from './database'
+
 export interface Migration {
   version: number
   name: string
   sql: string
+  /** Runs after `sql`, in the same transaction, for steps that need to read data first. */
+  up?: (db: Db) => void
 }
 
 /**

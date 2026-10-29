@@ -28,4 +28,8 @@ export class SqliteSettingsRepository implements SettingsRepository {
       )
       .run(key, JSON.stringify(value), Date.now())
   }
+
+  remove(key: string): void {
+    this.db.prepare('DELETE FROM settings WHERE key = ?').run(key)
+  }
 }

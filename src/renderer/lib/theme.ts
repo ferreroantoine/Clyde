@@ -6,7 +6,7 @@ export type ResolvedTheme = 'light' | 'dark'
 
 const media = () => window.matchMedia('(prefers-color-scheme: dark)')
 
-export function resolveTheme(theme: Settings['theme']): ResolvedTheme {
+export function resolveTheme(theme: Settings['appearance']['theme']): ResolvedTheme {
   if (theme === 'system') return media().matches ? 'dark' : 'light'
   return theme
 }
@@ -30,7 +30,7 @@ export function tokenToHex(token: string): string | null {
 export const useResolvedTheme = create<{ theme: ResolvedTheme }>()(() => ({ theme: 'light' }))
 
 /** Keeps the `dark` class on <html> in sync with the setting (and the OS when set to system). */
-export function useApplyTheme(theme: Settings['theme']): void {
+export function useApplyTheme(theme: Settings['appearance']['theme']): void {
   useEffect(() => {
     const apply = () => {
       const next = resolveTheme(theme)

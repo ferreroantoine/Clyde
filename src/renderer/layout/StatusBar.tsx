@@ -86,7 +86,7 @@ export function StatusBar() {
           icon={theme === 'dark' ? Sun : Moon}
           label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
           side="top"
-          onClick={() => void updateSetting('theme', theme === 'dark' ? 'light' : 'dark')}
+          onClick={() => void updateSetting('appearance.theme', theme === 'dark' ? 'light' : 'dark')}
           className="size-5"
         />
       </div>

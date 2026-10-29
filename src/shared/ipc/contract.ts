@@ -58,7 +58,7 @@ export const requestSchemas = {
   'pty:resize': z.object({ id: ptyId, ...dims }),
   'pty:kill': z.object({ id: ptyId }),
   'settings:getAll': z.undefined(),
-  'settings:set': z.object({ key: z.string().min(1).max(128), value: z.unknown() }),
+  'settings:set': z.object({ path: z.string().min(3).max(128), value: z.unknown() }),
   'profiles:list': z.undefined(),
   'profiles:create': profileCreateSchema,
   'profiles:update': profileUpdateSchema,

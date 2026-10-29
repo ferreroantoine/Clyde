@@ -22,6 +22,7 @@ export function migrate(db: Db, migrations: Migration[] = defaultMigrations): nu
   for (const m of pending) {
     db.transaction(() => {
       db.exec(m.sql)
+      m.up?.(db)
       db.pragma(`user_version = ${m.version}`)
     })()
   }

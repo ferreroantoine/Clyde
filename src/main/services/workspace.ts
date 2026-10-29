@@ -48,8 +48,8 @@ export class WorkspaceService {
   }
 
   private rememberRecent(root: string): void {
-    const recent = this.settings.getAll().recentWorkspaces.filter((p) => p.toLowerCase() !== root.toLowerCase())
-    this.settings.set('recentWorkspaces', [root, ...recent].slice(0, MAX_RECENT))
+    const recent = this.settings.getAll().general.recentWorkspaces.filter((p) => p.toLowerCase() !== root.toLowerCase())
+    this.settings.set('general.recentWorkspaces', [root, ...recent].slice(0, MAX_RECENT))
   }
 
   async dispose(): Promise<void> {

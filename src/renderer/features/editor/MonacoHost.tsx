@@ -13,7 +13,7 @@ export function MonacoHost({ path, ready }: { path: string | null; ready: boolea
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
   const currentPath = useRef<string | null>(null)
   const theme = useResolvedTheme((s) => s.theme)
-  const fontSize = useSettings((s) => s.settings.editorFontSize)
+  const fontSize = useSettings((s) => s.settings.editor.fontSize)
   const reveal = useEditor((s) => s.reveal)
 
   useEffect(() => {
@@ -23,7 +23,7 @@ export function MonacoHost({ path, ready }: { path: string | null; ready: boolea
       automaticLayout: true,
       fontFamily: "'JetBrains Mono Variable', 'Cascadia Code', monospace",
       fontLigatures: true,
-      fontSize: useSettings.getState().settings.editorFontSize,
+      fontSize: useSettings.getState().settings.editor.fontSize,
       lineHeight: 1.6,
       minimap: { enabled: true, renderCharacters: false, scale: 1 },
       scrollBeyondLastLine: false,

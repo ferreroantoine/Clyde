@@ -20,7 +20,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useGlobalErrorToasts } from '@/lib/errors'
 
 export function App() {
-  const theme = useSettings((s) => s.settings.theme)
+  const theme = useSettings((s) => s.settings.appearance.theme)
   useApplyTheme(theme)
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export function App() {
   }, [])
 
   const resolvedTheme = useResolvedTheme((s) => s.theme)
-  const terminalFontSize = useSettings((s) => s.settings.terminalFontSize)
+  const terminalFontSize = useSettings((s) => s.settings.terminal.fontSize)
   useEffect(() => terminals.setTheme(resolvedTheme), [resolvedTheme])
   useEffect(() => terminals.setFontSize(terminalFontSize), [terminalFontSize])
 
