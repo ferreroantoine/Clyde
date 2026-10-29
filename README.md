@@ -1,8 +1,44 @@
-# Clyde
+<p align="center"><img src="resources/icon.png" width="88" alt=""></p>
 
-Agent-centric desktop IDE for Windows: several AI accounts and providers side by side, several agents on one repository, live supervision, and MCP tools allowed per agent.
+<h1 align="center">Clyde</h1>
 
-Stack: Electron 45, React 19, TypeScript (strict), electron-vite, Tailwind CSS v4 + shadcn/ui, Monaco, xterm.js + node-pty, SQLite (better-sqlite3).
+<p align="center">Agent-centric desktop IDE for Windows: several AI accounts and providers side by side, several agents on one repository, live supervision, and MCP tools allowed per agent.</p>
+
+![Clyde: the editor, a terminal and an agent asking to edit a file](docs/screenshots/agent-approval.png)
+
+## Download
+
+Get **Clyde-Setup-&lt;version&gt;.exe** from the [releases page](https://github.com/ferreroantoine/clyde/releases) and run it. It installs for your user without admin rights, adds Start menu and desktop shortcuts, and starts Clyde. The installer is not code-signed yet: if SmartScreen says "Windows protected your PC", click **More info**, then **Run anyway**.
+
+Then open a folder and add an account in **Accounts**. The task board also needs [Git for Windows](https://git-scm.com/download/win).
+
+## Tour
+
+**Accounts.** Claude subscriptions (through Claude Code's own sign-in), Anthropic, OpenAI and Mistral API keys, and local Ollama models, each with a color and a label that follow it everywhere. Clyde never switches accounts for you.
+
+![Accounts screen with four accounts](docs/screenshots/accounts.png)
+
+**Task board.** Each task runs a saved agent in its own branch and git worktree, so several agents can work on one repository at once.
+
+![Kanban board with tasks to do, in progress, to review and done](docs/screenshots/board.png)
+
+**Review.** Read the diff of a task, then merge it, request changes (the agent picks up your comments in the same worktree) or abandon it.
+
+![Diff review of a task before merging](docs/screenshots/review.png)
+
+**Supervision.** Sessions, tokens, cost and usage limits per account, charts per day, and the full transcript of every session.
+
+![Supervision dashboard with usage per account](docs/screenshots/supervision.png)
+
+**Command palette** (`Ctrl+K`) for every action, and `Ctrl+P` to open a file. Light and dark themes follow the system or your choice.
+
+![Command palette filtering "new"](docs/screenshots/palette.png)
+
+![Clyde in the dark theme](docs/screenshots/dark.png)
+
+## Stack
+
+Electron 45, React 19, TypeScript (strict), electron-vite, Tailwind CSS v4 + shadcn/ui, Monaco, xterm.js + node-pty, SQLite (better-sqlite3).
 
 Docs: [original spec](docs/SPEC.md) (French), [approved plan](docs/PLAN.md).
 
@@ -16,7 +52,7 @@ Docs: [original spec](docs/SPEC.md) (French), [approved plan](docs/PLAN.md).
 | 4 | Parallel agents, git worktrees, Kanban, diff review and merge | done |
 | 5 | Supervision dashboard, metrics, command palette, polish, packaging | done |
 
-## Install on Windows
+## Build from source on Windows
 
 ### Prerequisites
 
@@ -57,6 +93,7 @@ Both install commands end by downloading the Electron binary (`install-electron`
 | `npm run lint` | ESLint |
 | `npm test` | Vitest unit tests |
 | `npm run package` | Builds the Windows installer (NSIS) into `release/`. Run it on Windows |
+| `npm run smoke:packaged -- <exe>` | Checks a packaged app: database, terminal, search, Claude Code binary |
 | `npm run package:dir` | Builds an unpacked app into `release/`, to check a package without installing it |
 | `npm run install:prebuilt` | `npm install --ignore-scripts` then `install-electron`, for machines without C++ build tools |
 | `npm run drive -- <outDir> '<steps json>'` | Launches the built app with Playwright, runs steps and takes screenshots (see `scripts/drive.mjs`) |
@@ -136,7 +173,11 @@ You sign in to a subscription account through Claude Code's own login, and the I
 
 ## Packaging
 
-`npm run package` builds `release/Clyde Setup <version>.exe`, a per-user NSIS installer. Build it on Windows: npm installs the Claude Code binary of the machine it runs on, and that binary (about 280 MB) is most of the package. For a distribution build, set `CLYDE_DISTRIBUTION=1` first. The installer is not code-signed, so Windows SmartScreen warns on first run.
+`npm run package` builds `release/Clyde-Setup-<version>.exe`, a one-click per-user NSIS installer. Build it on Windows: npm installs the Claude Code binary of the machine it runs on, and that binary (about 280 MB) is most of the package. For a distribution build, set `CLYDE_DISTRIBUTION=1` first. The installer is not code-signed, so Windows SmartScreen warns on first run.
+
+`npm run smoke:packaged -- <app executable>` launches a packaged app and checks the parts that only break once packaged: the database, the terminal, search and the bundled Claude Code binary.
+
+Releases are built by `.github/workflows/release.yml` on a Windows runner: pushing a tag `v<version>` (matching `package.json`) builds the installer, installs it silently, runs the smoke test on the installed app and publishes a GitHub release with `.github/RELEASE_NOTES.md` as its text. Versions with a `-` (such as `0.1.0-beta.1`) are published as prereleases.
 
 ## Known limits
 
