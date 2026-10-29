@@ -49,7 +49,7 @@ export function MonacoHost({ path, ready }: { path: string | null; ready: boolea
   }, [])
 
   useEffect(() => {
-    monaco.editor.setTheme(theme === 'dark' ? 'atelier-dark' : 'atelier-light')
+    monaco.editor.setTheme(theme === 'dark' ? 'clyde-dark' : 'clyde-light')
   }, [theme])
 
   useEffect(() => {

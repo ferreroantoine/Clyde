@@ -21,7 +21,7 @@ function Welcome() {
   return (
     <EmptyState
       icon={Code2}
-      title={info ? 'No file open' : 'Welcome to Atelier'}
+      title={info ? 'No file open' : 'Welcome to Clyde'}
       description={info ? 'Pick a file in the explorer to open it here.' : 'Open a folder to get started.'}
       action={
         <div className="flex flex-col items-center gap-4">

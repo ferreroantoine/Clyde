@@ -20,8 +20,8 @@ export function Shell() {
   const agent = usePanelSync(useLayout((s) => s.agentPanelOpen), useLayout((s) => s.setAgentPanelOpen))
   const terminal = usePanelSync(useLayout((s) => s.terminalOpen), useLayout((s) => s.setTerminalOpen))
 
-  const outer = useDefaultLayout({ id: 'atelier.outer', ...(storage ? { storage } : {}) })
-  const middle = useDefaultLayout({ id: 'atelier.middle', ...(storage ? { storage } : {}) })
+  const outer = useDefaultLayout({ id: 'clyde.outer', ...(storage ? { storage } : {}) })
+  const middle = useDefaultLayout({ id: 'clyde.middle', ...(storage ? { storage } : {}) })
 
   return (
     <div className="flex h-full flex-col">

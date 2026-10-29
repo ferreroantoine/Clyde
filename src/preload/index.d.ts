@@ -1,8 +1,8 @@
-import type { AtelierApi } from '../shared/ipc/api'
+import type { ClydeApi } from '../shared/ipc/api'
 
 declare global {
   interface Window {
-    atelier: AtelierApi
+    clyde: ClydeApi
   }
 }
 

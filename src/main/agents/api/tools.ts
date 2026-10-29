@@ -17,7 +17,7 @@ const obj = (properties: Record<string, unknown>, required: string[]) => ({
   additionalProperties: false
 })
 
-/** Atelier's built-in tools for API agents, as the spec lists them. */
+/** Clyde's built-in tools for API agents, as the spec lists them. */
 export const BASE_TOOLS: ToolSpec[] = [
   {
     name: 'read_file',

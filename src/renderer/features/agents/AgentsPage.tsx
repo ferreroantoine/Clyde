@@ -103,7 +103,7 @@ function TaskCard({ task }: { task: Task }) {
         <span className="truncate">{agent?.name ?? 'No agent'}</span>
         <span className="flex items-center gap-1 font-mono">
           <GitBranch className="size-3" />
-          {task.branch.replace(/^atelier\//, '')}
+          {task.branch.replace(/^clyde\//, '')}
         </span>
         <span>· {relativeTime(task.updatedAt)}</span>
       </div>
@@ -166,7 +166,7 @@ function NewTaskDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>New task</DialogTitle>
-          <DialogDescription>Atelier creates a branch and a git worktree for it, from the branch checked out now.</DialogDescription>
+          <DialogDescription>Clyde creates a branch and a git worktree for it, from the branch checked out now.</DialogDescription>
         </DialogHeader>
         <form
           className="grid gap-4"

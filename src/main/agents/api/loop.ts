@@ -29,7 +29,7 @@ function isAbort(err: unknown, signal: AbortSignal): boolean {
 }
 
 /**
- * Atelier's own agent loop for API providers: stream a reply, run the tool calls it asks for
+ * Clyde's own agent loop for API providers: stream a reply, run the tool calls it asks for
  * (each through the permission engine, and the user when it says "ask"), feed the results
  * back, and repeat until the model stops calling tools, a step limit, or an interrupt.
  */

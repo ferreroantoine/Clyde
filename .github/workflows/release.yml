@@ -1,0 +1,107 @@
+# Builds the Windows installer and portable exe on Windows, installs the first and starts the
+# second, and checks that both work.
+# Publishing: a new version in package.json is released once, from the first push that carries
+# it (or from a v<version> tag), as a prerelease when the version has a "-" (0.1.0-beta.1).
+name: Release
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Decide whether this push publishes a release
+        id: release
+        shell: bash
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$tag" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json ($tag)"
+            exit 1
+          fi
+          if [ "$GITHUB_REF_TYPE" = tag ] || [ -z "$(git ls-remote --tags origin "refs/tags/$tag")" ]; then
+            publish=true
+          else
+            publish=false
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "Version $tag, publish: $publish"
+
+      # Native modules ship prebuilt binaries, so no compiler is needed (see README).
+      - name: Install dependencies
+        run: |
+          npm ci --ignore-scripts
+          npx install-electron
+
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: Build the installer
+        run: |
+          npx electron-vite build
+          npx electron-builder --win --x64 --publish never
+
+      - name: Install it silently, then check the installed app
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem release\Clyde-Setup-*.exe | Select-Object -First 1
+          Start-Process -FilePath $installer.FullName -ArgumentList '/S' -Wait
+          $exe = Join-Path $env:LOCALAPPDATA 'Programs\clyde\Clyde.exe'
+          if (-not (Test-Path $exe)) { Get-ChildItem (Join-Path $env:LOCALAPPDATA 'Programs') -Recurse -Filter Clyde.exe | Select-Object -First 1 -ExpandProperty FullName | Set-Variable exe }
+          Write-Host "Installed at $exe"
+          node scripts/smoke-packaged.mjs "$exe" release/smoke.png
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Start the portable exe and check it keeps its data next to itself
+        shell: pwsh
+        run: |
+          $source = Get-ChildItem release\Clyde-*-portable.exe | Select-Object -First 1
+          $dir = New-Item -ItemType Directory -Path (Join-Path $env:RUNNER_TEMP 'portable')
+          $exe = Copy-Item $source.FullName $dir -PassThru
+          $db = Join-Path $dir 'Clyde-data\clyde.db'
+          $watch = [Diagnostics.Stopwatch]::StartNew()
+          Start-Process -FilePath $exe.FullName
+          while (-not (Test-Path $db) -and $watch.Elapsed.TotalSeconds -lt 180) { Start-Sleep -Milliseconds 500 }
+          $started = Test-Path $db
+          Write-Host "Database next to the exe after $([int]$watch.Elapsed.TotalSeconds) s: $started"
+          Get-Process -Name 'Clyde', $exe.BaseName -ErrorAction SilentlyContinue | Stop-Process -Force
+          if (-not $started) { exit 1 }
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: clyde-windows
+          path: |
+            release/Clyde-Setup-*.exe
+            release/Clyde-*-portable.exe
+            release/smoke.png
+          if-no-files-found: ignore
+
+      - name: Publish the release
+        if: steps.release.outputs.publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Clyde ${{ steps.release.outputs.tag }}
+          body_path: .github/RELEASE_NOTES.md
+          prerelease: ${{ contains(steps.release.outputs.tag, '-') }}
+          files: |
+            release/Clyde-Setup-*.exe
+            release/Clyde-*-portable.exe
