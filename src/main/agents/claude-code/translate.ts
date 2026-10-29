@@ -34,6 +34,8 @@ export class MessageTranslator {
   private readonly messages = new Map<string, MessageState>()
   private streamingId: string | null = null
   private readonly blockKeys = new Map<number, string>()
+  /** `total_cost_usd` is the session's running total; turns report the difference. */
+  private costSoFar = 0
 
   private state(id: string): MessageState {
     let s = this.messages.get(id)
@@ -52,14 +54,16 @@ export class MessageTranslator {
         return this.assistant(msg)
       case 'user':
         return this.user(msg)
-      case 'result':
+      case 'result': {
+        const turnCost = Math.max(0, msg.total_cost_usd - this.costSoFar)
+        this.costSoFar = Math.max(this.costSoFar, msg.total_cost_usd)
         return [
           {
             type: 'turn_end',
             isError: msg.is_error,
             subtype: msg.subtype,
             errors: 'errors' in msg ? msg.errors : [],
-            costUsd: msg.total_cost_usd,
+            costUsd: turnCost,
             inputTokens:
               msg.usage.input_tokens +
               (msg.usage.cache_read_input_tokens ?? 0) +
@@ -68,6 +72,7 @@ export class MessageTranslator {
             durationMs: msg.duration_ms
           }
         ]
+      }
       case 'rate_limit_event': {
         const info = msg.rate_limit_info
         return [

@@ -122,6 +122,17 @@ describe('MessageTranslator', () => {
     expect(events).toHaveLength(3)
   })
 
+  it('turns the running session cost into a cost per turn', () => {
+    const t = new MessageTranslator()
+    const costs = [0.02, 0.05, 0.05].map((total) => {
+      const [event] = t.translate(sdk.result({ total_cost_usd: total }))
+      return event?.type === 'turn_end' ? event.costUsd : undefined
+    })
+    expect(costs[0]).toBeCloseTo(0.02)
+    expect(costs[1]).toBeCloseTo(0.03)
+    expect(costs[2]).toBe(0)
+  })
+
   it('flattens and truncates tool results', () => {
     expect(toolResultText('plain')).toBe('plain')
     expect(toolResultText([{ type: 'text', text: 'a' }, { type: 'image' }, { type: 'text', text: 'b' }])).toBe('a\n[image]\nb')
