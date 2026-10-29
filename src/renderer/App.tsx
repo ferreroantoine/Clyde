@@ -2,7 +2,9 @@ import { useEffect, useMemo } from 'react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Shell } from '@/layout/Shell'
 import { Toaster } from '@/layout/Toaster'
-import { useApplyTheme } from '@/lib/theme'
+import { useApplyTheme, useResolvedTheme } from '@/lib/theme'
+import { terminals } from '@/lib/terminal/registry'
+import { useTerminals } from '@/stores/terminals'
 import { useShortcuts, type Shortcut } from '@/lib/shortcuts'
 import { useLayout } from '@/stores/layout'
 import { useSettings } from '@/stores/settings'
@@ -24,11 +26,18 @@ export function App() {
         if (disposed) unsubscribe()
         else off = unsubscribe
       })
+    const offTerminals = useTerminals.getState().init()
     return () => {
       disposed = true
       off?.()
+      offTerminals()
     }
   }, [])
+
+  const resolvedTheme = useResolvedTheme((s) => s.theme)
+  const terminalFontSize = useSettings((s) => s.settings.terminalFontSize)
+  useEffect(() => terminals.setTheme(resolvedTheme), [resolvedTheme])
+  useEffect(() => terminals.setFontSize(terminalFontSize), [terminalFontSize])
 
   const shortcuts = useMemo<Shortcut[]>(() => {
     const layout = useLayout.getState
