@@ -133,7 +133,13 @@ export class BaseToolExecutor {
     return resolve(this.cwd, path || '.')
   }
 
-  async run(name: string, input: Record<string, unknown>, signal: AbortSignal): Promise<ToolOutput> {
+  async run(
+    name: string,
+    input: Record<string, unknown>,
+    signal: AbortSignal,
+    /** Live output of run_command, for the agent's read-only terminal. */
+    onOutput?: (chunk: string) => void
+  ): Promise<ToolOutput> {
     try {
       switch (name) {
         case 'read_file':
@@ -150,7 +156,7 @@ export class BaseToolExecutor {
         case 'list_files':
           return await this.list(input)
         case 'run_command':
-          return await this.exec(str(input, 'command'), Number(input['timeout_seconds']) || 120, signal)
+          return await this.exec(str(input, 'command'), Number(input['timeout_seconds']) || 120, signal, onOutput)
         default:
           return { content: `Unknown tool ${name}`, isError: true }
       }
@@ -220,7 +226,12 @@ export class BaseToolExecutor {
     return { content: lines.length ? lines.join('\n') : '(empty folder)', isError: false }
   }
 
-  private exec(command: string, timeoutSeconds: number, signal: AbortSignal): Promise<ToolOutput> {
+  private exec(
+    command: string,
+    timeoutSeconds: number,
+    signal: AbortSignal,
+    onOutput?: (chunk: string) => void
+  ): Promise<ToolOutput> {
     const timeoutMs = Math.min(600, Math.max(1, timeoutSeconds)) * 1000
     return new Promise((resolvePromise) => {
       const child = spawn(this.shell.file, this.shell.args(command), {
@@ -232,7 +243,9 @@ export class BaseToolExecutor {
       })
       let output = ''
       const append = (chunk: Buffer) => {
-        output += chunk.toString('utf8')
+        const text = chunk.toString('utf8')
+        onOutput?.(text)
+        output += text
         if (output.length > MAX_OUTPUT_CHARS * 2) output = output.slice(-MAX_OUTPUT_CHARS)
       }
       child.stdout.on('data', append)

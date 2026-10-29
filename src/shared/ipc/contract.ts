@@ -2,6 +2,18 @@ import { z } from 'zod'
 import type { EventChannel, InvokeChannel } from './channels'
 import type { Settings } from '../settings'
 import { profileCreateSchema, profileIdSchema, profileUpdateSchema, type ConnectionResult, type Profile } from '../profiles'
+import {
+  agentDefinitionInputSchema,
+  agentDefinitionUpdateSchema,
+  agentIdSchema,
+  taskIdSchema,
+  taskInputSchema,
+  type AgentDefinition,
+  type MergeResult,
+  type Task,
+  type TaskChange,
+  type TaskFileDiff
+} from '../tasks'
 import { mcpIdSchema, mcpServerInputSchema, mcpServerUpdateSchema, type McpImportPreview, type McpServer } from '../mcp'
 import {
   agentStartSchema,
@@ -63,7 +75,20 @@ export const requestSchemas = {
   'mcp:delete': z.object({ id: mcpIdSchema }),
   'mcp:reconnect': z.object({ id: mcpIdSchema }),
   'mcp:importPreview': z.undefined(),
-  'mcp:import': z.object({ path: z.string().min(1).max(4096), names: z.array(z.string().max(200)).max(200) })
+  'mcp:import': z.object({ path: z.string().min(1).max(4096), names: z.array(z.string().max(200)).max(200) }),
+  'agents:list': z.undefined(),
+  'agents:create': agentDefinitionInputSchema,
+  'agents:update': agentDefinitionUpdateSchema,
+  'agents:delete': z.object({ id: agentIdSchema }),
+  'tasks:list': z.undefined(),
+  'tasks:create': taskInputSchema,
+  'tasks:start': z.object({ id: taskIdSchema }),
+  'tasks:requestChanges': z.object({ id: taskIdSchema, comments: z.string().trim().min(1).max(50_000) }),
+  'tasks:changes': z.object({ id: taskIdSchema }),
+  'tasks:fileDiff': z.object({ id: taskIdSchema, path: z.string().min(1).max(4096) }),
+  'tasks:merge': z.object({ id: taskIdSchema }),
+  'tasks:abandon': z.object({ id: taskIdSchema }),
+  'tasks:delete': z.object({ id: taskIdSchema })
 } satisfies Record<InvokeChannel, z.ZodType>
 
 export interface InvokeResponses {
@@ -100,6 +125,19 @@ export interface InvokeResponses {
   'mcp:reconnect': null
   'mcp:importPreview': McpImportPreview | null
   'mcp:import': McpServer[]
+  'agents:list': AgentDefinition[]
+  'agents:create': AgentDefinition
+  'agents:update': AgentDefinition
+  'agents:delete': null
+  'tasks:list': Task[]
+  'tasks:create': Task
+  'tasks:start': Task
+  'tasks:requestChanges': Task
+  'tasks:changes': TaskChange[]
+  'tasks:fileDiff': TaskFileDiff
+  'tasks:merge': MergeResult
+  'tasks:abandon': Task
+  'tasks:delete': null
 }
 
 export interface EventPayloads {
@@ -111,6 +149,8 @@ export interface EventPayloads {
   'agent:session': AgentSessionInfo
   'agent:event': AgentEventEnvelope
   'mcp:changed': McpServer[]
+  'agents:changed': AgentDefinition[]
+  'tasks:changed': Task[]
 }
 
 export type InvokeRequest<C extends InvokeChannel> = z.input<(typeof requestSchemas)[C]>

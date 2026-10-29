@@ -71,5 +71,40 @@ export const migrations: Migration[] = [
         updated_at INTEGER NOT NULL
       );
     `
+  },
+  {
+    version: 5,
+    name: 'agent definitions and tasks',
+    sql: `
+      CREATE TABLE agents (
+        id               TEXT PRIMARY KEY,
+        name             TEXT NOT NULL,
+        profile_id       TEXT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+        model            TEXT NOT NULL DEFAULT '',
+        system_prompt    TEXT NOT NULL DEFAULT '',
+        permission_level TEXT NOT NULL,
+        mcp_tools        TEXT NOT NULL DEFAULT '[]',
+        created_at       INTEGER NOT NULL,
+        updated_at       INTEGER NOT NULL
+      );
+      CREATE TABLE tasks (
+        id            TEXT PRIMARY KEY,
+        title         TEXT NOT NULL,
+        description   TEXT NOT NULL,
+        agent_id      TEXT REFERENCES agents(id) ON DELETE SET NULL,
+        repo_root     TEXT NOT NULL,
+        base_branch   TEXT NOT NULL,
+        branch        TEXT NOT NULL,
+        worktree_path TEXT NOT NULL,
+        status        TEXT NOT NULL,
+        outcome       TEXT,
+        session_id    TEXT,
+        note          TEXT,
+        merge_commit  TEXT,
+        created_at    INTEGER NOT NULL,
+        updated_at    INTEGER NOT NULL
+      );
+      CREATE INDEX tasks_repo ON tasks(repo_root, status);
+    `
   }
 ]

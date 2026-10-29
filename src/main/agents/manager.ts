@@ -83,6 +83,10 @@ export class AgentManager {
     return [...this.sessions.values()].map((e) => e.info)
   }
 
+  get(sessionId: string): AgentSessionInfo | null {
+    return this.sessions.get(sessionId)?.info ?? null
+  }
+
   async start(request: AgentStart): Promise<AgentSessionInfo> {
     const req = agentStartSchema.parse(request)
     const active = this.list().filter((s) => !ENDED.includes(s.status)).length
@@ -107,6 +111,8 @@ export class AgentManager {
       permissionLevel: req.permissionLevel,
       cwd,
       mcpTools: req.mcpTools,
+      agentId: req.agentId ?? null,
+      taskId: req.taskId ?? null,
       status: 'starting',
       createdAt: Date.now()
     }
@@ -211,9 +217,9 @@ export class AgentManager {
           const mcpName = qualified.get(call.name)
           return mcpName ? { name: mcpName, input: call.input } : toEngineRequest(call.name, call.input, platform)
         },
-        execute: (call, signal) => {
+        execute: (call, signal, onOutput) => {
           const mcpName = qualified.get(call.name)
-          return mcpName ? this.deps.mcp.callTool(mcpName, call.input, signal) : executor.run(call.name, call.input, signal)
+          return mcpName ? this.deps.mcp.callTool(mcpName, call.input, signal) : executor.run(call.name, call.input, signal, onOutput)
         },
         describeError: (err) => describeApiError(err, target)
       }

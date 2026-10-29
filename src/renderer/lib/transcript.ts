@@ -133,6 +133,9 @@ function reduce(view: SessionView, event: AgentEvent, seq: number): SessionView 
       next[index] = { ...tool, approval: tool.approval && { ...tool.approval, state: event.decision } }
       return { ...view, items: next }
     }
+    case 'tool_output':
+      // Shown in the agent's read-only terminal, not in the transcript.
+      return view
     case 'permission_denied': {
       const patched = updateTool(items, event.toolUseId, (t) => ({ ...t, denied: event.reason }))
       return patched ? { ...view, items: patched } : view
