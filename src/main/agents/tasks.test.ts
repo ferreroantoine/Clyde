@@ -21,6 +21,8 @@ function setup() {
   sh(repo, 'init', '-q', '-b', 'main')
   sh(repo, 'config', 'user.email', 'me@example.com')
   sh(repo, 'config', 'user.name', 'Me')
+  // Git for Windows checks files out with CRLF by default; the assertions compare exact bytes.
+  sh(repo, 'config', 'core.autocrlf', 'false')
   writeFileSync(join(repo, 'README.md'), '# demo\n')
   sh(repo, 'add', '.')
   sh(repo, 'commit', '-qm', 'init')

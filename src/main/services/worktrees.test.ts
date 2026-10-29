@@ -12,6 +12,8 @@ function repo() {
   sh(dir, 'init', '-q', '-b', 'main')
   sh(dir, 'config', 'user.email', 'me@example.com')
   sh(dir, 'config', 'user.name', 'Me')
+  // Git for Windows checks files out with CRLF by default; the assertions compare exact bytes.
+  sh(dir, 'config', 'core.autocrlf', 'false')
   writeFileSync(join(dir, 'a.txt'), 'one\ntwo\n')
   writeFileSync(join(dir, 'old.txt'), 'bye\n')
   sh(dir, 'add', '.')
