@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { monaco } from '@/lib/monaco/setup'
 import { getModel } from '@/lib/monaco/models'
-import { useEditor } from '@/stores/editor'
+import { saveHooks, useEditor } from '@/stores/editor'
 import { useSettings } from '@/stores/settings'
 import { useResolvedTheme } from '@/lib/theme'
 
@@ -13,7 +13,7 @@ export function MonacoHost({ path, ready }: { path: string | null; ready: boolea
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
   const currentPath = useRef<string | null>(null)
   const theme = useResolvedTheme((s) => s.theme)
-  const fontSize = useSettings((s) => s.settings.editor.fontSize)
+  const options = useSettings((s) => s.settings.editor)
   const reveal = useEditor((s) => s.reveal)
 
   useEffect(() => {
@@ -21,11 +21,12 @@ export function MonacoHost({ path, ready }: { path: string | null; ready: boolea
     const editor = monaco.editor.create(container.current, {
       model: null,
       automaticLayout: true,
-      fontFamily: "'JetBrains Mono Variable', 'Cascadia Code', monospace",
+      fontFamily: useSettings.getState().settings.editor.fontFamily,
       fontLigatures: true,
       fontSize: useSettings.getState().settings.editor.fontSize,
+      wordWrap: useSettings.getState().settings.editor.wordWrap ? 'on' : 'off',
       lineHeight: 1.6,
-      minimap: { enabled: true, renderCharacters: false, scale: 1 },
+      minimap: { enabled: useSettings.getState().settings.editor.minimap, renderCharacters: false, scale: 1 },
       scrollBeyondLastLine: false,
       smoothScrolling: true,
       cursorSmoothCaretAnimation: 'on',
@@ -34,14 +35,20 @@ export function MonacoHost({ path, ready }: { path: string | null; ready: boolea
       bracketPairColorization: { enabled: true },
       guides: { bracketPairs: 'active', indentation: true },
       stickyScroll: { enabled: true },
-      tabSize: 2
+      tabSize: useSettings.getState().settings.editor.tabSize
     })
+    // Format on save (Settings › Editor), with the formatter Monaco has for the language.
+    saveHooks.beforeSave = async () => {
+      if (!useSettings.getState().settings.editor.formatOnSave) return
+      await editor.getAction('editor.action.formatDocument')?.run()
+    }
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => void useEditor.getState().save())
     const cursorSub = editor.onDidChangeCursorPosition((e) =>
       useEditor.getState().setCursor({ line: e.position.lineNumber, column: e.position.column })
     )
     editorRef.current = editor
     return () => {
+      saveHooks.beforeSave = null
       cursorSub.dispose()
       editor.dispose()
       editorRef.current = null
@@ -53,8 +60,15 @@ export function MonacoHost({ path, ready }: { path: string | null; ready: boolea
   }, [theme])
 
   useEffect(() => {
-    editorRef.current?.updateOptions({ fontSize })
-  }, [fontSize])
+    const editor = editorRef.current
+    editor?.updateOptions({
+      fontSize: options.fontSize,
+      fontFamily: options.fontFamily,
+      wordWrap: options.wordWrap ? 'on' : 'off',
+      minimap: { enabled: options.minimap, renderCharacters: false, scale: 1 }
+    })
+    editor?.getModel()?.updateOptions({ tabSize: options.tabSize })
+  }, [options])
 
   // Swap models, remembering scroll and cursor per file.
   useEffect(() => {
@@ -65,6 +79,7 @@ export function MonacoHost({ path, ready }: { path: string | null; ready: boolea
     }
     const model = path && ready ? getModel(path) : null
     editor.setModel(model)
+    model?.updateOptions({ tabSize: useSettings.getState().settings.editor.tabSize })
     currentPath.current = model ? path : null
     if (model && path) {
       const state = viewStates.get(path)

@@ -60,6 +60,69 @@
   --terminal: oklch(0.16 0.006 265);
 }
 
+/* Accent colors (Settings › Appearance). Indigo is the default above. */
+[data-accent='blue'] {
+  --primary: oklch(0.52 0.17 250);
+  --ring: oklch(0.52 0.17 250 / 0.5);
+}
+.dark[data-accent='blue'] {
+  --primary: oklch(0.68 0.15 250);
+  --ring: oklch(0.68 0.15 250 / 0.5);
+}
+[data-accent='teal'] {
+  --primary: oklch(0.55 0.11 190);
+  --ring: oklch(0.55 0.11 190 / 0.5);
+}
+.dark[data-accent='teal'] {
+  --primary: oklch(0.68 0.11 190);
+  --ring: oklch(0.68 0.11 190 / 0.5);
+}
+[data-accent='green'] {
+  --primary: oklch(0.55 0.15 150);
+  --ring: oklch(0.55 0.15 150 / 0.5);
+}
+.dark[data-accent='green'] {
+  --primary: oklch(0.68 0.14 150);
+  --ring: oklch(0.68 0.14 150 / 0.5);
+}
+[data-accent='orange'] {
+  --primary: oklch(0.55 0.17 50);
+  --ring: oklch(0.55 0.17 50 / 0.5);
+}
+.dark[data-accent='orange'] {
+  --primary: oklch(0.68 0.15 50);
+  --ring: oklch(0.68 0.15 50 / 0.5);
+}
+[data-accent='rose'] {
+  --primary: oklch(0.52 0.19 10);
+  --ring: oklch(0.52 0.19 10 / 0.5);
+}
+.dark[data-accent='rose'] {
+  --primary: oklch(0.68 0.17 10);
+  --ring: oklch(0.68 0.17 10 / 0.5);
+}
+[data-accent='violet'] {
+  --primary: oklch(0.52 0.2 300);
+  --ring: oklch(0.52 0.2 300 / 0.5);
+}
+.dark[data-accent='violet'] {
+  --primary: oklch(0.68 0.17 300);
+  --ring: oklch(0.68 0.17 300 / 0.5);
+}
+[data-accent='slate'] {
+  --primary: oklch(0.52 0.035 260);
+  --ring: oklch(0.52 0.035 260 / 0.5);
+}
+.dark[data-accent='slate'] {
+  --primary: oklch(0.68 0.035 260);
+  --ring: oklch(0.68 0.035 260 / 0.5);
+}
+
+/* Compact density tightens every Tailwind spacing (padding, gaps, margins). */
+[data-density='compact'] {
+  --spacing: 0.2rem;
+}
+
 @theme inline {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', monospace;

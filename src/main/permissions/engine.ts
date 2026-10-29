@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { posix, win32 } from 'node:path'
 import type { PermissionLevel } from '@shared/agent'
 
@@ -97,8 +98,8 @@ export function decide(ctx: EngineContext, tool: ToolRequest): PermissionDecisio
     if (outside(target) || globOutside) {
       const where = globOutside ? pattern : target
       return level === 'autonomous'
-        ? { decision: 'deny', reason: `${where} is outside the agent's folder` }
-        : { decision: 'ask', reason: `Reads outside the agent's folder: ${where}` }
+        ? { decision: 'deny', reason: t("{where} is outside the agent's folder", { where }) }
+        : { decision: 'ask', reason: t("Reads outside the agent's folder: {where}", { where }) }
     }
     return { decision: 'allow' }
   }
@@ -106,25 +107,25 @@ export function decide(ctx: EngineContext, tool: ToolRequest): PermissionDecisio
   if (WRITE_TOOLS.has(tool.name)) {
     if (outside(target)) {
       return level === 'autonomous'
-        ? { decision: 'deny', reason: `${target} is outside the agent's folder` }
-        : { decision: 'ask', reason: `Writes outside the agent's folder: ${target}` }
+        ? { decision: 'deny', reason: t("{target} is outside the agent's folder", { target }) }
+        : { decision: 'ask', reason: t("Writes outside the agent's folder: {target}", { target }) }
     }
-    if (level === 'validate-all') return { decision: 'ask', reason: 'File changes need your approval' }
+    if (level === 'validate-all') return { decision: 'ask', reason: t('File changes need your approval') }
     return { decision: 'allow' }
   }
 
   if (EXEC_TOOLS.has(tool.name)) {
     const command = typeof tool.input['command'] === 'string' ? (tool.input['command'] as string) : ''
-    if (level !== 'autonomous') return { decision: 'ask', reason: 'Shell commands need your approval' }
-    if (GIT_PUSH.test(command)) return { decision: 'deny', reason: 'git push is not allowed for autonomous agents' }
+    if (level !== 'autonomous') return { decision: 'ask', reason: t('Shell commands need your approval') }
+    if (GIT_PUSH.test(command)) return { decision: 'deny', reason: t('git push is not allowed for autonomous agents') }
     const escape = changedDirs(command).find((dir) => !isInsideDir(cwd, dir, platform))
-    if (escape) return { decision: 'deny', reason: `The command leaves the agent's folder (${escape})` }
+    if (escape) return { decision: 'deny', reason: t("The command leaves the agent's folder ({escape})", { escape }) }
     return { decision: 'allow' }
   }
 
   if (tool.name.startsWith('mcp__')) {
-    return level === 'autonomous' ? { decision: 'allow' } : { decision: 'ask', reason: 'MCP tools need your approval' }
+    return level === 'autonomous' ? { decision: 'allow' } : { decision: 'ask', reason: t('MCP tools need your approval') }
   }
 
-  return { decision: 'ask', reason: `${tool.name} is not a tool Atelier knows, so it needs your approval` }
+  return { decision: 'ask', reason: t('{name} is not a tool Atelier knows, so it needs your approval', { name: tool.name }) }
 }

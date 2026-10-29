@@ -1,5 +1,8 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, dialog, net } from 'electron'
+import { app, BrowserWindow, dialog, net, Notification } from 'electron'
+import type { AgentEventEnvelope } from '@shared/agent'
+import { resolveLocale, setLocale, t } from '@shared/i18n'
+import { handleClose } from './tray'
 import { openDatabase, migrate, type Db } from './services/db/database'
 import { SqliteSettingsRepository } from './services/db/settings-repo'
 import { createMainWindow } from './window'
@@ -26,6 +29,8 @@ import { registerTaskHandlers } from './ipc/tasks'
 import { registerMetricsHandlers } from './ipc/metrics'
 import { MetricsService } from './metrics/metrics'
 import { setupLimits } from './limits/setup'
+import { DataService } from './services/data'
+import { registerDataHandlers } from './ipc/data'
 import { registerLimitsHandlers } from './ipc/limits'
 import { AgentDefinitionsService } from './services/agent-definitions'
 import { WorktreeService } from './services/worktrees'
@@ -55,8 +60,8 @@ function openAppDatabase(): Db | null {
   } catch (err) {
     log.error('could not open the database', err)
     dialog.showErrorBox(
-      'Atelier could not open its database',
-      `${(err as Error).message}\n\nFile: ${file}\n\nSettings will not be saved during this session.`
+      t('Atelier could not open its database'),
+      t('{message}\n\nFile: {file}\n\nSettings will not be saved during this session.', { message: (err as Error).message, file })
     )
     return null
   }
@@ -92,6 +97,10 @@ if (!app.requestSingleInstanceLock()) {
   void app.whenReady().then(async () => {
     const db = openAppDatabase()
     const settings = new SettingsService(db ? new SqliteSettingsRepository(db) : new MemorySettingsRepository())
+    // Main's own messages (errors, notifications, dialogs) follow the interface language.
+    const applyLocale = () => setLocale(resolveLocale(settings.getAll().general.language, app.getLocale()))
+    applyLocale()
+    settings.onChange(applyLocale)
     const workspace = new WorkspaceService(settings, {
       onChanged: (info) => broadcast('workspace:changed', info),
       onFsChanges: (changes) => broadcast('fs:changed', changes)
@@ -104,7 +113,7 @@ if (!app.requestSingleInstanceLock()) {
       () => settings.getAll().terminal.shell
     )
     registerAppHandlers(settings, db ? new NoticesService(db) : null)
-    registerWorkspaceHandlers(workspace)
+    registerWorkspaceHandlers(workspace, () => settings.getAll().general.projectsFolder)
     registerTerminalHandlers(ptys, workspace)
 
     const clientApp = `atelier/${app.getVersion()}`
@@ -136,6 +145,8 @@ if (!app.requestSingleInstanceLock()) {
     const fetch = ((input, init) => net.fetch(input as string, init)) as typeof globalThis.fetch
     const agents = new AgentManager({
       profiles,
+      maxParallel: () => settings.getAll().agents.maxParallel,
+      defaultModel: () => settings.getAll().agents.defaultModel,
       mcp,
       createAdapter: (target) => createAdapter(target, fetch),
       hasPwsh,
@@ -150,6 +161,7 @@ if (!app.requestSingleInstanceLock()) {
         metrics.onEvent(envelope)
         tasks.onAgentEvent(envelope)
         limitsSetup.onAgentEvent(envelope)
+        notifyAgent(envelope)
       },
       onLimits: (profileId, sessionId, readings) => limitsSetup.ingest(profileId, readings, sessionId),
       onSession: (info) => {
@@ -176,7 +188,8 @@ if (!app.requestSingleInstanceLock()) {
 
     const definitions = new AgentDefinitionsService(profileDb, (list) => broadcast('agents:changed', list))
     const tasks: TaskService = new TaskService(profileDb, {
-      worktrees: new WorktreeService(worktreesRoot()),
+      worktrees: new WorktreeService(() => settings.getAll().agents.worktreesFolder.trim() || worktreesRoot()),
+      deleteMergedWorktrees: () => settings.getAll().agents.deleteMergedWorktrees,
       agents: definitions,
       sessions: agents,
       workspaceRoot: () => workspace.current()?.root ?? null,
@@ -192,6 +205,18 @@ if (!app.requestSingleInstanceLock()) {
     })
     metrics.recover()
     registerMetricsHandlers(metrics)
+    registerDataHandlers(
+      new DataService({
+        db: profileDb,
+        settings,
+        profiles,
+        agents: definitions,
+        mcp,
+        metrics,
+        activeSessionIds: () => agents.list().filter((s) => !['stopped', 'error'].includes(s.status)).map((s) => s.id)
+      }),
+      settings
+    )
     registerLimitsHandlers({ limits: limitsSetup.limits, poller: limitsSetup.poller, diagnose: limitsSetup.diagnose })
     limitsSetup.syncProfiles(profiles.list())
     limitsSetup.poller.start()
@@ -207,9 +232,41 @@ if (!app.requestSingleInstanceLock()) {
 
     // Reopen the last workspace before the window asks for it.
     const [last] = settings.getAll().general.recentWorkspaces
-    if (last) await workspace.open(last).catch((err) => log.warn('could not reopen last workspace', err))
+    if (last && settings.getAll().general.reopenLastProject) {
+      await workspace.open(last).catch((err) => log.warn('could not reopen last workspace', err))
+    }
 
-    createMainWindow()
+    const win = createMainWindow()
+    handleClose(win, () => settings.getAll().general.closeBehavior)
+    // Settings › Appearance › interface text size scales the whole window, Monaco and xterm included.
+    const zoom = () => win.webContents.setZoomFactor(settings.getAll().appearance.uiFontSize / 13)
+    win.webContents.on('did-finish-load', zoom)
+    settings.onChange((next, previous) => {
+      if (next.appearance.uiFontSize !== previous.appearance.uiFontSize) zoom()
+    })
+
+    /** Desktop notifications for agents, when the window is in the background. */
+    function notifyAgent(envelope: AgentEventEnvelope): void {
+      const { event } = envelope
+      const prefs = settings.getAll().notifications
+      const wanted = (event.type === 'turn_end' && prefs.agentDone) || (event.type === 'approval_request' && prefs.approvalNeeded)
+      if (!wanted || win.isDestroyed() || win.isFocused() || !Notification.isSupported()) return
+      const session = agents.get(envelope.sessionId)
+      const profile = session ? profiles.list().find((p) => p.id === session.profileId) : undefined
+      const who = profile?.name ?? t('An agent')
+      const note =
+        event.type === 'approval_request'
+          ? new Notification({ title: t('{name} needs your approval', { name: who }), body: event.reason })
+          : new Notification({
+              title: event.type === 'turn_end' && event.isError ? t('{name} stopped with an error', { name: who }) : t('{name} has finished', { name: who }),
+              body: event.type === 'turn_end' && event.isError ? (event.errors[0] ?? '') : t('Its answer is in the agent panel.')
+            })
+      note.on('click', () => {
+        win.show()
+        win.focus()
+      })
+      note.show()
+    }
     log.info(`started v${app.getVersion()} (electron ${process.versions.electron})`)
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createMainWindow()

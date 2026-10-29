@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CircleCheck, LoaderCircle, ShieldCheck } from 'lucide-react'
 import type { Profile, ProfileKind } from '@shared/profiles'
+import { t } from '@shared/i18n'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -20,9 +21,11 @@ const CLI_NAMES: Partial<Record<ProfileKind, string>> = { 'claude-code': 'Claude
 
 function signInHelp(kind: ProfileKind, cli: string): string {
   if (kind === 'antigravity') {
-    return 'Antigravity starts below and opens your browser to sign in. It keeps the sign-in in the Windows credential store; Atelier never sees it. Close this window once Antigravity shows its prompt.'
+    return t(
+      'Antigravity starts below and opens your browser to sign in. It keeps the sign-in in the Windows credential store; Atelier never sees it. Close this window once Antigravity shows its prompt.'
+    )
   }
-  return `${cli}’s own login runs below and opens your browser. Atelier never sees your credentials; they stay in this account’s folder.`
+  return t('{cli}’s own login runs below and opens your browser. Atelier never sees your credentials; they stay in this account’s folder.', { cli })
 }
 
 /**
@@ -46,7 +49,7 @@ export function LoginDialog({ profile, onClose }: { profile: Profile | null; onC
 }
 
 function LoginSession({ profile, onFailed, onDone }: { profile: Profile; onFailed: () => void; onDone: () => void }) {
-  const cli = CLI_NAMES[profile.kind] ?? 'The CLI'
+  const cli = CLI_NAMES[profile.kind] ?? t('The CLI')
   const [ptyId, setPtyId] = useState<string | null>(null)
   const [exitCode, setExitCode] = useState<number | null>(null)
 
@@ -74,7 +77,7 @@ function LoginSession({ profile, onFailed, onDone }: { profile: Profile; onFaile
         setPtyId(info.id)
       })
       .catch((err) => {
-        notify.error(`Could not start ${cli}`, err)
+        notify.error(t('Could not start {cli}', { cli }), err)
         onFailed()
       })
     return () => {
@@ -90,7 +93,7 @@ function LoginSession({ profile, onFailed, onDone }: { profile: Profile; onFaile
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Sign in: {profile.name}</DialogTitle>
+        <DialogTitle>{t('Sign in: {name}', { name: profile.name })}</DialogTitle>
         <DialogDescription className="flex items-start gap-1.5">
           <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
           {signInHelp(profile.kind, cli)}
@@ -108,13 +111,13 @@ function LoginSession({ profile, onFailed, onDone }: { profile: Profile; onFaile
       <DialogFooter className="items-center sm:justify-between">
         <span className="text-xs text-muted-foreground">
           {exitCode === null ? (
-            'Follow the steps in the terminal. Links open in your browser.'
+            t('Follow the steps in the terminal. Links open in your browser.')
           ) : exitCode === 0 ? (
             <span className="flex items-center gap-1.5 text-success">
-              <CircleCheck className="size-3.5" /> {cli} finished. Close to test the connection.
+              <CircleCheck className="size-3.5" /> {t('{cli} finished. Close to test the connection.', { cli })}
             </span>
           ) : (
-            `${cli} exited with code ${exitCode}.`
+            t('{cli} exited with code {code}.', { cli, code: exitCode })
           )}
         </span>
         <Button onClick={onDone}>{exitCode === null ? 'Close' : 'Done'}</Button>

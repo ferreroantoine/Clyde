@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import type { AgentEvent, PermissionLevel } from '@shared/agent'
 import type { PermissionDecision, ToolRequest } from '../../permissions/engine'
 import type { ApprovalOutcome, ApprovalQuestion } from '../../permissions/broker'
@@ -132,7 +133,7 @@ export class CodexSession {
     } catch (err) {
       if (!this.stopped) {
         const detail = proc.stderrTail().split('\n').filter(Boolean).at(-1)
-        this.deps.emit({ type: 'error', message: `Codex did not start: ${(err as Error).message}${detail ? ` (${detail})` : ''}` })
+        this.deps.emit({ type: 'error', message: t('Codex did not start: {message}', { message: (err as Error).message }) + (detail ? ` (${detail})` : '') })
       }
       proc.kill()
       throw err
@@ -141,8 +142,8 @@ export class CodexSession {
     rpc.close(new Error('Codex exited'))
     if (!this.stopped && code !== 0) {
       const detail = proc.stderrTail().split('\n').filter(Boolean).at(-1)
-      this.deps.emit({ type: 'error', message: `Codex exited with code ${code ?? 'unknown'}${detail ? `: ${detail}` : ''}` })
-      throw new Error(`Codex exited with code ${code}`)
+      this.deps.emit({ type: 'error', message: t('Codex exited with code {code}', { code: code ?? '?' }) + (detail ? `: ${detail}` : '') })
+      throw new Error(t('Codex exited with code {code}', { code }))
     }
   }
 
@@ -162,7 +163,7 @@ export class CodexSession {
     if (this.stopped) return
     this.stopped = true
     this.abort.abort()
-    this.rpc?.close(new Error('The session was stopped'))
+    this.rpc?.close(new Error(t('The session was stopped')))
     this.proc?.kill()
   }
 
@@ -182,7 +183,7 @@ export class CodexSession {
         if (this.stopped) return
         this.turn = null
         const message = err instanceof RpcRequestError ? err.error.message : err.message
-        this.deps.emit({ type: 'error', message: `Codex refused the message: ${message}` })
+        this.deps.emit({ type: 'error', message: t('Codex refused the message: {message}', { message }) })
         this.deps.emit({
           type: 'turn_end',
           isError: true,
@@ -249,7 +250,7 @@ export class CodexSession {
       case 'item/permissions/requestApproval': {
         const p = params as PermissionsApprovalParams
         const tool = { name: 'CodexPermissions', input: { cwd: p.cwd, permissions: p.permissions as unknown } }
-        const allowed = await this.approve(p.itemId, p.turnId, tool, p.reason ?? 'Codex asks for more access than its sandbox gives')
+        const allowed = await this.approve(p.itemId, p.turnId, tool, p.reason ?? t('Codex asks for more access than its sandbox gives'))
         const granted: Record<string, unknown> = {}
         if (allowed) {
           if (p.permissions.network) granted['network'] = p.permissions.network
@@ -296,7 +297,7 @@ export class CodexSession {
       this.deps.emit({ type: 'permission_denied', toolUseId: itemId, toolName: tool.name, reason: decision.reason })
       return false
     }
-    const reason = codexReason ? `${decision.reason}. Codex says: ${codexReason}` : decision.reason
+    const reason = codexReason ? t('{reason}. Codex says: {codexReason}', { reason: decision.reason, codexReason }) : decision.reason
     const outcome = await this.deps.ask({ toolUseId: itemId, toolName: tool.name, input: tool.input, reason }, this.abort.signal)
     if (outcome.behavior === 'allow') return true
     // Codex's decline carries no message; the user's reason goes to the agent as steering input.

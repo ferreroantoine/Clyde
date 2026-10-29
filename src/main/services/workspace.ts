@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { existsSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import { basename, join } from 'node:path'
@@ -28,7 +29,7 @@ export class WorkspaceService {
   }
 
   requireRoot(): string {
-    if (!this.info) throw new AppError('no_workspace', 'Open a folder first')
+    if (!this.info) throw new AppError('no_workspace', t('Open a folder first'))
     return this.info.root
   }
 
@@ -36,9 +37,9 @@ export class WorkspaceService {
     let root: string
     try {
       root = await realpath(path)
-      if (!(await stat(root)).isDirectory()) throw new Error('not a directory')
+      if (!(await stat(root)).isDirectory()) throw new Error(t('not a directory'))
     } catch {
-      throw new AppError('not_found', `Folder not found: ${path}`)
+      throw new AppError('not_found', t('Folder not found: {path}', { path }))
     }
     this.info = { root, name: basename(root) || root, isGitRepo: existsSync(join(root, '.git')) }
     this.watcher.start(root)

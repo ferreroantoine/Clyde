@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t, tn } from '@shared/i18n'
 import type { McpImportPreview, McpServer, McpServerInput, McpServerUpdate } from '@shared/mcp'
 import { invoke, on } from '@/lib/ipc'
 import { notify } from './notifications'
@@ -32,7 +33,7 @@ export const useMcp = create<McpState>()((set) => ({
       .then((servers) => set({ servers, loaded: true }))
       .catch((err) => {
         set({ loaded: true })
-        notify.error('Could not load MCP servers', err)
+        notify.error(t('Could not load MCP servers'), err)
       })
     return off
   },
@@ -42,7 +43,7 @@ export const useMcp = create<McpState>()((set) => ({
       set({ servers: await invoke('mcp:create', input) })
       return true
     } catch (err) {
-      notify.error('Could not add the server', err)
+      notify.error(t('Could not add the server'), err)
       return false
     }
   },
@@ -52,17 +53,17 @@ export const useMcp = create<McpState>()((set) => ({
       set({ servers: await invoke('mcp:update', input) })
       return true
     } catch (err) {
-      notify.error('Could not save the server', err)
+      notify.error(t('Could not save the server'), err)
       return false
     }
   },
 
   remove: async (id) => {
-    await invoke('mcp:delete', { id }).catch((err) => notify.error('Could not delete the server', err))
+    await invoke('mcp:delete', { id }).catch((err) => notify.error(t('Could not delete the server'), err))
   },
 
   reconnect: async (id) => {
-    await invoke('mcp:reconnect', { id }).catch((err) => notify.error('Could not reconnect', err))
+    await invoke('mcp:reconnect', { id }).catch((err) => notify.error(t('Could not reconnect'), err))
   },
 
   startImport: async () => {
@@ -70,7 +71,7 @@ export const useMcp = create<McpState>()((set) => ({
     try {
       set({ preview: await invoke('mcp:importPreview') })
     } catch (err) {
-      notify.error('Could not read that file', err)
+      notify.error(t('Could not read that file'), err)
     } finally {
       set({ picking: false })
     }
@@ -81,10 +82,10 @@ export const useMcp = create<McpState>()((set) => ({
   importServers: async (path, names) => {
     try {
       set({ servers: await invoke('mcp:import', { path, names }) })
-      notify.success(`Imported ${names.length} server${names.length > 1 ? 's' : ''}`)
+      notify.success(tn('Imported {count} server', 'Imported {count} servers', names.length))
       return true
     } catch (err) {
-      notify.error('Import failed', err)
+      notify.error(t('Import failed'), err)
       return false
     }
   }

@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { StringDecoder } from 'node:string_decoder'
 
 /**
@@ -55,7 +56,7 @@ export class RpcConnection {
     private readonly log: (line: string) => void = () => undefined
   ) {
     transport.onLine((line) => this.receive(line))
-    transport.onClose((reason) => this.close(reason ?? new Error('The Codex process exited')))
+    transport.onClose((reason) => this.close(reason ?? new Error(t('The Codex process exited'))))
   }
 
   onNotification(handler: NotificationHandler): void {

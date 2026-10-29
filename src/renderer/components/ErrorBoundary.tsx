@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { t } from '@shared/i18n'
 import { TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -27,16 +28,14 @@ export class ErrorBoundary extends Component<Props, { error: Error | null }> {
       <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center">
         <TriangleAlert className="size-6 text-destructive" />
         <div className="space-y-1">
-          <p className="text-sm font-medium">{this.props.scope} ran into an error</p>
+          <p className="text-sm font-medium">{t('{scope} ran into an error', { scope: this.props.scope })}</p>
           <p className="max-w-md font-mono text-xs break-words text-muted-foreground">{error.message}</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => this.setState({ error: null })}>
-            Try again
-          </Button>
+            {t('Try again')}</Button>
           <Button size="sm" variant="ghost" onClick={() => window.location.reload()}>
-            Reload the window
-          </Button>
+            {t('Reload the window')}</Button>
         </div>
       </div>
     )

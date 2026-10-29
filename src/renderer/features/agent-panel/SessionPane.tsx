@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { intlLocale, t, tk } from '@shared/i18n'
 import { ArrowUp, CircleAlert, Gauge, Square } from 'lucide-react'
 import { PERMISSION_LEVEL_LABELS, type AgentStatus } from '@shared/agent'
 import { kindLabel } from '@shared/profiles'
@@ -14,12 +15,12 @@ import { useLimits } from '@/stores/limits'
 import { ToolCard } from './ToolCard'
 
 export const STATUS_LABELS: Record<AgentStatus, string> = {
-  starting: 'Starting',
-  idle: 'Ready',
-  running: 'Working',
-  'awaiting-approval': 'Needs approval',
-  stopped: 'Stopped',
-  error: 'Ended with an error'
+  starting: tk('Starting'),
+  idle: tk('Ready'),
+  running: tk('Working'),
+  'awaiting-approval': tk('Needs approval'),
+  stopped: tk('Stopped'),
+  error: tk('Ended with an error')
 }
 
 export function StatusDot({ status }: { status: AgentStatus }) {
@@ -58,9 +59,9 @@ export function Item({ item, cwd, ended, subscription = false }: { item: Transcr
       return (
         <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground" data-turn={item.subtype}>
           {item.isError && <CircleAlert className="size-3 text-destructive" />}
-          {item.isError ? item.errors[0] ?? `Turn ended: ${item.subtype.replace(/_/g, ' ')}` : 'Done'}
+          {item.isError ? item.errors[0] ?? t('Turn ended: {reason}', { reason: item.subtype.replace(/_/g, ' ') }) : t('Done')}
           <span>
-            · {(item.durationMs / 1000).toFixed(1)}s · {tokens(item.inputTokens)} in / {tokens(item.outputTokens)} out
+            · {(item.durationMs / 1000).toFixed(1)}s · {t('{input} in / {output} out', { input: tokens(item.inputTokens), output: tokens(item.outputTokens) })}
             {item.costUsd !== null && !subscription && ` · ${usd(item.costUsd)}`}
           </span>
         </p>
@@ -126,16 +127,16 @@ function Composer({ view }: { view: SessionView }) {
               void submit()
             }
           }}
-          placeholder={ended ? 'This session has ended' : busy ? 'Queue a follow-up…' : 'Ask the agent… (Enter to send)'}
-          aria-label="Message to the agent"
+          placeholder={ended ? t('This session has ended') : busy ? t('Queue a follow-up…') : t('Ask the agent… (Enter to send)')}
+          aria-label={t('Message to the agent')}
           className="max-h-[200px] min-h-6 flex-1 resize-none bg-transparent py-0.5 text-[13px] outline-none placeholder:text-muted-foreground"
         />
         {busy ? (
-          <Button type="button" size="icon-xs" variant="outline" aria-label="Interrupt the agent" onClick={() => void interrupt()}>
+          <Button type="button" size="icon-xs" variant="outline" aria-label={t('Interrupt the agent')} onClick={() => void interrupt()}>
             <Square className="fill-current" />
           </Button>
         ) : (
-          <Button type="button" size="icon-xs" aria-label="Send" disabled={!text.trim() || ended} onClick={() => void submit()}>
+          <Button type="button" size="icon-xs" aria-label={t('Send')} disabled={!text.trim() || ended} onClick={() => void submit()}>
             <ArrowUp />
           </Button>
         )}
@@ -168,12 +169,12 @@ export function SessionPane({ view }: { view: SessionView }) {
   return (
     <div className="flex h-full min-h-0 flex-col" data-session={view.info.id} data-status={view.info.status}>
       <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b px-3 py-2 text-[11px] text-muted-foreground">
-        {profile ? <ProfileBadge profile={profile} className="font-medium text-foreground" /> : <span>Deleted account</span>}
-        <span className="font-mono">{view.info.model || 'default model'}</span>
-        <span>· {PERMISSION_LEVEL_LABELS[view.info.permissionLevel]}</span>
+        {profile ? <ProfileBadge profile={profile} className="font-medium text-foreground" /> : <span>{t('Deleted account')}</span>}
+        <span className="font-mono">{view.info.model || t('default model')}</span>
+        <span>· {t(PERMISSION_LEVEL_LABELS[view.info.permissionLevel])}</span>
         <span className="ml-auto flex items-center gap-1.5">
           <StatusDot status={view.info.status} />
-          {STATUS_LABELS[view.info.status]}
+          {t(STATUS_LABELS[view.info.status])}
           {!subscription && view.totals.costUsd > 0 && <span>· {usd(view.totals.costUsd)}</span>}
         </span>
       </div>
@@ -185,13 +186,13 @@ export function SessionPane({ view }: { view: SessionView }) {
           )}
         >
           <Gauge className="size-3.5" />
-          {limit.status === 'rejected' ? 'Usage limit reached' : 'Close to the usage limit'}
-          {limit.resetsAt && ` · resets ${new Date(limit.resetsAt * 1000).toLocaleTimeString()}`}
+          {limit.status === 'rejected' ? t('Usage limit reached') : t('Close to the usage limit')}
+          {limit.resetsAt && ` · ${t('resets {time}', { time: new Date(limit.resetsAt * 1000).toLocaleTimeString(intlLocale()) })}`}
         </p>
       )}
       {subscription && (
-        <div className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-[11px] text-muted-foreground" aria-label="Plan use of this session">
-          <span>This session</span>
+        <div className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-[11px] text-muted-foreground" aria-label={t('Plan use of this session')}>
+          <span>{t('This session')}</span>
           <SessionLimitLine usage={planUse ?? []} />
         </div>
       )}
@@ -206,7 +207,7 @@ export function SessionPane({ view }: { view: SessionView }) {
       >
         {view.items.length === 0 && (
           <p className="pt-6 text-center text-xs text-muted-foreground">
-            {view.info.status === 'starting' ? `Starting ${kindLabel(view.info.kind)}…` : 'Ask something to start.'}
+            {view.info.status === 'starting' ? t('Starting {cli}…', { cli: kindLabel(view.info.kind) }) : t('Ask something to start.')}
           </p>
         )}
         {view.items.map((item) => (
@@ -214,8 +215,7 @@ export function SessionPane({ view }: { view: SessionView }) {
         ))}
         {view.info.status === 'running' && last?.kind !== 'text' && (
           <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <StatusDot status="running" /> Working…
-          </p>
+            <StatusDot status="running" /> {' '}{t('Working…')}</p>
         )}
       </div>
       <Composer view={view} />

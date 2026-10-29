@@ -108,3 +108,12 @@ Je travaille dans un conteneur Linux sans compte Claude Pro/Max, ChatGPT ou Goog
 - Antigravity : rien de lisible de façon fiable → « indisponible », bouton Diagnostic qui affiche la sortie brute de `agy -p "/usage"` pour la prochaine itération.
 - Attribution : à chaque relevé, la hausse depuis le relevé précédent va aux sessions ayant tourné entre-temps (une seule → officiel ; plusieurs → prorata tokens, estimé). Une utilisation hors de l'IDE pendant ce temps (claude.ai dans le navigateur) est attribuée aux sessions : limite connue.
 - Relevés en arrière-plan toutes les 10 min (réglable) pour les comptes sans agent actif, sans envoyer de prompt.
+
+### Chantier 4 — fait
+- Paramètres v2 : un document versionné (`shared/settings.ts`), sections typées, migrations depuis les clés plates v1, valeur invalide remplacée champ par champ, document plus récent laissé intact (lecture seule). Réinitialisation par section.
+- Page Paramètres plein centre avec recherche (accents ignorés) ; Comptes et MCP y sont déplacés (barre d'activité allégée).
+- i18n : clé = texte anglais, `t()` / `tn()` (pluriel français : 0 et 1 au singulier) / `tk()` ; dictionnaire `shared/i18n/fr.ts` complet (≈850 chaînes, interface + messages d'erreur du processus principal) ; un test vérifie que chaque chaîne utilisée a sa traduction. Les prompts et descriptions d'outils envoyés aux modèles restent en anglais.
+- Export de configuration sans aucun secret (clés, jetons, variables MCP chiffrées non exportées, arguments masqués par `redactArgs`), import qui ajoute ce qui manque, purge de l'historique.
+- Raccourcis : tous modifiables, conflits signalés (commandes entre elles et touches de l'éditeur Monaco).
+- Barre d'état système (fermer = réduire, si choisi), notifications de bureau quand Atelier est en arrière-plan, sons.
+

@@ -1,4 +1,5 @@
 import { FolderOpen, History } from 'lucide-react'
+import { t } from '@shared/i18n'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/EmptyState'
 import { useSettings } from '@/stores/settings'
@@ -16,19 +17,17 @@ export function NoWorkspace() {
       <EmptyState
         className="h-auto pt-16"
         icon={FolderOpen}
-        title="No folder open"
-        description="Open a folder or repository to browse its files."
+        title={t('No folder open')}
+        description={t('Open a folder or repository to browse its files.')}
         action={
           <Button size="sm" onClick={() => void pick()}>
-            Open folder
-          </Button>
+            {t('Open folder')}</Button>
         }
       />
       {recent.length > 0 && (
         <div className="mt-8 px-3">
           <p className="mb-1 flex items-center gap-1.5 px-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-            <History className="size-3" /> Recent
-          </p>
+            <History className="size-3" /> {' '}{t('Recent')}</p>
           {recent.map((path) => (
             <button
               key={path}

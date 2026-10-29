@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { t } from '@shared/i18n'
 import { PERMISSION_LEVELS, PERMISSION_LEVEL_LABELS, type PermissionLevel, ANTIGRAVITY_LEVEL_HINTS } from '@shared/agent'
 import type { AgentDefinition } from '@shared/tasks'
 import { Button } from '@/components/ui/button'
@@ -7,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { ProfileBadge } from '@/components/ProfileBadge'
 import { LEVEL_HINTS, McpPicker } from '@/features/agent-panel/NewSession'
 import { useBoard } from '@/stores/board'
+import { useSettings } from '@/stores/settings'
 import { useProfiles } from '@/stores/profiles'
 import { cn } from '@/lib/utils'
 
@@ -36,7 +38,7 @@ function AgentForm({ agent, close }: { agent?: AgentDefinition; close: () => voi
   const [name, setName] = useState(agent?.name ?? '')
   const [profileId, setProfileId] = useState(agent?.profileId ?? profiles[0]?.id ?? '')
   const [model, setModel] = useState(agent?.model ?? '')
-  const [level, setLevel] = useState<PermissionLevel>(agent?.permissionLevel ?? 'files-auto')
+  const [level, setLevel] = useState<PermissionLevel>(agent?.permissionLevel ?? useSettings.getState().settings.agents.defaultPermission)
   const [prompt, setPrompt] = useState(agent?.systemPrompt ?? '')
   const [mcpTools, setMcpTools] = useState(new Set(agent?.mcpTools ?? []))
   const test = tests[profileId]
@@ -51,8 +53,8 @@ function AgentForm({ agent, close }: { agent?: AgentDefinition; close: () => voi
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{agent ? `Edit ${agent.name}` : 'New agent'}</DialogTitle>
-        <DialogDescription>An agent is an account, a model, instructions, a permission level and its MCP tools.</DialogDescription>
+        <DialogTitle>{agent ? t('Edit {name}', { name: agent.name }) : t('New agent')}</DialogTitle>
+        <DialogDescription>{t('An agent is an account, a model, instructions, a permission level and its MCP tools.')}</DialogDescription>
       </DialogHeader>
       <form
         className="grid gap-4"
@@ -61,11 +63,11 @@ function AgentForm({ agent, close }: { agent?: AgentDefinition; close: () => voi
           if (name.trim() && profileId) void save()
         }}
       >
-        <Field label="Name">
-          <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Reviewer" maxLength={60} />
+        <Field label={t('Name')}>
+          <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t('Reviewer')} maxLength={60} />
         </Field>
-        <Field label="Account">
-          <div className="grid gap-1.5" role="radiogroup" aria-label="Account">
+        <Field label={t('Account')}>
+          <div className="grid gap-1.5" role="radiogroup" aria-label={t('Account')}>
             {profiles.map((p) => (
               <button
                 key={p.id}
@@ -81,11 +83,11 @@ function AgentForm({ agent, close }: { agent?: AgentDefinition; close: () => voi
                 <ProfileBadge profile={p} />
               </button>
             ))}
-            {profiles.length === 0 && <p className="text-xs text-muted-foreground">Add an account first.</p>}
+            {profiles.length === 0 && <p className="text-xs text-muted-foreground">{t('Add an account first.')}</p>}
           </div>
         </Field>
-        <Field label="Model">
-          <Input list="agent-def-models" value={model} onChange={(e) => setModel(e.target.value)} placeholder="default" className="font-mono text-xs" />
+        <Field label={t('Model')}>
+          <Input list="agent-def-models" value={model} onChange={(e) => setModel(e.target.value)} placeholder={t('default')} className="font-mono text-xs" />
           <datalist id="agent-def-models">
             {models.map((m) => (
               <option key={m.value} value={m.value}>
@@ -94,39 +96,38 @@ function AgentForm({ agent, close }: { agent?: AgentDefinition; close: () => voi
             ))}
           </datalist>
         </Field>
-        <Field label="Permissions">
+        <Field label={t('Permissions')}>
           <div className="grid gap-1.5">
             {PERMISSION_LEVELS.map((l) => (
               <label key={l} className={cn('flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-1.5 text-xs', level === l && 'border-primary bg-primary/5')}>
                 <input type="radio" name="agent-level" checked={level === l} onChange={() => setLevel(l)} className="mt-0.5 accent-[var(--primary)]" />
                 <span>
-                  <span className="block font-medium">{PERMISSION_LEVEL_LABELS[l]}</span>
+                  <span className="block font-medium">{t(PERMISSION_LEVEL_LABELS[l])}</span>
                   <span className="block text-[11px] text-muted-foreground">
-                    {profiles.find((p) => p.id === profileId)?.kind === 'antigravity' ? ANTIGRAVITY_LEVEL_HINTS[l] : LEVEL_HINTS[l]}
+                    {profiles.find((p) => p.id === profileId)?.kind === 'antigravity' ? t(ANTIGRAVITY_LEVEL_HINTS[l]) : t(LEVEL_HINTS[l])}
                   </span>
                 </span>
               </label>
             ))}
           </div>
         </Field>
-        <Field label="MCP tools">
+        <Field label={t('MCP tools')}>
           <McpPicker value={mcpTools} onChange={setMcpTools} />
         </Field>
-        <Field label="System prompt">
+        <Field label={t('System prompt')}>
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="How this agent works, e.g. “Write tests first. Keep changes small.”"
-            aria-label="System prompt"
+            placeholder={t('How this agent works, e.g. “Write tests first. Keep changes small.”')}
+            aria-label={t('System prompt')}
             className="min-h-20 w-full resize-y rounded-md border bg-transparent px-3 py-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </Field>
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={close}>
-            Cancel
-          </Button>
+            {t('Cancel')}</Button>
           <Button type="submit" disabled={!name.trim() || !profileId}>
-            {agent ? 'Save' : 'Create agent'}
+            {agent ? t('Save') : t('Create agent')}
           </Button>
         </DialogFooter>
       </form>

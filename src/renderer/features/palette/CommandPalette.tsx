@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { t } from '@shared/i18n'
 import { CornerDownLeft, File, Search } from 'lucide-react'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { FileIcon } from '@/features/explorer/FileIcon'
@@ -39,8 +40,8 @@ export function CommandPalette() {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && hide()}>
       <DialogContent showCloseButton={false} className="top-[18%] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-xl">
-        <DialogTitle className="sr-only">Command palette</DialogTitle>
-        <DialogDescription className="sr-only">Type to filter commands and files, Enter to run.</DialogDescription>
+        <DialogTitle className="sr-only">{t('Command palette')}</DialogTitle>
+        <DialogDescription className="sr-only">{t('Type to filter commands and files, Enter to run.')}</DialogDescription>
         {open && <PaletteBody key={mode} mode={mode} close={hide} />}
       </DialogContent>
     </Dialog>
@@ -114,8 +115,8 @@ function PaletteBody({ mode, close }: { mode: 'all' | 'files'; close: () => void
             setQuery(e.target.value)
             setIndex(0)
           }}
-          placeholder={mode === 'files' ? 'Go to file…' : 'Type a command or a file name…'}
-          aria-label="Command"
+          placeholder={mode === 'files' ? t('Go to file…') : t('Type a command or a file name…')}
+          aria-label={t('Command')}
           role="combobox"
           aria-expanded
           aria-controls="palette-list"
@@ -126,11 +127,11 @@ function PaletteBody({ mode, close }: { mode: 'all' | 'files'; close: () => void
       <div ref={list} id="palette-list" role="listbox" className="max-h-80 overflow-y-auto p-1.5">
         {entries.length === 0 && (
           <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-            {mode === 'files' && !root ? 'Open a folder to search its files.' : 'Nothing matches.'}
+            {mode === 'files' && !root ? t('Open a folder to search its files.') : t('Nothing matches.')}
           </p>
         )}
         {entries.map((entry, i) => {
-          const group = entry.kind === 'command' ? entry.command.group : 'Files'
+          const group = entry.kind === 'command' ? entry.command.group : t('Files')
           const header = group !== lastGroup ? group : null
           lastGroup = group
           return (
@@ -172,8 +173,7 @@ function PaletteBody({ mode, close }: { mode: 'all' | 'files'; close: () => void
         })}
       </div>
       <p className="flex items-center gap-1 border-t px-3 py-1.5 text-[11px] text-muted-foreground">
-        <File className="size-3" /> ↑↓ to move · Enter to run · Esc to close
-      </p>
+        <File className="size-3" /> {' '}{t('↑↓ to move · Enter to run · Esc to close')}</p>
     </div>
   )
 }

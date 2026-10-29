@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { intlLocale, t, tk, tn } from '@shared/i18n'
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { CircleAlert, CircleCheck, Gauge, History, LoaderCircle, RefreshCw, Stethoscope } from 'lucide-react'
 import type { Billing, LimitDiagnostic } from '@shared/limits'
@@ -17,9 +18,9 @@ import { useSupervision } from '@/stores/supervision'
 import { cn } from '@/lib/utils'
 
 const RANGES: Array<{ value: MetricsRange; label: string }> = [
-  { value: '24h', label: '24 hours' },
-  { value: '7d', label: '7 days' },
-  { value: '30d', label: '30 days' }
+  { value: '24h', label: tk('24 hours') },
+  { value: '7d', label: tk('7 days') },
+  { value: '30d', label: tk('30 days') }
 ]
 
 /** "Local" for local models, "—" when nothing could be priced, "~" before estimates. */
@@ -30,7 +31,7 @@ function cost(value: number, estimated: boolean, billing: Billing, unpriced = fa
 }
 
 const shortDate = (ms: number) =>
-  new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  new Date(ms).toLocaleString(intlLocale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
 /** Every source of an account's limits, raw, so a missing value can be explained. */
 function DiagnosticDialog({ profileId, onClose }: { profileId: string | null; onClose: () => void }) {
@@ -49,13 +50,12 @@ function DiagnosticDialog({ profileId, onClose }: { profileId: string | null; on
     <Dialog open={!!profileId} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Usage limits diagnostic</DialogTitle>
-          <DialogDescription>What each source answered for this account. Keys and tokens are masked.</DialogDescription>
+          <DialogTitle>{t('Usage limits diagnostic')}</DialogTitle>
+          <DialogDescription>{t('What each source answered for this account. Keys and tokens are masked.')}</DialogDescription>
         </DialogHeader>
         {results === null ? (
           <p className="flex items-center gap-2 py-6 text-xs text-muted-foreground">
-            <LoaderCircle className="size-4 animate-spin" /> Asking the CLI… (it starts without sending a prompt)
-          </p>
+            <LoaderCircle className="size-4 animate-spin" /> {' '}{t('Asking the CLI… (it starts without sending a prompt)')}</p>
         ) : (
           <div className="max-h-[60vh] space-y-3 overflow-y-auto">
             {results.map((r) => (
@@ -80,19 +80,17 @@ function PlanLimits({ usage, onDiagnose }: { usage: ProfileUsage; onDiagnose: ()
   const refreshing = useLimits((s) => s.refreshing)
   const windows = limits?.windows ?? []
   return (
-    <div className="space-y-2.5" aria-label="Plan limits">
+    <div className="space-y-2.5" aria-label={t('Plan limits')}>
       {windows.length === 0 ? (
-        <p className="text-[11px] text-muted-foreground">No reading yet.</p>
+        <p className="text-[11px] text-muted-foreground">{t('No reading yet.')}</p>
       ) : (
         windows.map((w) => <LimitGauge key={w.window} state={w} color={usage.color} />)
       )}
       <div className="flex items-center gap-1">
         <Button size="xs" variant="ghost" disabled={refreshing} onClick={() => void refresh(usage.profileId)}>
-          <RefreshCw className={refreshing ? 'animate-spin' : undefined} /> Read now
-        </Button>
+          <RefreshCw className={refreshing ? 'animate-spin' : undefined} /> {' '}{t('Read now')}</Button>
         <Button size="xs" variant="ghost" onClick={onDiagnose}>
-          <Stethoscope /> Diagnostic
-        </Button>
+          <Stethoscope /> {' '}{t('Diagnostic')}</Button>
       </div>
     </div>
   )
@@ -100,36 +98,36 @@ function PlanLimits({ usage, onDiagnose }: { usage: ProfileUsage; onDiagnose: ()
 
 function ProfileCard({ usage, onDiagnose }: { usage: ProfileUsage; onDiagnose: () => void }) {
   return (
-    <article className="relative space-y-3 overflow-hidden rounded-xl border bg-card p-4 pl-5 shadow-xs" aria-label={`Usage of ${usage.name}`}>
+    <article className="relative space-y-3 overflow-hidden rounded-xl border bg-card p-4 pl-5 shadow-xs" aria-label={t('Usage of {name}', { name: usage.name })}>
       <span className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: usage.color }} />
       <header className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="truncate text-sm font-semibold">{usage.name}</h3>
           <p className="text-[11px] text-muted-foreground">
             {kindLabel(usage.kind)}
-            {usage.billing === 'subscription' && ' · subscription'}
+            {usage.billing === 'subscription' && ` · ${t('subscription')}`}
           </p>
         </div>
         <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
           <StatusDot status={usage.activeSessions ? 'running' : 'stopped'} />
-          {usage.activeSessions} active
+          {t('{count} active', { count: usage.activeSessions })}
         </span>
       </header>
       <dl className={cn('grid gap-2', usage.billing === 'subscription' ? 'grid-cols-2' : 'grid-cols-3')}>
         <div className="min-w-0">
-          <dt className="text-[11px] text-muted-foreground">Sessions</dt>
+          <dt className="text-[11px] text-muted-foreground">{t('Sessions')}</dt>
           <dd className="text-lg font-semibold tabular-nums">{usage.sessions}</dd>
         </div>
         <div className="min-w-0">
-          <dt className="text-[11px] text-muted-foreground">Tokens</dt>
+          <dt className="text-[11px] text-muted-foreground">{t('Tokens')}</dt>
           <dd className="text-lg font-semibold tabular-nums">{tokens(usage.inputTokens + usage.outputTokens)}</dd>
           <dd className="truncate text-[11px] text-muted-foreground tabular-nums">
-            {tokens(usage.inputTokens)} in · {tokens(usage.outputTokens)} out
+            {t('{input} in · {output} out', { input: tokens(usage.inputTokens), output: tokens(usage.outputTokens) })}
           </dd>
         </div>
         {usage.billing !== 'subscription' && (
           <div className="min-w-0">
-            <dt className="text-[11px] text-muted-foreground">{usage.costEstimated && usage.billing === 'api' ? 'Est. cost' : 'Cost'}</dt>
+            <dt className="text-[11px] text-muted-foreground">{usage.costEstimated && usage.billing === 'api' ? t('Est. cost') : t('Cost')}</dt>
             <dd className="text-lg font-semibold tabular-nums">{cost(usage.costUsd, usage.costEstimated, usage.billing, usage.unpricedTurns > 0)}</dd>
           </div>
         )}
@@ -137,7 +135,7 @@ function ProfileCard({ usage, onDiagnose }: { usage: ProfileUsage; onDiagnose: (
       {usage.unpricedTurns > 0 && (
         <p className="flex items-start gap-1 text-[11px] text-muted-foreground">
           <CircleAlert className="mt-px size-3 shrink-0" />
-          {usage.unpricedTurns} turn{usage.unpricedTurns > 1 ? 's' : ''} without a known price. Add the model in Settings › Prices.
+          {tn('{count} turn without a known price. Add the model in Settings › Prices.', '{count} turns without a known price. Add the model in Settings › Prices.', usage.unpricedTurns)}
         </p>
       )}
       {usage.billing === 'subscription' && <PlanLimits usage={usage} onDiagnose={onDiagnose} />}
@@ -171,12 +169,12 @@ function LimitHistoryChart({ usage }: { usage: ProfileUsage }) {
   return (
     <figure className="rounded-xl border bg-card p-4 shadow-xs">
       <figcaption className="mb-3 flex items-center gap-1.5 text-xs font-medium">
-        <ProfileDot color={usage.color} /> {usage.name} · plan use, last 7 days
+        <ProfileDot color={usage.color} /> {t('{name} · plan use, last 7 days', { name: usage.name })}
       </figcaption>
       {data.length === 0 ? (
-        <p className="py-10 text-center text-xs text-muted-foreground">No reading in the last 7 days.</p>
+        <p className="py-10 text-center text-xs text-muted-foreground">{t('No reading in the last 7 days.')}</p>
       ) : (
-        <div className="h-48" role="img" aria-label={`5-hour and weekly use of ${usage.name} over 7 days`}>
+        <div className="h-48" role="img" aria-label={t('5-hour and weekly use of {name} over 7 days', { name: usage.name })}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
               <CartesianGrid vertical={false} stroke="var(--border)" />
@@ -186,19 +184,19 @@ function LimitHistoryChart({ usage }: { usage: ProfileUsage }) {
                 scale="time"
                 domain={[now - 7 * 86_400_000, now]}
                 ticks={dayTicks}
-                tickFormatter={(ms: number) => new Date(ms).toLocaleDateString([], { weekday: 'short' })}
+                tickFormatter={(ms: number) => new Date(ms).toLocaleDateString(intlLocale(), { weekday: 'short' })}
                 tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
                 axisLine={{ stroke: 'var(--border)' }}
                 tickLine={false}
               />
               <YAxis domain={[0, 100]} tickFormatter={(n: number) => `${n}%`} tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} width={40} />
               <Tooltip
-                labelFormatter={(ms) => new Date(Number(ms)).toLocaleString()}
-                formatter={(value, name) => [`${value}%`, name === 'five_hour' ? '5-hour window' : 'Weekly']}
+                labelFormatter={(ms) => new Date(Number(ms)).toLocaleString(intlLocale())}
+                formatter={(value, name) => [`${value}%`, name === 'five_hour' ? t('5-hour window') : t('Weekly')]}
                 contentStyle={{ background: 'var(--popover)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, color: 'var(--popover-foreground)' }}
               />
               <Legend
-                formatter={(id) => <span style={{ color: 'var(--muted-foreground)', fontSize: 11 }}>{id === 'five_hour' ? '5-hour window' : 'Weekly'}</span>}
+                formatter={(id) => <span style={{ color: 'var(--muted-foreground)', fontSize: 11 }}>{id === 'five_hour' ? t('5-hour window') : t('Weekly')}</span>}
                 iconType="plainline"
               />
               <Line dataKey="five_hour" stroke={usage.color} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
@@ -238,7 +236,7 @@ function DailyChart({
   return (
     <figure className="rounded-xl border bg-card p-4 shadow-xs">
       <figcaption className="mb-3 text-xs font-medium">{title}</figcaption>
-      <div className="h-56" role="img" aria-label={`${title}, per day and per account`}>
+      <div className="h-56" role="img" aria-label={t('{title}, per day and per account', { title })}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }} barCategoryGap="28%">
             <CartesianGrid vertical={false} stroke="var(--border)" />
@@ -322,11 +320,11 @@ function Transcript() {
         <DialogHeader>
           <DialogTitle className="truncate">{transcript?.session.title ?? 'Session'}</DialogTitle>
           <DialogDescription>
-            {transcript && `${transcript.session.profileName} · ${transcript.session.model || 'default model'} · ${new Date(transcript.session.startedAt).toLocaleString()}`}
+            {transcript && `${transcript.session.profileName} · ${transcript.session.model || t('default model')} · ${new Date(transcript.session.startedAt).toLocaleString(intlLocale())}`}
           </DialogDescription>
         </DialogHeader>
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1" aria-label="Transcript">
-          {view?.items.length === 0 && <p className="text-xs text-muted-foreground">No message in this session.</p>}
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1" aria-label={t('Transcript')}>
+          {view?.items.length === 0 && <p className="text-xs text-muted-foreground">{t('No message in this session.')}</p>}
           {view?.items.map((item) => (
             <Item key={itemKey(item)} item={item} cwd={view.info.cwd} ended subscription={transcript?.session.billing === 'subscription'} />
           ))}
@@ -339,20 +337,20 @@ function Transcript() {
 function SessionsTable({ sessions }: { sessions: SessionRecord[] }) {
   const open = useSupervision((s) => s.openTranscript)
   const profiles = useSupervision((s) => s.dashboard?.profiles ?? [])
-  if (sessions.length === 0) return <p className="px-4 py-6 text-center text-xs text-muted-foreground">No session in this period.</p>
+  if (sessions.length === 0) return <p className="px-4 py-6 text-center text-xs text-muted-foreground">{t('No session in this period.')}</p>
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
         <thead className="text-left text-[11px] text-muted-foreground">
           <tr className="border-b">
-            <th className="px-4 py-2 font-medium">Started</th>
-            <th className="px-2 py-2 font-medium">Account</th>
-            <th className="px-2 py-2 font-medium">Session</th>
-            <th className="px-2 py-2 font-medium">Model</th>
-            <th className="px-2 py-2 text-right font-medium">Turns</th>
-            <th className="px-2 py-2 text-right font-medium">Tokens</th>
-            <th className="px-2 py-2 text-right font-medium">Use</th>
-            <th className="px-4 py-2 font-medium">Status</th>
+            <th className="px-4 py-2 font-medium">{t('Started')}</th>
+            <th className="px-2 py-2 font-medium">{t('Account')}</th>
+            <th className="px-2 py-2 font-medium">{t('Session')}</th>
+            <th className="px-2 py-2 font-medium">{t('Model')}</th>
+            <th className="px-2 py-2 text-right font-medium">{t('Turns')}</th>
+            <th className="px-2 py-2 text-right font-medium">{t('Tokens')}</th>
+            <th className="px-2 py-2 text-right font-medium">{t('Use')}</th>
+            <th className="px-4 py-2 font-medium">{t('Status')}</th>
           </tr>
         </thead>
         <tbody>
@@ -375,8 +373,8 @@ function SessionsTable({ sessions }: { sessions: SessionRecord[] }) {
                   </span>
                 </td>
                 <td className="max-w-72 truncate px-2 py-2" title={s.title ?? undefined}>
-                  {s.title ?? <span className="text-muted-foreground">(no message)</span>}
-                  {s.taskId && <span className="ml-1.5 rounded bg-muted px-1 text-[10px] text-muted-foreground">task</span>}
+                  {s.title ?? <span className="text-muted-foreground">{t('(no message)')}</span>}
+                  {s.taskId && <span className="ml-1.5 rounded bg-muted px-1 text-[10px] text-muted-foreground">{t('task')}</span>}
                 </td>
                 <td className="px-2 py-2 font-mono text-[11px] whitespace-nowrap">{s.model || 'default'}</td>
                 <td className="px-2 py-2 text-right tabular-nums">{s.turns}</td>
@@ -387,7 +385,7 @@ function SessionsTable({ sessions }: { sessions: SessionRecord[] }) {
                 <td className="px-4 py-2 whitespace-nowrap">
                   <span className="flex items-center gap-1.5">
                     <StatusDot status={s.status} />
-                    {STATUS_LABELS[s.status]}
+                    {t(STATUS_LABELS[s.status])}
                   </span>
                 </td>
               </tr>
@@ -433,13 +431,11 @@ export function SupervisionPage() {
       <div className="mx-auto max-w-6xl space-y-6 px-8 py-10">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold tracking-tight">Supervision</h1>
+            <h1 className="text-lg font-semibold tracking-tight">{t('Supervision')}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Sessions and tokens per account; plan limits for subscriptions, cost for API accounts (estimates from Settings ›
-              Prices). Each value says whether the CLI reported it or Atelier computed it.
-            </p>
+              {t('Sessions and tokens per account; plan limits for subscriptions, cost for API accounts (estimates from Settings › Prices). Each value says whether the CLI reported it or Atelier computed it.')}</p>
           </div>
-          <div className="flex items-center gap-2" role="group" aria-label="Period">
+          <div className="flex items-center gap-2" role="group" aria-label={t('Period')}>
             <div className="flex rounded-lg border bg-muted p-0.5">
               {RANGES.map((r) => (
                 <button
@@ -452,11 +448,11 @@ export function SupervisionPage() {
                     range === r.value ? 'bg-background font-medium shadow-xs' : 'text-muted-foreground hover:text-foreground'
                   )}
                 >
-                  {r.label}
+                  {t(r.label)}
                 </button>
               ))}
             </div>
-            <Button size="icon-sm" variant="ghost" aria-label="Refresh" onClick={() => void load()}>
+            <Button size="icon-sm" variant="ghost" aria-label={t('Refresh')} onClick={() => void load()}>
               <RefreshCw className={loading ? 'animate-spin' : undefined} />
             </Button>
           </div>
@@ -464,18 +460,18 @@ export function SupervisionPage() {
 
         {dashboard && dashboard.profiles.length === 0 ? (
           <div className="rounded-xl border border-dashed py-14">
-            <EmptyState icon={Gauge} title="No account yet" description="Add an account and start an agent; its usage shows here." />
+            <EmptyState icon={Gauge} title={t('No account yet')} description={t('Add an account and start an agent; its usage shows here.')} />
           </div>
         ) : (
           dashboard && (
             <>
-              <section className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-3" aria-label="Accounts">
+              <section className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-3" aria-label={t('Accounts')}>
                 {dashboard.profiles.map((p) => (
                   <ProfileCard key={p.profileId} usage={p} onDiagnose={() => setDiagnosing(p.profileId)} />
                 ))}
               </section>
               {dashboard.profiles.some((p) => p.billing === 'subscription') && (
-                <section className="grid grid-cols-[repeat(auto-fill,minmax(22rem,1fr))] gap-3" aria-label="Plan limits history">
+                <section className="grid grid-cols-[repeat(auto-fill,minmax(22rem,1fr))] gap-3" aria-label={t('Plan limits history')}>
                   {dashboard.profiles
                     .filter((p) => p.billing === 'subscription')
                     .map((p) => (
@@ -484,19 +480,18 @@ export function SupervisionPage() {
                 </section>
               )}
               {hasUsage ? (
-                <section className="grid gap-3 lg:grid-cols-2" aria-label="Charts">
-                  <DailyChart dashboard={dashboard} metric="tokens" title="Tokens per day" format={tokens} />
-                  <DailyChart dashboard={dashboard} metric="cost" title="API cost per day (USD)" format={(n) => usd(n)} />
+                <section className="grid gap-3 lg:grid-cols-2" aria-label={t('Charts')}>
+                  <DailyChart dashboard={dashboard} metric="tokens" title={t('Tokens per day')} format={tokens} />
+                  <DailyChart dashboard={dashboard} metric="cost" title={t('API cost per day (USD)')} format={(n) => usd(n)} />
                 </section>
               ) : (
                 <div className="rounded-xl border border-dashed py-10">
-                  <EmptyState icon={Gauge} title="No usage in this period" description="Charts appear once an agent has finished a turn." />
+                  <EmptyState icon={Gauge} title={t('No usage in this period')} description={t('Charts appear once an agent has finished a turn.')} />
                 </div>
               )}
-              <section className="rounded-xl border bg-card shadow-xs" aria-label="History">
+              <section className="rounded-xl border bg-card shadow-xs" aria-label={t('History')}>
                 <h2 className="flex items-center gap-1.5 border-b px-4 py-2.5 text-xs font-medium">
-                  <History className="size-3.5" /> History
-                  <span className="font-normal text-muted-foreground">· click a session to read it</span>
+                  <History className="size-3.5" /> {' '}{t('History')}<span className="font-normal text-muted-foreground">{t('· click a session to read it')}</span>
                 </h2>
                 <SessionsTable sessions={dashboard.sessions} />
               </section>

@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import type { AgentEvent } from '@shared/agent'
 import type { PermissionDecision, ToolRequest } from '../../permissions/engine'
 import type { ApprovalOutcome, ApprovalQuestion } from '../../permissions/broker'
@@ -101,7 +102,7 @@ export class ApiSession {
       for (let step = 0; ; step++) {
         if (step >= (this.cfg.maxSteps ?? MAX_STEPS)) {
           subtype = 'error_max_turns'
-          errors.push(`Stopped after ${this.cfg.maxSteps ?? MAX_STEPS} steps without finishing.`)
+          errors.push(t('Stopped after {steps} steps without finishing.', { steps: this.cfg.maxSteps ?? MAX_STEPS }))
           break
         }
         const key = `t${turn}s${step}:0`
@@ -116,7 +117,7 @@ export class ApiSession {
           if (event.type === 'text_delta') this.deps.emit({ type: 'text_delta', key, text: event.text })
           else done = event
         }
-        if (!done) throw new Error('The model stream ended without a reply')
+        if (!done) throw new Error(t('The model stream ended without a reply'))
         totals.inputTokens += done.usage.inputTokens
         totals.outputTokens += done.usage.outputTokens
         if (done.text) this.deps.emit({ type: 'text', key, text: done.text })
@@ -124,7 +125,7 @@ export class ApiSession {
         if (done.toolCalls.length === 0) {
           if (done.stopReason === 'max_tokens') {
             subtype = 'error_max_tokens'
-            errors.push('The reply hit the output token limit.')
+            errors.push(t('The reply hit the output token limit.'))
           }
           break
         }
@@ -139,7 +140,7 @@ export class ApiSession {
         } finally {
           // Every call needs a result in the history, or the next request is rejected.
           for (const call of done.toolCalls.slice(results.length)) {
-            const output = { content: 'Interrupted by the user', isError: true }
+            const output = { content: t('Interrupted by the user'), isError: true }
             results.push({ toolCallId: call.id, name: call.name, ...output })
             this.deps.emit({ type: 'tool_result', toolUseId: call.id, ...output })
           }

@@ -1,3 +1,5 @@
+import { t } from '@shared/i18n'
+import { effectiveBindings, formatCombo } from '@shared/keybindings'
 import { PROFILE_KIND_LABELS } from '@shared/profiles'
 import { useAgents, ENDED_STATUSES } from '@/stores/agents'
 import { useBoard } from '@/stores/board'
@@ -13,7 +15,8 @@ import { useWorkspace } from '@/stores/workspace'
 export interface Command {
   id: string
   title: string
-  group: 'Go to' | 'View' | 'Agents' | 'Create' | 'Workspace' | 'Sessions'
+  /** Translated group heading. */
+  group: string
   shortcut?: string
   run: () => void
 }
@@ -27,56 +30,58 @@ export function buildCommands(): Command[] {
   const settings = useSettings.getState()
   const active = agents.activeId ? agents.sessions[agents.activeId] : undefined
   const showAgentPanel = () => layout.setAgentPanelOpen(true)
+  const keys = effectiveBindings(settings.settings.shortcuts.bindings)
+  const sc = (id: string) => (keys[id] ? { shortcut: formatCombo(keys[id] as string) } : {})
 
   const commands: Command[] = [
-    { id: 'go.files', title: 'Go to Explorer', group: 'Go to', shortcut: 'Ctrl+Shift+E', run: () => layout.showSidebarTab('files') },
-    { id: 'go.search', title: 'Search in files', group: 'Go to', shortcut: 'Ctrl+Shift+F', run: () => layout.showSidebarTab('search') },
-    { id: 'go.file', title: 'Go to file…', group: 'Go to', shortcut: 'Ctrl+P', run: () => setTimeout(() => usePalette.getState().show('files')) },
-    { id: 'go.board', title: 'Go to Agents board', group: 'Go to', run: () => layout.showCenter('agents') },
-    { id: 'go.accounts', title: 'Go to Accounts', group: 'Go to', run: () => layout.showCenter('accounts') },
-    { id: 'go.mcp', title: 'Go to MCP servers', group: 'Go to', run: () => layout.showCenter('mcp') },
-    { id: 'go.supervision', title: 'Go to Supervision', group: 'Go to', run: () => layout.showCenter('supervision') },
-    { id: 'go.settings', title: 'Open Settings', group: 'Go to', shortcut: 'Ctrl+,', run: () => layout.showCenter('settings') },
+    { id: 'go.files', title: t('Go to Explorer'), group: t('Go to'), ...sc('view.explorer'), run: () => layout.showSidebarTab('files') },
+    { id: 'go.search', title: t('Search in files'), group: t('Go to'), ...sc('view.search'), run: () => layout.showSidebarTab('search') },
+    { id: 'go.file', title: t('Go to file…'), group: t('Go to'), ...sc('file.quickOpen'), run: () => setTimeout(() => usePalette.getState().show('files')) },
+    { id: 'go.board', title: t('Go to Agents board'), group: t('Go to'), run: () => layout.showCenter('agents') },
+    { id: 'go.accounts', title: t('Go to Accounts'), group: t('Go to'), run: () => layout.showSettings('accounts') },
+    { id: 'go.mcp', title: t('Go to MCP servers'), group: t('Go to'), run: () => layout.showSettings('mcp') },
+    { id: 'go.supervision', title: t('Go to Supervision'), group: t('Go to'), run: () => layout.showCenter('supervision') },
+    { id: 'go.settings', title: t('Open Settings'), group: t('Go to'), ...sc('view.settings'), run: () => layout.showCenter('settings') },
 
-    { id: 'view.sidebar', title: 'Toggle sidebar', group: 'View', shortcut: 'Ctrl+B', run: layout.toggleSidebar },
-    { id: 'view.terminal', title: 'Toggle terminal', group: 'View', shortcut: 'Ctrl+J', run: layout.toggleTerminal },
-    { id: 'view.agent', title: 'Toggle agent panel', group: 'View', shortcut: 'Ctrl+Alt+B', run: layout.toggleAgentPanel },
+    { id: 'view.sidebar', title: t('Toggle sidebar'), group: t('View'), ...sc('layout.sidebar'), run: layout.toggleSidebar },
+    { id: 'view.terminal', title: t('Toggle terminal'), group: t('View'), ...sc('layout.terminal'), run: layout.toggleTerminal },
+    { id: 'view.agent', title: t('Toggle agent panel'), group: t('View'), ...sc('layout.agentPanel'), run: layout.toggleAgentPanel },
     ...(['light', 'dark', 'system'] as const)
-      .filter((t) => t !== settings.settings.appearance.theme)
-      .map((t): Command => ({
-        id: `view.theme.${t}`,
-        title: `Use the ${t === 'system' ? 'system' : t} theme`,
-        group: 'View',
-        run: () => void settings.update('appearance.theme', t)
+      .filter((theme) => theme !== settings.settings.appearance.theme)
+      .map((theme): Command => ({
+        id: `view.theme.${theme}`,
+        title: theme === 'system' ? t('Use the system theme') : theme === 'dark' ? t('Use the dark theme') : t('Use the light theme'),
+        group: t('View'),
+        run: () => void settings.update('appearance.theme', theme)
       })),
 
-    { id: 'ws.open', title: 'Open folder…', group: 'Workspace', shortcut: 'Ctrl+O', run: () => void useWorkspace.getState().pick() },
-    { id: 'ws.terminal', title: 'New terminal', group: 'Workspace', run: () => {
+    { id: 'ws.open', title: t('Open folder…'), group: t('Workspace'), ...sc('file.openFolder'), run: () => void useWorkspace.getState().pick() },
+    { id: 'ws.terminal', title: t('New terminal'), group: t('Workspace'), run: () => {
       layout.setTerminalOpen(true)
       void useTerminals.getState().create()
     } },
     ...(useEditor.getState().active
-      ? [{ id: 'ws.save', title: 'Save file', group: 'Workspace' as const, shortcut: 'Ctrl+S', run: () => void useEditor.getState().save() }]
+      ? [{ id: 'ws.save', title: t('Save file'), group: t('Workspace'), ...sc('file.save'), run: () => void useEditor.getState().save() }]
       : []),
 
-    { id: 'new.session', title: 'New agent session', group: 'Create', run: () => {
+    { id: 'new.session', title: t('New agent session'), group: t('Create'), run: () => {
       agents.select(null)
       showAgentPanel()
     } },
-    { id: 'new.task', title: 'New task…', group: 'Create', run: () => layout.request('new-task') },
-    { id: 'new.agent', title: 'New saved agent…', group: 'Create', run: () => layout.request('new-agent') },
-    { id: 'new.account', title: 'Add account…', group: 'Create', run: () => layout.request('new-account') },
-    { id: 'new.mcp', title: 'Add MCP server…', group: 'Create', run: () => layout.request('new-mcp') },
-    { id: 'new.import', title: 'Import claude_desktop_config.json…', group: 'Create', run: () => {
-      layout.showCenter('mcp')
+    { id: 'new.task', title: t('New task…'), group: t('Create'), run: () => layout.request('new-task') },
+    { id: 'new.agent', title: t('New saved agent…'), group: t('Create'), run: () => layout.request('new-agent') },
+    { id: 'new.account', title: t('Add account…'), group: t('Create'), run: () => layout.request('new-account') },
+    { id: 'new.mcp', title: t('Add MCP server…'), group: t('Create'), run: () => layout.request('new-mcp') },
+    { id: 'new.import', title: t('Import claude_desktop_config.json…'), group: t('Create'), run: () => {
+      layout.showSettings('mcp')
       void useMcp.getState().startImport()
     } }
   ]
 
   if (active && !ENDED_STATUSES.has(active.info.status)) {
     commands.push(
-      { id: 'agent.interrupt', title: 'Interrupt the active agent', group: 'Agents', run: () => void agents.interrupt() },
-      { id: 'agent.stop', title: 'Stop the active agent session', group: 'Agents', run: () => void agents.stop() }
+      { id: 'agent.interrupt', title: t('Interrupt the active agent'), group: t('Agents'), run: () => void agents.interrupt() },
+      { id: 'agent.stop', title: t('Stop the active agent session'), group: t('Agents'), run: () => void agents.stop() }
     )
   }
   for (const id of agents.order) {
@@ -85,8 +90,11 @@ export function buildCommands(): Command[] {
     const profile = profileById(profiles, view.info.profileId)
     commands.push({
       id: `session.${id}`,
-      title: `Switch to ${profile?.name ?? 'agent'} · ${view.info.model || 'default model'}${ENDED_STATUSES.has(view.info.status) ? ' (ended)' : ''}`,
-      group: 'Sessions',
+      title: t(ENDED_STATUSES.has(view.info.status) ? 'Switch to {name} · {model} (ended)' : 'Switch to {name} · {model}', {
+        name: profile?.name ?? t('agent'),
+        model: view.info.model || t('default model')
+      }),
+      group: t('Sessions'),
       run: () => {
         agents.select(id)
         showAgentPanel()
@@ -98,8 +106,8 @@ export function buildCommands(): Command[] {
     if (!workspace || !profile?.usable) continue
     commands.push({
       id: `agent.start.${agent.id}`,
-      title: `Chat with ${agent.name} (${profile.name}, ${PROFILE_KIND_LABELS[profile.kind]})`,
-      group: 'Agents',
+      title: t('Chat with {agent} ({account}, {kind})', { agent: agent.name, account: profile.name, kind: PROFILE_KIND_LABELS[profile.kind] }),
+      group: t('Agents'),
       run: () => {
         showAgentPanel()
         void agents.start({

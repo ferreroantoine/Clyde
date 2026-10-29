@@ -64,6 +64,29 @@ describe('SettingsService', () => {
     expect(repo.loadAll()[DOCUMENT_KEY]).toEqual(future)
   })
 
+  it('resets one section, keeps recent folders, and tells listeners', () => {
+    const service = new SettingsService(new MemorySettingsRepository())
+    service.set('general.recentWorkspaces', ['/a'])
+    service.set('general.closeBehavior', 'tray')
+    service.set('editor.tabSize', 4)
+    const seen: string[] = []
+    service.onChange((next, previous) => seen.push(`${previous.general.closeBehavior}->${next.general.closeBehavior}`))
+    service.resetSection('general')
+    expect(service.getAll().general).toMatchObject({ closeBehavior: 'quit', recentWorkspaces: ['/a'] })
+    expect(service.getAll().editor.tabSize).toBe(4)
+    expect(seen).toEqual(['tray->quit'])
+    expect(() => service.resetSection('nope')).toThrow(/Unknown settings section/)
+  })
+
+  it('imports a whole document, keeping valid values only', () => {
+    const service = new SettingsService(new MemorySettingsRepository())
+    service.set('general.recentWorkspaces', ['/mine'])
+    service.importAll({ appearance: { theme: 'dark', accent: 'neon' }, general: { recentWorkspaces: ['/theirs'] }, editor: { tabSize: 8 } })
+    expect(service.getAll().appearance).toMatchObject({ theme: 'dark', accent: 'indigo' })
+    expect(service.getAll().editor.tabSize).toBe(8)
+    expect(service.getAll().general.recentWorkspaces).toEqual(['/mine'])
+  })
+
   it('refuses to migrate from an unknown version', () => {
     expect(() => migrateSettings({}, 0)).toThrow(/No settings migration/)
   })

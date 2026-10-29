@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t } from '@shared/i18n'
 import type { ConnectionResult, Profile, ProfileCreate, ProfileUpdate } from '@shared/profiles'
 import { invoke, on } from '@/lib/ipc'
 import { notify } from './notifications'
@@ -26,7 +27,7 @@ export const useProfiles = create<ProfilesState>()((set, get) => ({
       .then((profiles) => set({ profiles, loaded: true }))
       .catch((err) => {
         set({ loaded: true })
-        notify.error('Could not load accounts', err)
+        notify.error(t('Could not load accounts'), err)
       })
     return off
   },
@@ -35,7 +36,7 @@ export const useProfiles = create<ProfilesState>()((set, get) => ({
     try {
       return await invoke('profiles:create', input)
     } catch (err) {
-      notify.error('Could not add the account', err)
+      notify.error(t('Could not add the account'), err)
       return null
     }
   },
@@ -44,7 +45,7 @@ export const useProfiles = create<ProfilesState>()((set, get) => ({
     try {
       return await invoke('profiles:update', input)
     } catch (err) {
-      notify.error('Could not save the account', err)
+      notify.error(t('Could not save the account'), err)
       return null
     }
   },
@@ -55,7 +56,7 @@ export const useProfiles = create<ProfilesState>()((set, get) => ({
       const { [id]: _removed, ...tests } = get().tests
       set({ tests })
     } catch (err) {
-      notify.error('Could not delete the account', err)
+      notify.error(t('Could not delete the account'), err)
     }
   },
 
@@ -68,7 +69,7 @@ export const useProfiles = create<ProfilesState>()((set, get) => ({
     } catch (err) {
       const { [id]: _pending, ...tests } = get().tests
       set({ tests })
-      notify.error('Connection test failed', err)
+      notify.error(t('Connection test failed'), err)
       return null
     }
   }

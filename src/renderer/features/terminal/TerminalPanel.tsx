@@ -1,4 +1,5 @@
 import { Eye, Plus, SquareTerminal, Trash2, X } from 'lucide-react'
+import { t } from '@shared/i18n'
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/EmptyState'
@@ -60,17 +61,16 @@ export function TerminalPanel() {
       <div className="flex h-9 shrink-0 items-center justify-between gap-2 border-b px-2">
         <div role="tablist" className="flex min-w-0 items-center gap-1 overflow-x-auto">
           <span className="px-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-            Terminal
-          </span>
+            {t('Terminal')}</span>
           {tabs.map((t) => (
             <Tab key={t.id} tab={t} active={t.id === active} />
           ))}
         </div>
         <div className="flex items-center gap-0.5">
-          <IconButton icon={Plus} label="New terminal" onClick={() => void create()} />
+          <IconButton icon={Plus} label={t('New terminal')} onClick={() => void create()} />
           <IconButton
             icon={Trash2}
-            label="Kill terminal"
+            label={t('Kill terminal')}
             disabled={!active}
             onClick={() => active && void close(active)}
           />
@@ -80,11 +80,10 @@ export function TerminalPanel() {
         {tabs.length === 0 ? (
           <EmptyState
             icon={SquareTerminal}
-            title="No terminal"
+            title={t('No terminal')}
             action={
               <Button size="sm" variant="outline" onClick={() => void create()}>
-                New terminal
-              </Button>
+                {t('New terminal')}</Button>
             }
           />
         ) : (

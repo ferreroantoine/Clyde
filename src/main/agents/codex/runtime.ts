@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import type { ConnectionResult, ModelOption } from '@shared/profiles'
 import type { AgentMcpServer } from '../../mcp/hub'
 import { withoutAccountVars } from '../claude-code/runtime'
@@ -43,7 +44,7 @@ export async function probeCodex(
 ): Promise<CodexProbe> {
   const proc = spawn({ file: target.binary, args: ['app-server'], env: target.env, cwd: target.cwd })
   const rpc = new RpcConnection(proc.transport)
-  const timer = setTimeout(() => rpc.close(new Error('Codex did not answer in time')), timeoutMs)
+  const timer = setTimeout(() => rpc.close(new Error(t('Codex did not answer in time'))), timeoutMs)
   try {
     const init = await rpc.request<InitializeResponse>('initialize', {
       clientInfo: { name: 'atelier', title: 'Atelier', version: target.clientVersion },
@@ -93,24 +94,24 @@ export async function testCodexConnection(
   try {
     info = await probe()
   } catch (err) {
-    result.status = 'Not connected'
-    result.detail = `Codex did not start: ${(err as Error).message}`
+    result.status = t('Not connected')
+    result.detail = t('Codex did not start: {message}', { message: (err as Error).message })
     return result
   }
   result.models = info.models
   const account = info.account.account
   if (!account) {
-    result.detail = 'Open the sign-in terminal and log in with the ChatGPT account this profile should use.'
+    result.detail = t('Open the sign-in terminal and log in with the ChatGPT account this profile should use.')
     return result
   }
   if (account.type !== 'chatgpt') {
-    result.status = 'Wrong sign-in'
-    result.detail = `Codex is signed in with ${account.type === 'apiKey' ? 'an API key' : account.type}, not a ChatGPT plan. Sign in again with ChatGPT.`
+    result.status = t('Wrong sign-in')
+    result.detail = t('Codex is signed in with {method}, not a ChatGPT plan. Sign in again with ChatGPT.', { method: account.type === 'apiKey' ? t('an API key') : account.type })
     return result
   }
   const chatgpt = account as { type: 'chatgpt'; email: string | null; planType: string }
   result.ok = true
-  result.status = 'Signed in'
+  result.status = t('Signed in')
   result.email = chatgpt.email
   result.subscriptionType = chatgpt.planType
   return result

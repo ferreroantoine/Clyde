@@ -1,5 +1,6 @@
+import { intlLocale, t } from '@shared/i18n'
 import { Notification } from 'electron'
-import { parseCodexRateLimits, type LimitDiagnostic, type LimitReading } from '@shared/limits'
+import { parseCodexRateLimits, windowLabel, type LimitDiagnostic, type LimitReading } from '@shared/limits'
 import type { AgentEventEnvelope, AgentSessionInfo } from '@shared/agent'
 import type { Profile } from '@shared/profiles'
 import { redact } from '@shared/redact'
@@ -42,8 +43,8 @@ export function setupLimits(deps: LimitsSetupDeps) {
       broadcast('limits:alert', alert)
       if (Notification.isSupported()) {
         new Notification({
-          title: `${alert.profileName}: ${alert.label} at ${Math.round(alert.usedPct)}%`,
-          body: alert.resetsAt ? `Resets ${new Date(alert.resetsAt).toLocaleString()}.` : 'Atelier will tell you when it resets.'
+          title: t('{account}: {window} at {pct}%', { account: alert.profileName, window: windowLabel(alert.window, alert.label), pct: Math.round(alert.usedPct) }),
+          body: alert.resetsAt ? t('Resets {date}.', { date: new Date(alert.resetsAt).toLocaleString(intlLocale()) }) : t('Atelier will tell you when it resets.')
         }).show()
       }
     }
@@ -118,7 +119,7 @@ export function setupLimits(deps: LimitsSetupDeps) {
         attempt('Claude Code /usage (Agent SDK)', async () => json((await probeClaudeLimits(await deps.query(), claudeTarget(p))).raw)),
         attempt('Status line bridge', async () => {
           const readings = readBridge(profiles.configDir(p.id))
-          if (!readings.length) throw new Error('No reading yet: Claude Code has not run the status line with limits for this account.')
+          if (!readings.length) throw new Error(t('No reading yet: Claude Code has not run the status line with limits for this account.'))
           return json(readings)
         })
       ])
@@ -132,12 +133,12 @@ export function setupLimits(deps: LimitsSetupDeps) {
           const home = profiles.configDir(p.id)
           const target = { binary: resolveAntigravityBinary(settings().cli.antigravityPath), env: buildAgyEnv(process.env, home), cwd: home }
           const { code, output } = await runAgy(spawnPty, target, ['-p', '/usage', '--output-format', 'json'], 90_000)
-          if (code !== 0) throw new Error(`agy exited with code ${code}:\n${output}`)
+          if (code !== 0) throw new Error(t('agy exited with code {code}:\n{output}', { code, output }))
           return output
         })
       ]
     }
-    return [{ source: 'API account', ok: true, output: 'API accounts have no plan limits; Atelier shows their cost instead.' }]
+    return [{ source: t('API account'), ok: true, output: t('API accounts have no plan limits; Atelier shows their cost instead.') }]
   }
 
   return {

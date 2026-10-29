@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -58,7 +59,7 @@ export function binaryPackages(platform: NodeJS.Platform, arch: string): string[
 /** The Claude Code executable: the user's override when set, else the one bundled with the Agent SDK. */
 export function resolveClaudeBinary(override: string): string {
   if (override.trim()) {
-    if (!existsSync(override)) throw new AppError('claude_code_missing', `Claude Code was not found at ${override}`)
+    if (!existsSync(override)) throw new AppError('claude_code_missing', t('Claude Code was not found at {override}', { override }))
     return override
   }
   const exe = process.platform === 'win32' ? 'claude.exe' : 'claude'
@@ -72,7 +73,7 @@ export function resolveClaudeBinary(override: string): string {
   }
   throw new AppError(
     'claude_code_missing',
-    'The Claude Code binary bundled with the Agent SDK is missing. Run npm install again, or set its path in Settings.'
+    t('The Claude Code binary bundled with the Agent SDK is missing. Run npm install again, or set its path in Settings.')
   )
 }
 
@@ -111,7 +112,7 @@ export function authStatus(binary: string, env: Record<string, string>, timeoutM
         try {
           resolve(parseAuthStatus(stdout))
         } catch {
-          reject(new AppError('agent_error', `Claude Code did not report its sign-in state: ${err?.message ?? 'no output'}`))
+          reject(new AppError('agent_error', t('Claude Code did not report its sign-in state: {message}', { message: err?.message ?? t('no output') })))
         }
       }
     )

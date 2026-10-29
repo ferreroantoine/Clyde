@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { t, tn } from '@shared/i18n'
 import { ArrowLeft, CircleAlert, GitBranch, GitMerge, LoaderCircle, MessageSquareReply, Trash2 } from 'lucide-react'
 import type { Task, TaskChange } from '@shared/tasks'
 import { Button } from '@/components/ui/button'
@@ -31,7 +32,7 @@ export function ReviewView({ task }: { task: Task }) {
   return (
     <div className="flex h-full min-h-0 flex-col" data-review={task.id}>
       <header className="flex shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2.5">
-        <Button size="icon-xs" variant="ghost" aria-label="Back to the board" onClick={closeReview}>
+        <Button size="icon-xs" variant="ghost" aria-label={t('Back to the board')} onClick={closeReview}>
           <ArrowLeft />
         </Button>
         <div className="min-w-0 flex-1">
@@ -43,19 +44,17 @@ export function ReviewView({ task }: { task: Task }) {
             </span>
             <span className="shrink-0">
               → <span className="font-mono">{task.baseBranch}</span>
-              {review?.changes && ` · ${changes.length} file${changes.length === 1 ? '' : 's'} changed`}
+              {review?.changes && ` · ${tn('{count} file changed', '{count} files changed', changes.length)}`}
             </span>
           </p>
         </div>
         <div className="flex gap-1.5">
           <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirmAbandon(true)}>
-            <Trash2 /> Abandon
-          </Button>
+            <Trash2 /> {' '}{t('Abandon')}</Button>
           <Button size="sm" variant="outline" disabled={busy} onClick={() => setAsking(true)}>
-            <MessageSquareReply /> Request changes
-          </Button>
+            <MessageSquareReply /> {' '}{t('Request changes')}</Button>
           <Button size="sm" disabled={busy || changes.length === 0} onClick={() => void merge(task.id)}>
-            {busy ? <LoaderCircle className="animate-spin" /> : <GitMerge />} Merge into {task.baseBranch}
+            {busy ? <LoaderCircle className="animate-spin" /> : <GitMerge />} {t('Merge into {branch}', { branch: task.baseBranch })}
           </Button>
         </div>
       </header>
@@ -66,11 +65,10 @@ export function ReviewView({ task }: { task: Task }) {
         </p>
       )}
       <div className="flex min-h-0 flex-1">
-        <nav className="w-64 shrink-0 overflow-y-auto border-r py-1" aria-label="Changed files">
+        <nav className="w-64 shrink-0 overflow-y-auto border-r py-1" aria-label={t('Changed files')}>
           {review?.loading && !review.changes && (
             <p className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground">
-              <LoaderCircle className="size-3.5 animate-spin" /> Reading the changes…
-            </p>
+              <LoaderCircle className="size-3.5 animate-spin" /> {' '}{t('Reading the changes…')}</p>
           )}
           {changes.map((c) => {
             const s = STATUS_LETTER[c.status]
@@ -94,9 +92,9 @@ export function ReviewView({ task }: { task: Task }) {
         </nav>
         <div className="min-w-0 flex-1">
           {review?.changes && changes.length === 0 ? (
-            <EmptyState icon={GitBranch} title="No changes" description="The agent has not changed any file in this worktree yet." />
+            <EmptyState icon={GitBranch} title={t('No changes')} description={t('The agent has not changed any file in this worktree yet.')} />
           ) : review?.diff?.unsupported ? (
-            <EmptyState icon={GitBranch} title="Binary or large file" description="This file cannot be shown as a text diff." />
+            <EmptyState icon={GitBranch} title={t('Binary or large file')} description={t('This file cannot be shown as a text diff.')} />
           ) : review?.diff ? (
             <DiffView diff={review.diff} />
           ) : null}
@@ -106,27 +104,25 @@ export function ReviewView({ task }: { task: Task }) {
       <Dialog open={asking} onOpenChange={setAsking}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Request changes</DialogTitle>
-            <DialogDescription>The agent continues in the same worktree with your comments as its next message.</DialogDescription>
+            <DialogTitle>{t('Request changes')}</DialogTitle>
+            <DialogDescription>{t('The agent continues in the same worktree with your comments as its next message.')}</DialogDescription>
           </DialogHeader>
           <textarea
             autoFocus
             value={comments}
             onChange={(e) => setComments(e.target.value)}
-            placeholder="What should change?"
-            aria-label="Review comments"
+            placeholder={t('What should change?')}
+            aria-label={t('Review comments')}
             className="min-h-32 w-full resize-y rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAsking(false)}>
-              Cancel
-            </Button>
+              {t('Cancel')}</Button>
             <Button
               disabled={!comments.trim() || busy}
               onClick={() => void requestChanges(task.id, comments).then((ok) => ok && setAsking(false))}
             >
-              Send to the agent
-            </Button>
+              {t('Send to the agent')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -134,16 +130,13 @@ export function ReviewView({ task }: { task: Task }) {
       <Dialog open={confirmAbandon} onOpenChange={setConfirmAbandon}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Abandon this task?</DialogTitle>
+            <DialogTitle>{t('Abandon this task?')}</DialogTitle>
             <DialogDescription>
-              The worktree and the branch <span className="font-mono">{task.branch}</span> are deleted, with every change in
-              them.
-            </DialogDescription>
+              {t('The worktree and the branch')}{' '}<span className="font-mono">{task.branch}</span> {' '}{t('are deleted, with every change in them.')}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setConfirmAbandon(false)}>
-              Keep it
-            </Button>
+              {t('Keep it')}</Button>
             <Button
               variant="destructive"
               onClick={() => {
@@ -151,8 +144,7 @@ export function ReviewView({ task }: { task: Task }) {
                 void abandon(task.id)
               }}
             >
-              Abandon
-            </Button>
+              {t('Abandon')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

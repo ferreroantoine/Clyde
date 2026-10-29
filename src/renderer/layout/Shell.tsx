@@ -1,4 +1,6 @@
 import { Group, Panel, useDefaultLayout } from 'react-resizable-panels'
+import { t, tk } from '@shared/i18n'
+import type { CenterView } from '@/stores/layout'
 import { useLayout } from '@/stores/layout'
 import { ActivityBar } from './ActivityBar'
 import { StatusBar } from './StatusBar'
@@ -11,6 +13,8 @@ import { AgentPanel } from '@/features/agent-panel/AgentPanel'
 import { CenterPage } from '@/features/pages/CenterPage'
 import { cn } from '@/lib/utils'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+
+const CENTER_SCOPES: Record<CenterView, string> = { editor: tk('The editor'), agents: tk('The agents board'), supervision: tk('Supervision'), settings: tk('Settings') }
 
 const storage = typeof window !== 'undefined' ? window.localStorage : undefined
 
@@ -60,7 +64,7 @@ export function Shell() {
                   </div>
                   {center !== 'editor' && (
                     <div className="absolute inset-0 bg-background">
-                      <ErrorBoundary key={center} scope={center[0]?.toUpperCase() + center.slice(1)}>
+                      <ErrorBoundary key={center} scope={t(CENTER_SCOPES[center])}>
                         <CenterPage view={center} />
                       </ErrorBoundary>
                     </div>
@@ -94,7 +98,7 @@ export function Shell() {
             maxSize="50"
             className="bg-chrome"
           >
-            <ErrorBoundary scope="The agent panel">
+            <ErrorBoundary scope={t('The agent panel')}>
               <AgentPanel />
             </ErrorBoundary>
           </Panel>

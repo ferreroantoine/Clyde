@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentEvent } from '@shared/agent'
 
@@ -172,16 +173,16 @@ export class MessageTranslator {
 export function describeAssistantError(error: string): string {
   switch (error) {
     case 'authentication_failed':
-      return 'Claude Code is not signed in for this profile, or its key was rejected. Open Accounts to sign in or update the key.'
+      return t('Claude Code is not signed in for this profile, or its key was rejected. Open Accounts to sign in or update the key.')
     case 'billing_error':
-      return 'The account has a billing problem. Check it on claude.ai or in the Anthropic Console.'
+      return t('The account has a billing problem. Check it on claude.ai or in the Anthropic Console.')
     case 'rate_limit':
-      return 'The account hit a usage limit. Wait for the reset or switch to another profile.'
+      return t('The account hit a usage limit. Wait for the reset or switch to another profile.')
     case 'overloaded':
-      return 'The API is overloaded. Try again in a moment.'
+      return t('The API is overloaded. Try again in a moment.')
     case 'model_not_found':
-      return 'This model is not available for the profile. Pick another model.'
+      return t('This model is not available for the profile. Pick another model.')
     default:
-      return `Claude Code reported an error: ${error.replace(/_/g, ' ')}.`
+      return t('Claude Code reported an error: {error}.', { error: error.replace(/_/g, ' ') })
   }
 }

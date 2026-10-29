@@ -18,6 +18,7 @@ import { priceInputSchema, type PriceRow } from '../pricing'
 import type { Dashboard, SessionTranscript } from '../metrics'
 import type { AppNotice } from '../notices'
 import type { CliStatus } from '../cli'
+import type { DataPaths, ImportSummary } from '../config-export'
 import type { LimitAlert, LimitDiagnostic, LimitHistory, ProfileLimits, SessionLimitUsage } from '../limits'
 import { mcpIdSchema, mcpServerInputSchema, mcpServerUpdateSchema, type McpImportPreview, type McpServer } from '../mcp'
 import {
@@ -63,6 +64,14 @@ export const requestSchemas = {
   'pty:kill': z.object({ id: ptyId }),
   'settings:getAll': z.undefined(),
   'settings:set': z.object({ path: z.string().min(3).max(128), value: z.unknown() }),
+  'settings:resetSection': z.object({ section: z.string().min(1).max(64) }),
+  'data:export': z.undefined(),
+  'data:import': z.undefined(),
+  'data:purge': z.undefined(),
+  'data:paths': z.undefined(),
+  'data:open': z.object({ target: z.enum(['userData', 'database', 'logs']) }),
+  'app:licenses': z.undefined(),
+  'app:pickPath': z.object({ kind: z.enum(['folder', 'file']), title: z.string().max(200), defaultPath: z.string().max(4096).optional() }),
   'profiles:list': z.undefined(),
   'profiles:create': profileCreateSchema,
   'profiles:update': profileUpdateSchema,
@@ -125,6 +134,14 @@ export interface InvokeResponses {
   'pty:kill': null
   'settings:getAll': Settings
   'settings:set': Settings
+  'settings:resetSection': Settings
+  'data:export': { path: string } | null
+  'data:import': ImportSummary | null
+  'data:purge': { sessions: number }
+  'data:paths': DataPaths
+  'data:open': null
+  'app:licenses': Array<{ name: string; version: string; license: string }>
+  'app:pickPath': string | null
   'profiles:list': Profile[]
   'profiles:create': Profile
   'profiles:update': Profile

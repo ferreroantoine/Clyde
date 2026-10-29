@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { randomUUID } from 'node:crypto'
 import type { AgentEventEnvelope, AgentSessionInfo, AgentStatus } from '@shared/agent'
 import { AppError } from '@shared/errors'
@@ -120,7 +121,7 @@ export class MetricsService {
         .run(id, data.kind, data.modelPrefix, data.inputPerMTok, data.outputPerMTok, this.now())
     } catch (err) {
       if (/UNIQUE/.test((err as Error).message)) {
-        throw new AppError('invalid_request', `There is already a price for ${data.modelPrefix}`)
+        throw new AppError('invalid_request', t('There is already a price for {modelPrefix}', { modelPrefix: data.modelPrefix }))
       }
       throw err
     }
@@ -147,7 +148,7 @@ export class MetricsService {
       .run(
         info.id,
         info.profileId,
-        profile?.name ?? 'Deleted account',
+        profile?.name ?? t('Deleted account'),
         info.kind,
         info.model,
         info.agentId,
@@ -263,7 +264,7 @@ export class MetricsService {
 
   transcript(sessionId: string): SessionTranscript {
     const row = this.db.prepare('SELECT * FROM sessions WHERE id = ?').get(sessionId) as SessionRow | undefined
-    if (!row) throw new AppError('not_found', 'This session is not in the history')
+    if (!row) throw new AppError('not_found', t('This session is not in the history'))
     const events = (
       this.db.prepare('SELECT seq, event FROM session_events WHERE session_id = ? ORDER BY seq').all(sessionId) as Array<{
         seq: number

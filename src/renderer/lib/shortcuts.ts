@@ -1,3 +1,4 @@
+import { comboOf } from '@shared/keybindings'
 import { useEffect } from 'react'
 
 export interface Shortcut {
@@ -6,14 +7,6 @@ export interface Shortcut {
   run: () => void
 }
 
-function comboOf(e: KeyboardEvent): string {
-  const parts: string[] = []
-  if (e.ctrlKey || e.metaKey) parts.push('ctrl')
-  if (e.altKey) parts.push('alt')
-  if (e.shiftKey) parts.push('shift')
-  parts.push(e.key.length === 1 ? e.key.toLowerCase() : e.key.toLowerCase())
-  return parts.join('+')
-}
 
 /** Window-level shortcuts. Monaco and xterm keep their own bindings when focused. */
 export function useShortcuts(shortcuts: Shortcut[]): void {

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t } from '@shared/i18n'
 import type { LimitDiagnostic, LimitHistory, ProfileLimits, SessionLimitUsage } from '@shared/limits'
 import { invoke, on } from '@/lib/ipc'
 import { notify } from './notifications'
@@ -61,7 +62,7 @@ export const useLimits = create<LimitsState>()((set, get) => ({
       const history = await invoke('limits:history', { profileId, days: 7 })
       set({ history: { ...get().history, [profileId]: history } })
     } catch (err) {
-      notify.error('Could not load the limit history', err)
+      notify.error(t('Could not load the limit history'), err)
     }
   },
 
@@ -70,7 +71,7 @@ export const useLimits = create<LimitsState>()((set, get) => ({
     try {
       set({ profiles: byProfile(await invoke('limits:refresh', profileId ? { profileId } : {})) })
     } catch (err) {
-      notify.error('Could not read the usage limits', err)
+      notify.error(t('Could not read the usage limits'), err)
     } finally {
       set({ refreshing: false })
     }
@@ -80,7 +81,7 @@ export const useLimits = create<LimitsState>()((set, get) => ({
     try {
       return await invoke('limits:diagnose', { profileId })
     } catch (err) {
-      notify.error('The diagnostic failed', err)
+      notify.error(t('The diagnostic failed'), err)
       return null
     }
   }

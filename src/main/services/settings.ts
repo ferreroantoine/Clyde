@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { defaultSettings, settingsSchema, SETTINGS_VERSION, splitPath, withSetting, type Settings } from '@shared/settings'
 import { AppError } from '@shared/errors'
 
@@ -106,18 +107,45 @@ export class SettingsService {
     return this.current
   }
 
+  private readonly listeners = new Set<(next: Settings, previous: Settings) => void>()
+
+  /** Called after every change, with the new and the previous settings. */
+  onChange(listener: (next: Settings, previous: Settings) => void): () => void {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  /** Puts one section back to its defaults. Recent folders survive a reset of General. */
+  resetSection(section: string): Settings {
+    if (!(section in settingsSchema.shape)) throw new AppError('invalid_request', t('Unknown settings section "{section}"', { section }))
+    const fresh = (defaultSettings as Record<string, unknown>)[section] as Record<string, unknown>
+    const keep = section === 'general' ? { recentWorkspaces: this.current.general.recentWorkspaces } : {}
+    return this.replace(settingsSchema.parse({ ...this.current, [section]: { ...fresh, ...keep } }))
+  }
+
+  /** Replaces everything at once (import), keeping what is valid field by field. */
+  importAll(doc: Record<string, unknown>): Settings {
+    return this.replace(sanitizeSettings({ ...doc, general: { ...(isObject(doc['general']) ? doc['general'] : {}), recentWorkspaces: this.current.general.recentWorkspaces } }))
+  }
+
+  private replace(next: Settings): Settings {
+    const previous = this.current
+    this.current = next
+    this.persist()
+    for (const l of this.listeners) l(next, previous)
+    return next
+  }
+
   /** Sets one value by path, e.g. `appearance.theme`. */
   set(path: string, value: unknown): Settings {
     const parts = splitPath(path)
     const section = parts && (settingsSchema.shape as Record<string, { unwrap(): { shape: Raw } }>)[parts[0]]
     if (!parts || !section || !(parts[1] in section.unwrap().shape)) {
-      throw new AppError('invalid_request', `Unknown setting "${path}"`)
+      throw new AppError('invalid_request', t('Unknown setting "{path}"', { path }))
     }
     const next = settingsSchema.safeParse(withSetting(this.current, path, value))
-    if (!next.success) throw new AppError('invalid_request', `Invalid value for "${path}"`)
-    this.current = next.data
-    this.persist()
-    return this.current
+    if (!next.success) throw new AppError('invalid_request', t('Invalid value for "{path}"', { path }))
+    return this.replace(next.data)
   }
 
   private persist(): void {

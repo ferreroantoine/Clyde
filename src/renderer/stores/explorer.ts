@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t } from '@shared/i18n'
 import type { DirEntry, FsChange } from '@shared/types'
 import { invoke } from '@/lib/ipc'
 import { notify } from './notifications'
@@ -42,7 +43,7 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
       if ((err as { code?: string }).code === 'not_found') {
         set({ children: without(get().children, (key) => key === path) })
       } else {
-        notify.error(`Could not read ${path || 'folder'}`, err)
+        notify.error(path ? t('Could not read {path}', { path }) : t('Could not read the folder'), err)
       }
     }
   },

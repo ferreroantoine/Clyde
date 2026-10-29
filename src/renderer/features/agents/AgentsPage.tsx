@@ -1,4 +1,5 @@
 import { SessionLimitLine } from '@/features/limits/LimitGauge'
+import { t, tn } from '@shared/i18n'
 import { useLimits } from '@/stores/limits'
 import { useEffect, useState } from 'react'
 import {
@@ -42,8 +43,8 @@ import { ReviewView } from './ReviewView'
 
 function relativeTime(ms: number): string {
   const s = Math.round((Date.now() - ms) / 1000)
-  if (s < 60) return 'just now'
-  if (s < 3600) return `${Math.round(s / 60)} min ago`
+  if (s < 60) return t('just now')
+  if (s < 3600) return t('{count} min ago', { count: Math.round(s / 60) })
   if (s < 86400) return `${Math.round(s / 3600)} h ago`
   return new Date(ms).toLocaleDateString()
 }
@@ -89,22 +90,20 @@ function TaskCard({ task }: { task: Task }) {
         <h4 className="text-[13px] leading-snug font-medium">{task.title}</h4>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="icon-xs" variant="ghost" aria-label={`Actions for ${task.title}`} className="-mt-0.5 -mr-1 shrink-0">
+            <Button size="icon-xs" variant="ghost" aria-label={t('Actions for {name}', { name: task.title })} className="-mt-0.5 -mr-1 shrink-0">
               <MoreHorizontal />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {task.status !== 'done' && task.status !== 'todo' && (
               <DropdownMenuItem onSelect={() => void abandon(task.id)}>
-                <Undo2 /> Abandon
-              </DropdownMenuItem>
+                <Undo2 /> {' '}{t('Abandon')}</DropdownMenuItem>
             )}
             {(task.status === 'todo' || task.status === 'done') && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onSelect={() => void deleteTask(task.id)}>
-                  <Trash2 /> Delete
-                </DropdownMenuItem>
+                  <Trash2 /> {' '}{t('Delete')}</DropdownMenuItem>
               </>
             )}
           </DropdownMenuContent>
@@ -113,7 +112,7 @@ function TaskCard({ task }: { task: Task }) {
       <p className="line-clamp-2 text-muted-foreground">{task.description}</p>
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
         {profile ? <ProfileDot color={profile.color} /> : null}
-        <span className="truncate">{agent?.name ?? 'No agent'}</span>
+        <span className="truncate">{agent?.name ?? t('No agent')}</span>
         <span className="flex items-center gap-1 font-mono">
           <GitBranch className="size-3" />
           {task.branch.replace(/^atelier\//, '')}
@@ -130,23 +129,20 @@ function TaskCard({ task }: { task: Task }) {
       <div className="flex gap-1.5">
         {task.status === 'todo' && (
           <Button size="xs" disabled={busy || !agent} onClick={() => void startTask(task.id)}>
-            {busy ? <LoaderCircle className="animate-spin" /> : <Play />} Start
+            {busy ? <LoaderCircle className="animate-spin" /> : <Play />} {t('Start')}
           </Button>
         )}
         {task.status === 'in_progress' && session && (
           <Button size="xs" variant="outline" onClick={openChat}>
-            <StatusDot status={session.info.status} /> Open chat
-          </Button>
+            <StatusDot status={session.info.status} /> {' '}{t('Open chat')}</Button>
         )}
         {task.status === 'review' && (
           <>
             <Button size="xs" onClick={() => void openReview(task.id)}>
-              <SearchCheck /> Review
-            </Button>
+              <SearchCheck /> {' '}{t('Review')}</Button>
             {session && (
               <Button size="xs" variant="ghost" onClick={openChat}>
-                <MessageSquare /> Chat
-              </Button>
+                <MessageSquare /> {' '}{t('Chat')}</Button>
             )}
           </>
         )}
@@ -179,8 +175,8 @@ function NewTaskDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>New task</DialogTitle>
-          <DialogDescription>Atelier creates a branch and a git worktree for it, from the branch checked out now.</DialogDescription>
+          <DialogTitle>{t('New task')}</DialogTitle>
+          <DialogDescription>{t('Atelier creates a branch and a git worktree for it, from the branch checked out now.')}</DialogDescription>
         </DialogHeader>
         <form
           className="grid gap-4"
@@ -196,25 +192,25 @@ function NewTaskDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
           }}
         >
           <label className="grid gap-1.5">
-            <span className="text-xs font-medium">Title</span>
-            <Input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Add a dark mode toggle" maxLength={120} />
+            <span className="text-xs font-medium">{t('Title')}</span>
+            <Input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('Add a dark mode toggle')} maxLength={120} />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-medium">What should the agent do?</span>
+            <span className="text-xs font-medium">{t('What should the agent do?')}</span>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              aria-label="Task description"
-              placeholder="The agent receives this as its first message."
+              aria-label={t('Task description')}
+              placeholder={t('The agent receives this as its first message.')}
               className="min-h-28 w-full resize-y rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-medium">Agent</span>
+            <span className="text-xs font-medium">{t('Agent')}</span>
             <select
               value={chosen}
               onChange={(e) => setAgentId(e.target.value)}
-              aria-label="Agent"
+              aria-label={t('Agent')}
               className="h-9 rounded-md border bg-transparent px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {agents.map((a) => (
@@ -226,10 +222,9 @@ function NewTaskDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
           </label>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
+              {t('Cancel')}</Button>
             <Button type="submit" disabled={!title.trim() || !description.trim() || !chosen || creating}>
-              {creating && <LoaderCircle className="animate-spin" />} Create task
+              {creating && <LoaderCircle className="animate-spin" />} {t('Create task')}
             </Button>
           </DialogFooter>
         </form>
@@ -250,30 +245,31 @@ function Board() {
   for (const t of tasks) columns[t.status].push(t)
 
   if (!workspace) {
-    return <EmptyState icon={GitBranch} title="No folder open" description="Open a git repository to plan tasks for your agents." />
+    return <EmptyState icon={GitBranch} title={t('No folder open')} description={t('Open a git repository to plan tasks for your agents.')} />
   }
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center justify-between px-6 pt-5 pb-3">
         <p className="text-xs text-muted-foreground">
-          {workspace.isGitRepo ? `Tasks for ${workspace.name}. Each one runs in its own branch and worktree.` : 'This folder is not a git repository; tasks need one.'}
+          {workspace.isGitRepo
+            ? t('Tasks for {name}. Each one runs in its own branch and worktree.', { name: workspace.name })
+            : t('This folder is not a git repository; tasks need one.')}
         </p>
-        <Button size="sm" disabled={!workspace.isGitRepo || agents.length === 0} onClick={() => setCreating(true)} title={agents.length === 0 ? 'Create an agent first' : undefined}>
-          <Plus /> New task
-        </Button>
+        <Button size="sm" disabled={!workspace.isGitRepo || agents.length === 0} onClick={() => setCreating(true)} title={agents.length === 0 ? t('Create an agent first') : undefined}>
+          <Plus /> {' '}{t('New task')}</Button>
       </div>
       <div className="grid min-h-0 flex-1 grid-cols-[repeat(4,minmax(14rem,1fr))] gap-3 overflow-x-auto px-6 pb-6">
         {TASK_STATUSES.map((status) => (
-          <section key={status} className="flex min-h-0 flex-col rounded-xl bg-muted/50" aria-label={TASK_STATUS_LABELS[status]}>
+          <section key={status} className="flex min-h-0 flex-col rounded-xl bg-muted/50" aria-label={t(TASK_STATUS_LABELS[status])}>
             <h3 className="flex items-center justify-between px-3 py-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-              {TASK_STATUS_LABELS[status]}
+              {t(TASK_STATUS_LABELS[status])}
               <span className="rounded bg-background px-1.5 text-[10px] tabular-nums">{columns[status].length}</span>
             </h3>
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-2 pb-2">
               {columns[status].map((t) => (
                 <TaskCard key={t.id} task={t} />
               ))}
-              {columns[status].length === 0 && <p className="px-1 py-4 text-center text-[11px] text-muted-foreground/70">Nothing here</p>}
+              {columns[status].length === 0 && <p className="px-1 py-4 text-center text-[11px] text-muted-foreground/70">{t('Nothing here')}</p>}
             </div>
           </section>
         ))}
@@ -305,24 +301,22 @@ function AgentCard({ agent, onEdit }: { agent: AgentDefinition; onEdit: () => vo
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="icon-xs" variant="ghost" aria-label={`Actions for ${agent.name}`}>
+            <Button size="icon-xs" variant="ghost" aria-label={t('Actions for {name}', { name: agent.name })}>
               <MoreHorizontal />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onSelect={onEdit}>
-              <Pencil /> Edit
-            </DropdownMenuItem>
+              <Pencil /> {' '}{t('Edit')}</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onSelect={() => void deleteAgent(agent.id)}>
-              <Trash2 /> Delete
-            </DropdownMenuItem>
+              <Trash2 /> {' '}{t('Delete')}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        <span className="font-mono">{agent.model || 'default model'}</span> · {PERMISSION_LEVEL_LABELS[agent.permissionLevel]}
-        {agent.mcpTools.length > 0 && ` · ${agent.mcpTools.length} MCP tool${agent.mcpTools.length > 1 ? 's' : ''}`}
+        <span className="font-mono">{agent.model || t('default model')}</span> · {t(PERMISSION_LEVEL_LABELS[agent.permissionLevel])}
+        {agent.mcpTools.length > 0 && ` · ${tn('{count} MCP tool', '{count} MCP tools', agent.mcpTools.length)}`}
       </p>
       {agent.systemPrompt && <p className="line-clamp-2 text-xs text-muted-foreground">{agent.systemPrompt}</p>}
       <div>
@@ -342,8 +336,7 @@ function AgentCard({ agent, onEdit }: { agent: AgentDefinition; onEdit: () => vo
             })
           }}
         >
-          <MessageSquare /> Chat in this folder
-        </Button>
+          <MessageSquare /> {' '}{t('Chat in this folder')}</Button>
       </div>
     </article>
   )
@@ -357,14 +350,13 @@ function AgentsList() {
   return (
     <div className="h-full overflow-y-auto px-6 py-5">
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">Saved agents run tasks on the board, or chat with you in the open folder.</p>
+        <p className="text-xs text-muted-foreground">{t('Saved agents run tasks on the board, or chat with you in the open folder.')}</p>
         <Button size="sm" onClick={() => setEditing('new')}>
-          <Plus /> New agent
-        </Button>
+          <Plus /> {' '}{t('New agent')}</Button>
       </div>
       {agents.length === 0 ? (
         <div className="rounded-xl border border-dashed py-14">
-          <EmptyState icon={Bot} title="No agent yet" description="Create one: an account, a model, a permission level and the MCP tools it may use." />
+          <EmptyState icon={Bot} title={t('No agent yet')} description={t('Create one: an account, a model, a permission level and the MCP tools it may use.')} />
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -397,12 +389,12 @@ export function AgentsPage() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex shrink-0 items-end gap-6 border-b px-6 pt-6">
-        <h1 className="pb-2 text-lg font-semibold tracking-tight">Agents</h1>
+        <h1 className="pb-2 text-lg font-semibold tracking-tight">{t('Agents')}</h1>
         <nav className="flex gap-4" role="tablist">
           {(
             [
-              ['board', 'Board'],
-              ['agents', 'Saved agents']
+              ['board', t('Board')],
+              ['agents', t('Saved agents')]
             ] as const
           ).map(([value, label]) => (
             <button

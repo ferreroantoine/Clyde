@@ -1,3 +1,5 @@
+import { t, tk, tn } from './i18n'
+
 /**
  * Plan usage limits (5-hour and weekly windows) of subscription accounts, as each CLI reports
  * them, and how a window's growth is split between the sessions that caused it. Pure, tested.
@@ -12,9 +14,10 @@ export const FIVE_HOUR = 'five_hour'
 export const SEVEN_DAY = 'seven_day'
 export const MAIN_WINDOWS = [FIVE_HOUR, SEVEN_DAY] as const
 
+/** English labels, as stored with each reading; windowLabel() translates them for display. */
 export const WINDOW_LABELS: Record<string, string> = {
-  [FIVE_HOUR]: '5-hour window',
-  [SEVEN_DAY]: 'Weekly'
+  [FIVE_HOUR]: tk('5-hour window'),
+  [SEVEN_DAY]: tk('Weekly')
 }
 
 /** One window as a CLI reported it. `resetsAt` is in milliseconds. */
@@ -163,15 +166,21 @@ export interface CodexSnapshot {
   secondary: CodexWindow | null
 }
 
+const codexLengthLabel = (minutes: number): string =>
+  minutes % 1440 === 0
+    ? tn('{count}-day window', '{count}-day window', minutes / 1440)
+    : minutes % 60 === 0
+      ? tn('{count}-hour window', '{count}-hour window', minutes / 60)
+      : tn('{count}-minute window', '{count}-minute window', minutes)
+
 /** Which of Atelier's windows a Codex window is, from its length: 5 hours, a week, or another. */
 function codexWindowId(minutes: number | null, fallback: string): { window: string; label: string } {
   if (minutes !== null && Math.abs(minutes - 300) <= 5) return { window: FIVE_HOUR, label: WINDOW_LABELS[FIVE_HOUR] as string }
   if (minutes !== null && Math.abs(minutes - 10_080) <= 60) return { window: SEVEN_DAY, label: WINDOW_LABELS[SEVEN_DAY] as string }
   if (minutes !== null) {
-    const label = minutes % 1440 === 0 ? `${minutes / 1440}-day window` : minutes % 60 === 0 ? `${minutes / 60}-hour window` : `${minutes}-minute window`
-    return { window: `codex:${minutes}m`, label }
+    return { window: `codex:${minutes}m`, label: codexLengthLabel(minutes) }
   }
-  return { window: `codex:${fallback}`, label: fallback === 'primary' ? 'Primary window' : 'Secondary window' }
+  return { window: `codex:${fallback}`, label: fallback === 'primary' ? t('Primary window') : t('Secondary window') }
 }
 
 /**
@@ -252,12 +261,30 @@ export function crossedThresholds(before: number | null, after: number, threshol
 
 /** "2 h 05 min", "3 d 4 h", "now": time left until a reset. */
 export function formatCountdown(ms: number): string {
-  if (ms <= 0) return 'now'
+  if (ms <= 0) return t('now')
   const minutes = Math.ceil(ms / 60_000)
   const days = Math.floor(minutes / 1440)
   const hours = Math.floor((minutes % 1440) / 60)
   const mins = minutes % 60
-  if (days > 0) return `${days} d ${hours} h`
-  if (hours > 0) return `${hours} h ${String(mins).padStart(2, '0')} min`
-  return `${mins} min`
+  if (days > 0) return t('{days} d {hours} h', { days, hours })
+  if (hours > 0) return t('{hours} h {minutes} min', { hours, minutes: String(mins).padStart(2, '0') })
+  return t('{minutes} min', { minutes: mins })
+}
+
+/** A window's name in the interface language. Stored labels are English; extra windows keep theirs. */
+export function windowLabel(window: string, stored: string): string {
+  if (window === FIVE_HOUR) return t('5-hour window')
+  if (window === SEVEN_DAY) return t('Weekly')
+  if (window === 'seven_day_opus') return t('Weekly · {model}', { model: 'Opus' })
+  if (window === 'seven_day_sonnet') return t('Weekly · {model}', { model: 'Sonnet' })
+  if (window.startsWith('model:')) return t('Weekly · {model}', { model: stored.split(' · ')[1] ?? window.slice(6) })
+  // Codex windows: the length is in the id, and a per-model bucket keeps its name after " · ".
+  const bucket = stored.includes(' · ') ? ` · ${stored.split(' · ').slice(1).join(' · ')}` : ''
+  if (window.endsWith(`:${FIVE_HOUR}`)) return t('5-hour window') + bucket
+  if (window.endsWith(`:${SEVEN_DAY}`)) return t('Weekly') + bucket
+  const minutes = /codex:(\d+)m$/.exec(window)?.[1]
+  if (minutes) return codexLengthLabel(Number(minutes)) + bucket
+  if (window.endsWith('codex:primary')) return t('Primary window') + bucket
+  if (window.endsWith('codex:secondary')) return t('Secondary window') + bucket
+  return stored
 }
