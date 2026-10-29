@@ -2,7 +2,7 @@ import { t } from '@shared/i18n'
 import type { AgentEvent } from '@shared/agent'
 import type { PermissionDecision, ToolRequest } from '../../permissions/engine'
 import type { ApprovalOutcome, ApprovalQuestion } from '../../permissions/broker'
-import type { AdapterEvent, ChatAdapter, ChatMessage, ToolCall, ToolResult, ToolSpec } from './chat'
+import type { AdapterEvent, ChatAdapter, ChatMessage, ImageInput, ToolCall, ToolResult, ToolSpec } from './chat'
 import type { ToolOutput } from './tools'
 
 export const MAX_STEPS = 50
@@ -36,7 +36,7 @@ function isAbort(err: unknown, signal: AbortSignal): boolean {
  */
 export class ApiSession {
   private readonly history: ChatMessage[] = []
-  private readonly queue: string[] = []
+  private readonly queue: Array<{ text: string; images: ImageInput[] }> = []
   private wake: (() => void) | null = null
   private closed = false
   private turn: AbortController | null = null
@@ -56,19 +56,20 @@ export class ApiSession {
       tools: this.cfg.tools.map((t) => t.name)
     })
     while (!this.closed) {
-      const text = this.queue.shift()
-      if (text === undefined) {
+      const next = this.queue.shift()
+      if (next === undefined) {
         await new Promise<void>((resolve) => (this.wake = resolve))
         this.wake = null
         continue
       }
-      await this.runTurn(text)
+      await this.runTurn(next.text, next.images)
     }
   }
 
-  send(text: string): void {
+  /** `images` go to the model with the message (chat attachments); vision models only. */
+  send(text: string, images: ImageInput[] = []): void {
     if (this.closed) return
-    this.queue.push(text)
+    this.queue.push({ text, images })
     this.wake?.()
   }
 
@@ -87,7 +88,7 @@ export class ApiSession {
     return this.history
   }
 
-  private async runTurn(text: string): Promise<void> {
+  private async runTurn(text: string, images: ImageInput[]): Promise<void> {
     const controller = new AbortController()
     this.turn = controller
     const signal = controller.signal
@@ -96,7 +97,7 @@ export class ApiSession {
     const totals = { inputTokens: 0, outputTokens: 0 }
     let subtype = 'success'
     const errors: string[] = []
-    this.history.push({ role: 'user', text })
+    this.history.push(images.length ? { role: 'user', text, images } : { role: 'user', text })
 
     try {
       for (let step = 0; ; step++) {

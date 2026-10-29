@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type CenterView = 'editor' | 'agents' | 'supervision' | 'settings'
-const CENTER_VIEWS: CenterView[] = ['editor', 'agents', 'supervision', 'settings']
+export type CenterView = 'chat' | 'editor' | 'agents' | 'supervision' | 'settings'
+const CENTER_VIEWS: CenterView[] = ['chat', 'editor', 'agents', 'supervision', 'settings']
 
 export const SETTINGS_SECTIONS = [
   'general',

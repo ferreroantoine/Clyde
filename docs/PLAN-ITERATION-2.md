@@ -127,3 +127,12 @@ Je travaille dans un conteneur Linux sans compte Claude Pro/Max, ChatGPT ou Goog
 - Kanban : glisser-déposer HTML5 avec réorganisation animée (aperçu de l'emplacement, cartes qui glissent) ; ordre persistant (migration SQL 10, `tasks.position`, `tasks:reorder`) ; changement de colonne limité aux actions existantes (À faire → En cours = démarrer, À relire → Terminé = fusionner).
 - Skeletons : comptes, serveurs MCP, supervision, tableau, revue de diff, arborescence.
 
+### Chantier 5 — fait
+- Une conversation répond via une session d'agent marquée `chatId` : lecture seule (lectures dans son dossier `userData/chat/<id>`, où sont les pièces jointes), aucune écriture ni commande, jamais de demande d'autorisation ; outils MCP de l'agent seulement si l'interrupteur est actif. Claude Code : outils d'écriture/shell désactivés en plus du hook ; boucle API : `read_file` et `list_files` seulement.
+- Une seule session de chat vivante à la fois (pour ne pas prendre les places des agents du projet). Si elle n'existe plus (redémarrage, changement de compte/modèle/agent/outils, modification, régénération), le message suivant démarre une session avec l'historique en contexte.
+- Modifier / régénérer remplacent la suite (pas de navigation entre branches) : plus simple, et c'est ce que montre l'interface.
+- Images : envoyées telles quelles aux modèles API (Anthropic, OpenAI, Gemini, Ollama) ; les CLI les lisent dans leur dossier (Claude Code par `Read`, Codex par `view_image`). **Non vérifié pour Antigravity** (pas de compte).
+- Markdown : `react-markdown` + `remark-gfm` + `remark-math` + `rehype-katex` ; coloration par `monaco.editor.colorize`. Migration SQL 11 (`conversations`, `chat_messages`, `chat_sessions`) ; la conso vient des tables `sessions` / `session_limit_usage` existantes.
+- « Continuer dans le projet » : session d'agent dans le dossier ouvert, conversation dans le prompt système (40 000 caractères au plus), aucun tour consommé.
+- Vérifié de bout en bout avec un faux serveur compatible OpenAI : streaming, tableau, code, formule, pièces jointes (image envoyée en `image_url`), continuer dans le projet.
+

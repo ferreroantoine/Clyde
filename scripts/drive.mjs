@@ -1,7 +1,7 @@
 // Launches the built app (run `npm run build` first), runs a list of steps, screenshots each one.
 // Usage: node scripts/drive.mjs <outDir> '<steps json>'
 // Steps: {"ss":"name"} | {"click":"css"} | {"press":"Control+B"} | {"type":"text"}
-//        | {"wait":"css"} | {"select":["css","value"]} | {"drag":["from css","to css"]} | {"mouse":["move",x,y]|["down"]|["up"]} | {"eval":"js expression"} | {"sleep":ms}
+//        | {"wait":"css"} | {"select":["css","value"]} | {"drag":["from css","to css"]} | {"files":["css","path",…]} | {"mouse":["move",x,y]|["down"]|["up"]} | {"eval":"js expression"} | {"sleep":ms}
 import { _electron as electron } from 'playwright-core'
 import { mkdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -39,6 +39,8 @@ try {
       await page.keyboard.type(step.type, { delay: 20 })
     } else if (step.wait) {
       await page.waitForSelector(step.wait, { timeout: 10_000 })
+    } else if (step.files) {
+      await page.setInputFiles(step.files[0], step.files.slice(1))
     } else if (step.mouse) {
       const [action, x, y] = step.mouse
       if (action === 'move') await page.mouse.move(x, y, { steps: 8 })

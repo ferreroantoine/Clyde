@@ -35,6 +35,9 @@ import { registerLimitsHandlers } from './ipc/limits'
 import { AgentDefinitionsService } from './services/agent-definitions'
 import { WorktreeService } from './services/worktrees'
 import { TaskService } from './agents/tasks'
+import { ChatStore } from './chat/store'
+import { ChatService } from './chat/service'
+import { registerChatHandlers } from './ipc/chat'
 import { loadQuery, type QueryFn } from './agents/claude-code/provider'
 import { DISTRIBUTION } from './build-flags'
 
@@ -160,6 +163,7 @@ if (!app.requestSingleInstanceLock()) {
         broadcast('agent:event', envelope)
         metrics.onEvent(envelope)
         tasks.onAgentEvent(envelope)
+        chat.onAgentEvent(envelope)
         limitsSetup.onAgentEvent(envelope)
         notifyAgent(envelope)
       },
@@ -197,6 +201,20 @@ if (!app.requestSingleInstanceLock()) {
     })
     tasks.recover()
     registerTaskHandlers(definitions, tasks)
+
+    const chat: ChatService = new ChatService({
+      store: new ChatStore(profileDb),
+      sessions: agents,
+      profiles: () => profiles.list(),
+      agents: () => definitions.list(),
+      root: join(app.getPath('userData'), 'chat'),
+      workspaceRoot: () => workspace.current()?.root ?? null,
+      defaultPermission: () => settings.getAll().agents.defaultPermission,
+      onChanged: (list) => broadcast('chat:changed', list),
+      onMessage: (message) => broadcast('chat:message', message),
+      onLive: (live) => broadcast('chat:live', live)
+    })
+    registerChatHandlers(chat)
 
     const metrics: MetricsService = new MetricsService(profileDb, {
       profiles: () => profiles.list(),

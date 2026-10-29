@@ -16,7 +16,13 @@ export function toAnthropicMessages(messages: ChatMessage[]): MessageParam[] {
     else out.push({ role, content: blocks })
   }
   for (const m of messages) {
-    if (m.role === 'user') push('user', [{ type: 'text', text: m.text }])
+    if (m.role === 'user') {
+      const images: ContentBlockParam[] = (m.images ?? []).map((img) => ({
+        type: 'image',
+        source: { type: 'base64', media_type: img.mime as 'image/png', data: img.data }
+      }))
+      push('user', [...images, { type: 'text', text: m.text }])
+    }
     else if (m.role === 'assistant') {
       const blocks: ContentBlockParam[] = []
       if (m.text) blocks.push({ type: 'text', text: m.text })

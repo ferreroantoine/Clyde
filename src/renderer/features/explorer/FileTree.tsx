@@ -5,6 +5,9 @@ import { useExplorer } from '@/stores/explorer'
 import { useEditor } from '@/stores/editor'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/Skeleton'
+
+/** Drag data type of a workspace-relative file path dragged from the Explorer. */
+export const EXPLORER_PATH_TYPE = 'application/x-atelier-path'
 import { FileIcon } from './FileIcon'
 
 const INDENT = 12
@@ -30,6 +33,12 @@ function Row({ entry, depth }: { entry: DirEntry; depth: number }) {
         type="button"
         onClick={onClick}
         title={entry.path}
+        // Files can be dropped on the chat composer as attachments.
+        draggable={!isDir}
+        onDragStart={(e) => {
+          e.dataTransfer.setData(EXPLORER_PATH_TYPE, entry.path)
+          e.dataTransfer.effectAllowed = 'copy'
+        }}
         style={{ paddingLeft: 8 + depth * INDENT }}
         className={cn(
           'press press-soft flex h-6 w-full items-center gap-1.5 pr-2 text-left text-[13px] outline-none',

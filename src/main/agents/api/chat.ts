@@ -22,9 +22,15 @@ export interface ToolResult {
   isError: boolean
 }
 
+/** An image sent with a user message (chat attachments), base64 without the data: prefix. */
+export interface ImageInput {
+  mime: string
+  data: string
+}
+
 /** Vendor-neutral conversation history; each adapter converts it to its own wire format. */
 export type ChatMessage =
-  | { role: 'user'; text: string }
+  | { role: 'user'; text: string; images?: ImageInput[] }
   | { role: 'assistant'; text: string; toolCalls: ToolCall[] }
   | { role: 'tool'; results: ToolResult[] }
 

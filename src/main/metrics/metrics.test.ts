@@ -36,6 +36,7 @@ function setup() {
     mcpTools: [],
     agentId: null,
     taskId: null,
+    chatId: null,
     status: 'idle',
     createdAt: now
   })

@@ -320,5 +320,42 @@ export const migrations: Migration[] = [
       ALTER TABLE tasks ADD COLUMN position REAL NOT NULL DEFAULT 0;
       UPDATE tasks SET position = created_at;
     `
+  },
+  {
+    version: 11,
+    name: 'chat',
+    sql: `
+      -- The Chat view. A conversation answers through agent sessions (chat_sessions), whose
+      -- usage is already in sessions/usage_events; messages are kept here as Markdown.
+      CREATE TABLE conversations (
+        id            TEXT PRIMARY KEY,
+        title         TEXT NOT NULL,
+        pinned        INTEGER NOT NULL DEFAULT 0,
+        agent_id      TEXT,
+        profile_id    TEXT NOT NULL,
+        model         TEXT NOT NULL DEFAULT '',
+        tools_enabled INTEGER NOT NULL DEFAULT 0,
+        created_at    INTEGER NOT NULL,
+        updated_at    INTEGER NOT NULL
+      );
+      CREATE TABLE chat_messages (
+        id              TEXT PRIMARY KEY,
+        conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        role            TEXT NOT NULL,
+        content         TEXT NOT NULL,
+        -- JSON arrays: files kept in the conversation's folder, tools used for the answer.
+        attachments     TEXT NOT NULL DEFAULT '[]',
+        tools           TEXT NOT NULL DEFAULT '[]',
+        status          TEXT NOT NULL DEFAULT 'done',
+        error           TEXT,
+        created_at      INTEGER NOT NULL
+      );
+      CREATE INDEX chat_messages_conversation ON chat_messages(conversation_id, created_at);
+      CREATE TABLE chat_sessions (
+        conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        session_id      TEXT NOT NULL,
+        PRIMARY KEY (conversation_id, session_id)
+      );
+    `
   }
 ]

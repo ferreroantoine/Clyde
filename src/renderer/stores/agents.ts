@@ -36,6 +36,8 @@ export const useAgents = create<AgentsState>()((set, get) => {
   })
 
   const upsertSession = (info: AgentSessionInfo) => {
+    // Chat sessions belong to the Chat view, not to the agent panel.
+    if (info.chatId) return
     const { sessions, order } = get()
     const current = sessions[info.id]
     set({

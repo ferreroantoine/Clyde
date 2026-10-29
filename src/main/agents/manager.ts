@@ -13,11 +13,11 @@ import { AppError } from '@shared/errors'
 import { isApiKind, type Profile } from '@shared/profiles'
 import type { ProfilesService } from '../services/profiles'
 import { ApprovalBroker } from '../permissions/broker'
-import { decide, type ToolRequest } from '../permissions/engine'
+import { decide, type PermissionDecision, type ToolRequest } from '../permissions/engine'
 import type { McpHub } from '../mcp/hub'
 import { ClaudeCodeSession, type QueryFn } from './claude-code/provider'
 import { buildProfileEnv, resolveClaudeBinary, withoutAccountVars } from './claude-code/runtime'
-import type { ChatAdapter } from './api/chat'
+import type { ChatAdapter, ImageInput } from './api/chat'
 import { describeApiError, type ApiTarget } from './api/clients'
 import { ApiSession } from './api/loop'
 import { BASE_TOOLS, BaseToolExecutor, defaultShell, toEngineRequest } from './api/tools'
@@ -73,7 +73,7 @@ export interface AgentManagerDeps {
 /** What the manager drives: a Claude Code session or Atelier's own loop. */
 interface AgentSession {
   start(): Promise<void>
-  send(text: string): void
+  send(text: string, images?: ImageInput[]): void
   interrupt(): Promise<void>
   stop(): void
 }
@@ -94,6 +94,25 @@ export function apiSystemPrompt(cwd: string, platform: NodeJS.Platform, extra: s
     'Use the tools to read and change files and to run commands. Paths are relative to that folder.',
     'Read a file before editing it, and prefer edit_file for small changes. Keep replies short and say what you changed.',
     'Some tool calls wait for the user to approve them. When one is denied, follow the user’s message instead of retrying.',
+    extra.trim()
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+}
+
+/** Tools a chat session's API loop gets: reading the attachments in its folder. */
+const CHAT_API_TOOLS = new Set(['read_file', 'list_files'])
+
+/** Claude Code tools turned off in chat; the permission hook refuses them anyway. */
+const CHAT_CLAUDE_DISALLOWED = ['Bash', 'PowerShell', 'Monitor', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit', 'KillShell']
+
+const CHAT_REFUSAL = () => t('The chat cannot change files or run commands. Use “Continue in the project” for that.')
+
+/** API agents' system prompt in the chat view. */
+export function chatSystemPrompt(extra: string): string {
+  return [
+    'You are a helpful assistant in the chat of Atelier, a desktop IDE. Answer in Markdown: headings, lists, tables and fenced code blocks with a language render well; LaTeX math goes between $…$ or $$…$$.',
+    'Files the user attaches are in your working folder; read them with your tools when the message mentions them.',
     extra.trim()
   ]
     .filter(Boolean)
@@ -141,30 +160,40 @@ export class AgentManager {
       mcpTools: req.mcpTools,
       agentId: req.agentId ?? null,
       taskId: req.taskId ?? null,
+      chatId: req.chatId ?? null,
       status: 'starting',
       createdAt: Date.now()
     }
     // MCP tools outside the allow-list are refused, whatever the permission level says.
-    const gate = (tool: ToolRequest) =>
-      tool.name.startsWith('mcp__') && !allowed.has(tool.name)
-        ? { decision: 'deny' as const, reason: t("{name} is not in this agent's MCP tools", { name: tool.name }) }
-        : decide({ level: info.permissionLevel, cwd, platform }, tool)
+    const chat = !!req.chatId
+    const gate = (tool: ToolRequest): PermissionDecision => {
+      if (tool.name.startsWith('mcp__') && !allowed.has(tool.name)) {
+        return { decision: 'deny', reason: t("{name} is not in this agent's MCP tools", { name: tool.name }) }
+      }
+      if (!chat) return decide({ level: info.permissionLevel, cwd, platform }, tool)
+      // Chat: MCP tools the user switched on run; reads stay in the conversation's folder; nothing else.
+      if (tool.name.startsWith('mcp__')) return { decision: 'allow' }
+      const verdict = decide({ level: 'validate-all', cwd, platform }, tool)
+      return verdict.decision === 'ask' ? { decision: 'deny', reason: CHAT_REFUSAL() } : verdict
+    }
     const common = {
       emit: (event: AgentEvent) => this.emit(id, event),
       decide: gate,
       ask: (question: Parameters<ApprovalBroker['ask']>[1], signal: AbortSignal) => this.broker.ask(id, question, signal)
     }
 
+    // CLI agents keep their own system prompt; in chat they get the chat guidance on top of it.
+    const cliPrompt = chat ? chatSystemPrompt(req.systemPrompt) : req.systemPrompt
     let session: AgentSession
     if (isApiKind(profile.kind)) {
       session = await this.apiSession(profile, apiKey, info, req.systemPrompt, allowed, platform, common)
     } else if (profile.kind === 'claude-code') {
-      session = await this.claudeCodeSession(profile, apiKey, info, req.systemPrompt, allowed, common)
+      session = await this.claudeCodeSession(profile, apiKey, info, cliPrompt, allowed, common, chat ? CHAT_CLAUDE_DISALLOWED : [])
     } else if (profile.kind === 'codex') {
-      session = this.codexSession(profile, info, req.systemPrompt, allowed, platform, common)
+      session = this.codexSession(profile, info, cliPrompt, allowed, platform, common)
     } else {
       this.checkAntigravityConflict(profile.id, info)
-      session = this.antigravitySession(profile, info, req.systemPrompt, allowed, platform, common.emit)
+      session = this.antigravitySession(profile, info, cliPrompt, allowed, platform, common.emit)
     }
 
     const entry: Entry = { info, session, seq: 0 }
@@ -188,7 +217,8 @@ export class AgentManager {
     info: AgentSessionInfo,
     systemPrompt: string,
     allowed: ReadonlySet<string>,
-    common: Pick<ConstructorParameters<typeof ClaudeCodeSession>[1], 'emit' | 'decide' | 'ask'>
+    common: Pick<ConstructorParameters<typeof ClaudeCodeSession>[1], 'emit' | 'decide' | 'ask'>,
+    disallowed: string[] = []
   ): Promise<AgentSession> {
     const binary = resolveClaudeBinary(this.deps.claudeCodePath())
     const env = buildProfileEnv(
@@ -207,7 +237,7 @@ export class AgentManager {
         model: info.model,
         appendSystemPrompt: systemPrompt,
         mcpServers: mcp.servers,
-        disallowedTools: mcp.disallowed
+        disallowedTools: [...mcp.disallowed, ...disallowed]
       },
       {
         ...common,
@@ -326,11 +356,12 @@ export class AgentManager {
       defaultShell(platform, this.deps.hasPwsh()),
       withoutAccountVars(this.deps.baseEnv ?? process.env)
     )
+    const chat = info.chatId !== null
     return new ApiSession(
       {
         model: info.model,
-        system: apiSystemPrompt(info.cwd, platform, systemPrompt),
-        tools: [...BASE_TOOLS, ...mcpTools.map(({ qualifiedName: _q, ...spec }) => spec)]
+        system: chat ? chatSystemPrompt(systemPrompt) : apiSystemPrompt(info.cwd, platform, systemPrompt),
+        tools: [...(chat ? BASE_TOOLS.filter((tool) => CHAT_API_TOOLS.has(tool.name)) : BASE_TOOLS), ...mcpTools.map(({ qualifiedName: _q, ...spec }) => spec)]
       },
       {
         ...common,
@@ -348,12 +379,14 @@ export class AgentManager {
     )
   }
 
-  send(sessionId: string, text: string): void {
+  /** `images` reach API models directly; CLI agents read attachments from their folder instead. */
+  send(sessionId: string, text: string, images: ImageInput[] = []): void {
     const entry = this.require(sessionId)
     if (ENDED.includes(entry.info.status)) throw new AppError('not_allowed', t('This session has ended. Start a new one.'))
     this.emit(sessionId, { type: 'user', id: randomUUID(), text })
     this.setStatus(sessionId, 'running')
-    entry.session?.send(text)
+    if (images.length) entry.session?.send(text, images)
+    else entry.session?.send(text)
   }
 
   async interrupt(sessionId: string): Promise<void> {
