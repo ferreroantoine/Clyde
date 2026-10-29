@@ -1,6 +1,12 @@
 import { useState, type ReactNode } from 'react'
-import { Check, KeyRound, UserRound } from 'lucide-react'
-import { PROFILE_COLORS, type AuthMode, type Profile } from '@shared/profiles'
+import { Bot, Check, Cpu, KeyRound, Sparkles, UserRound, Wind } from 'lucide-react'
+import {
+  DEFAULT_OLLAMA_URL,
+  PROFILE_COLORS,
+  type AuthMode,
+  type Profile,
+  type ProfileKind
+} from '@shared/profiles'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -24,6 +30,48 @@ function Field({ label, hint, children }: { label: string; hint?: ReactNode; chi
   )
 }
 
+interface Choice {
+  kind: ProfileKind
+  auth: AuthMode
+  icon: typeof KeyRound
+  title: string
+  description: string
+  keyPlaceholder?: string
+}
+
+/** Every way to add an account, in the order the dialog shows them. */
+const CHOICES: Choice[] = [
+  {
+    kind: 'claude-code',
+    auth: 'subscription',
+    icon: UserRound,
+    title: 'Claude subscription',
+    description: 'Claude Code, signed in with your plan. Personal use.'
+  },
+  {
+    kind: 'claude-code',
+    auth: 'api-key',
+    icon: KeyRound,
+    title: 'Claude Code + API key',
+    description: 'Claude Code, billed to a Console key.',
+    keyPlaceholder: 'sk-ant-…'
+  },
+  {
+    kind: 'anthropic',
+    auth: 'api-key',
+    icon: Sparkles,
+    title: 'Anthropic API',
+    description: 'Claude models in Atelier’s own agent loop.',
+    keyPlaceholder: 'sk-ant-…'
+  },
+  { kind: 'openai', auth: 'api-key', icon: Bot, title: 'OpenAI', description: 'GPT models.', keyPlaceholder: 'sk-…' },
+  { kind: 'mistral', auth: 'api-key', icon: Wind, title: 'Mistral', description: 'La Plateforme models.', keyPlaceholder: 'API key' },
+  { kind: 'ollama', auth: 'none', icon: Cpu, title: 'Ollama', description: 'Local models, no key.' }
+]
+
+const choiceOf = (kind: ProfileKind, auth: AuthMode) =>
+  CHOICES.find((c) => c.kind === kind && c.auth === auth) ?? (CHOICES[0] as Choice)
+
 function AuthOption({
   active,
   disabled,
@@ -46,13 +94,13 @@ function AuthOption({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        'flex items-start gap-2.5 rounded-lg border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+        'flex items-start gap-2 rounded-lg border p-2.5 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50',
         active ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'hover:bg-accent/60'
       )}
     >
       <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
       <span className="space-y-0.5">
-        <span className="block text-sm font-medium">{title}</span>
+        <span className="block text-[13px] font-medium">{title}</span>
         <span className="block text-[11px] leading-snug text-muted-foreground">{description}</span>
       </span>
     </button>
@@ -97,22 +145,32 @@ function ProfileForm({
   const [name, setName] = useState(profile?.name ?? '')
   const [label, setLabel] = useState(profile?.label ?? '')
   const [color, setColor] = useState<string>(() => profile?.color ?? nextColor())
-  const [auth, setAuth] = useState<AuthMode>(profile?.auth ?? (distribution ? 'api-key' : 'subscription'))
+  const [choice, setChoice] = useState<Choice>(() =>
+    profile ? choiceOf(profile.kind, profile.auth) : choiceOf('claude-code', distribution ? 'api-key' : 'subscription')
+  )
   const [apiKey, setApiKey] = useState('')
+  const [baseUrl, setBaseUrl] = useState(profile?.baseUrl ?? '')
   const [defaultModel, setDefaultModel] = useState(profile?.defaultModel ?? '')
   const [saving, setSaving] = useState(false)
 
   const editing = !!profile
+  const { kind, auth } = choice
   const needsKey = auth === 'api-key' && !editing
   const canSave = name.trim().length > 0 && (!needsKey || apiKey.trim().length > 0) && !saving
 
   const save = async () => {
     setSaving(true)
-    const common = { name, label, color: color as (typeof PROFILE_COLORS)[number], defaultModel }
+    const common = {
+      name,
+      label,
+      color: color as (typeof PROFILE_COLORS)[number],
+      defaultModel,
+      ...(kind === 'ollama' ? { baseUrl: baseUrl.trim() } : {})
+    }
     const key = apiKey.trim() ? { apiKey: apiKey.trim() } : {}
     const saved = editing
       ? await update({ id: profile.id, ...common, ...key })
-      : await create({ kind: 'claude-code', auth, ...common, ...key })
+      : await create({ kind, auth, ...common, ...key })
     setSaving(false)
     if (!saved) return
     close()
@@ -122,9 +180,11 @@ function ProfileForm({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{editing ? 'Edit account' : 'Add a Claude account'}</DialogTitle>
+        <DialogTitle>{editing ? `Edit ${choice.title} account` : 'Add an account'}</DialogTitle>
         <DialogDescription>
-          Each account gets its own Claude Code configuration folder, so several accounts can work side by side.
+          {kind === 'claude-code'
+            ? 'Each Claude Code account gets its own configuration folder, so several accounts can work side by side.'
+            : 'Runs Atelier’s own agent loop: read, write, list files and run commands, plus the MCP tools you allow.'}
         </DialogDescription>
       </DialogHeader>
 
@@ -136,22 +196,21 @@ function ProfileForm({
         }}
       >
         {!editing && (
-          <div className="grid grid-cols-2 gap-2">
-            <AuthOption
-              active={auth === 'subscription'}
-              disabled={distribution}
-              icon={UserRound}
-              title="Claude subscription"
-              description={distribution ? 'Not available in this build.' : 'Sign in with Claude Code. Personal use.'}
-              onClick={() => setAuth('subscription')}
-            />
-            <AuthOption
-              active={auth === 'api-key'}
-              icon={KeyRound}
-              title="Anthropic API key"
-              description="Billed to your Console organization."
-              onClick={() => setAuth('api-key')}
-            />
+          <div className="grid grid-cols-2 gap-2" role="group" aria-label="Provider">
+            {CHOICES.map((c) => {
+              const blocked = distribution && c.auth === 'subscription'
+              return (
+                <AuthOption
+                  key={`${c.kind}:${c.auth}`}
+                  active={c === choice}
+                  disabled={blocked}
+                  icon={c.icon}
+                  title={c.title}
+                  description={blocked ? 'Not available in this build.' : c.description}
+                  onClick={() => setChoice(c)}
+                />
+              )
+            })}
           </div>
         )}
 
@@ -202,15 +261,33 @@ function ProfileForm({
               spellCheck={false}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder={editing && profile.hasApiKey ? 'Stored, leave empty to keep it' : 'sk-ant-…'}
+              placeholder={editing && profile.hasApiKey ? 'Stored, leave empty to keep it' : (choice.keyPlaceholder ?? 'API key')}
               className="font-mono text-xs"
+            />
+          </Field>
+        )}
+
+        {kind === 'ollama' && (
+          <Field label="Server URL" hint="Where Ollama listens. Atelier talks to its OpenAI-compatible /v1 API.">
+            <Input
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder={DEFAULT_OLLAMA_URL}
+              className="font-mono text-xs"
+              spellCheck={false}
             />
           </Field>
         )}
 
         <Field
           label="Default model"
-          hint={models.length ? undefined : 'Empty uses Claude Code’s default. Test the connection to list models.'}
+          hint={
+            models.length
+              ? undefined
+              : kind === 'claude-code'
+                ? 'Empty uses Claude Code’s default. Test the connection to list models.'
+                : 'Empty picks the provider’s first chat model. Test the connection to list them.'
+          }
         >
           <Input
             list="profile-models"

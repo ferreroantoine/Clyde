@@ -12,6 +12,7 @@ import { useWorkspace } from '@/stores/workspace'
 import { useEditor } from '@/stores/editor'
 import { useProfiles } from '@/stores/profiles'
 import { useAgents } from '@/stores/agents'
+import { useMcp } from '@/stores/mcp'
 
 export function App() {
   const theme = useSettings((s) => s.settings.theme)
@@ -31,7 +32,9 @@ export function App() {
     const offTerminals = useTerminals.getState().init()
     const offProfiles = useProfiles.getState().init()
     const offAgents = useAgents.getState().init()
+    const offMcp = useMcp.getState().init()
     return () => {
+      offMcp()
       offAgents()
       disposed = true
       off?.()

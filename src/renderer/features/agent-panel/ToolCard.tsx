@@ -37,7 +37,12 @@ const ICONS: Record<string, LucideIcon> = {
   WebSearch: Globe,
   Agent: Users,
   Task: Users,
-  TodoWrite: ListTodo
+  TodoWrite: ListTodo,
+  run_command: SquareTerminal,
+  read_file: FileText,
+  write_file: FilePen,
+  edit_file: FilePen,
+  list_files: Search
 }
 
 const DECISION_LABEL = {
@@ -53,7 +58,7 @@ function Approval({ tool }: { tool: ToolItem }) {
   const [message, setMessage] = useState('')
   const approval = tool.approval
   if (!approval) return null
-  const shell = tool.name === 'Bash' || tool.name === 'PowerShell' || tool.name === 'Monitor'
+  const shell = ['Bash', 'PowerShell', 'Monitor', 'run_command'].includes(tool.name)
 
   if (approval.state !== 'pending') {
     return (
@@ -109,6 +114,12 @@ function Approval({ tool }: { tool: ToolItem }) {
   )
 }
 
+/** `mcp__github__search` reads as `github › search`. */
+function displayName(name: string): string {
+  const mcp = /^mcp__([^_]+(?:[-_][^_]+)*?)__(.+)$/.exec(name)
+  return mcp ? `${mcp[1]} › ${mcp[2]}` : name
+}
+
 export function ToolCard({ tool, cwd, ended }: { tool: ToolItem; cwd: string; ended: boolean }) {
   const state = toolState(tool, ended)
   const [open, setOpen] = useState(false)
@@ -133,7 +144,7 @@ export function ToolCard({ tool, cwd, ended }: { tool: ToolItem; cwd: string; en
       >
         <ChevronRight className={cn('size-3 shrink-0 text-muted-foreground transition-transform', open && 'rotate-90')} />
         <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="shrink-0 font-medium">{tool.name.replace(/^mcp__/, '')}</span>
+        <span className="shrink-0 font-medium">{displayName(tool.name)}</span>
         <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">{summary}</span>
         {state === 'running' && <LoaderCircle className="size-3.5 shrink-0 animate-spin text-muted-foreground" />}
         {state === 'done' && <Check className="size-3.5 shrink-0 text-success" />}
