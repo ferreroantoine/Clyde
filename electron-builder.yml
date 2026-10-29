@@ -1,0 +1,42 @@
+# Packaging. Build the Windows installer on Windows: npm installs the Claude Code binary for
+# the machine it runs on, and the installer must ship the Windows one.
+appId: dev.atelier.app
+productName: Atelier
+copyright: Copyright © 2026
+directories:
+  output: release
+  buildResources: resources
+files:
+  - out/**
+  - package.json
+  - '!**/*.map'
+  - '!**/*.{md,markdown}'
+  - '!**/{test,tests,__tests__}/**'
+# Executables and native modules cannot run from inside app.asar.
+asarUnpack:
+  - node_modules/node-pty/**
+  - node_modules/better-sqlite3/**
+  - node_modules/@vscode/ripgrep/**
+  - node_modules/@anthropic-ai/claude-agent-sdk-*/**
+# node-pty and better-sqlite3 ship N-API prebuilds that load in Electron as is.
+npmRebuild: false
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/icon.png
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: Atelier
+mac:
+  target: dmg
+  category: public.app-category.developer-tools
+linux:
+  target: [AppImage]
+  category: Development
+  # npm can install both Claude Code builds on Linux; glibc distributions need only one.
+  files:
+    - '!node_modules/@anthropic-ai/claude-agent-sdk-linux-*-musl/**'
