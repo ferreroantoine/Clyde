@@ -14,10 +14,30 @@ export const INVOKE_CHANNELS = [
   'pty:resize',
   'pty:kill',
   'settings:getAll',
-  'settings:set'
+  'settings:set',
+  'profiles:list',
+  'profiles:create',
+  'profiles:update',
+  'profiles:delete',
+  'profiles:test',
+  'profiles:login',
+  'agent:list',
+  'agent:start',
+  'agent:send',
+  'agent:interrupt',
+  'agent:stop',
+  'agent:approve'
 ] as const
 
-export const EVENT_CHANNELS = ['workspace:changed', 'fs:changed', 'pty:data', 'pty:exit'] as const
+export const EVENT_CHANNELS = [
+  'workspace:changed',
+  'fs:changed',
+  'pty:data',
+  'pty:exit',
+  'profiles:changed',
+  'agent:session',
+  'agent:event'
+] as const
 
 export type InvokeChannel = (typeof INVOKE_CHANNELS)[number]
 export type EventChannel = (typeof EVENT_CHANNELS)[number]

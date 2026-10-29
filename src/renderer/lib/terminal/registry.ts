@@ -1,5 +1,6 @@
 import { Terminal, type ITheme } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import '@xterm/xterm/css/xterm.css'
 import { tokenToHex, type ResolvedTheme } from '@/lib/theme'
 
@@ -97,6 +98,8 @@ export const terminals = {
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
+    // Opens https links (sign-in URLs, docs) in the system browser through the window open handler.
+    term.loadAddon(new WebLinksAddon((_event, uri) => window.open(uri, '_blank')))
     term.onData(handlers.onInput)
     let used = false
     const markUsed = () => {
