@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+  Bot,
   CircleAlert,
   CircleCheck,
+  Cpu,
   KeyRound,
   LoaderCircle,
   LogIn,
@@ -9,10 +11,13 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Sparkles,
   Trash2,
-  UserRound
+  UserRound,
+  Wind,
+  type LucideIcon
 } from 'lucide-react'
-import type { Profile } from '@shared/profiles'
+import { PROFILE_KIND_LABELS, type Profile } from '@shared/profiles'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -61,6 +66,22 @@ function ConnectionLine({ profile }: { profile: Profile }) {
   )
 }
 
+function kindLine(profile: Profile): { icon: LucideIcon; text: string } {
+  if (profile.kind === 'claude-code') {
+    return profile.auth === 'subscription'
+      ? { icon: UserRound, text: 'Claude Code · subscription' }
+      : { icon: KeyRound, text: 'Claude Code · API key' }
+  }
+  const icons: Record<Exclude<Profile['kind'], 'claude-code'>, LucideIcon> = {
+    anthropic: Sparkles,
+    openai: Bot,
+    mistral: Wind,
+    ollama: Cpu
+  }
+  const text = profile.kind === 'ollama' ? `Ollama · ${profile.baseUrl}` : `${PROFILE_KIND_LABELS[profile.kind]} · API key`
+  return { icon: icons[profile.kind], text }
+}
+
 function ProfileCard({
   profile,
   onEdit,
@@ -74,7 +95,8 @@ function ProfileCard({
 }) {
   const test = useProfiles((s) => s.test)
   const testing = useProfiles((s) => s.tests[profile.id] === 'testing')
-  const subscription = profile.auth === 'subscription'
+  const subscription = profile.kind === 'claude-code' && profile.auth === 'subscription'
+  const { icon: KindIcon, text: kindText } = kindLine(profile)
 
   return (
     <article
@@ -97,8 +119,8 @@ function ProfileCard({
             )}
           </div>
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-            {subscription ? <UserRound className="size-3.5" /> : <KeyRound className="size-3.5" />}
-            {subscription ? 'Claude subscription' : 'Anthropic API key'}
+            <KindIcon className="size-3.5" />
+            <span className="truncate">{kindText}</span>
             {profile.personalUse && (
               <Badge variant="outline" className="h-4 px-1.5 text-[10px] font-medium">
                 Personal use
@@ -157,7 +179,7 @@ export function AccountsPage() {
   }, [])
 
   const onCreated = (profile: Profile) => {
-    if (profile.auth === 'subscription') setLoginFor(profile)
+    if (profile.kind === 'claude-code' && profile.auth === 'subscription') setLoginFor(profile)
     else void test(profile.id)
   }
 
@@ -181,7 +203,7 @@ export function AccountsPage() {
             <EmptyState
               icon={KeyRound}
               title="No account yet"
-              description="Add a Claude subscription or an Anthropic API key. OpenAI, Mistral and Ollama accounts arrive with the API providers."
+              description="Add a Claude subscription, an API key for Anthropic, OpenAI or Mistral, or a local Ollama."
               action={
                 <Button size="sm" variant="outline" onClick={() => setEditing('new')}>
                   <Plus /> Add account

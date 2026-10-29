@@ -1,0 +1,81 @@
+import { create } from 'zustand'
+import type { McpImportPreview, McpServer, McpServerInput, McpServerUpdate } from '@shared/mcp'
+import { invoke, on } from '@/lib/ipc'
+import { notify } from './notifications'
+
+interface McpState {
+  servers: McpServer[]
+  loaded: boolean
+  init: () => () => void
+  create: (input: McpServerInput) => Promise<boolean>
+  update: (input: McpServerUpdate) => Promise<boolean>
+  remove: (id: string) => Promise<void>
+  reconnect: (id: string) => Promise<void>
+  /** Opens the file picker; null when cancelled. */
+  previewImport: () => Promise<McpImportPreview | null>
+  importServers: (path: string, names: string[]) => Promise<boolean>
+}
+
+export const useMcp = create<McpState>()((set) => ({
+  servers: [],
+  loaded: false,
+
+  init: () => {
+    const off = on('mcp:changed', (servers) => set({ servers }))
+    invoke('mcp:list')
+      .then((servers) => set({ servers, loaded: true }))
+      .catch((err) => {
+        set({ loaded: true })
+        notify.error('Could not load MCP servers', err)
+      })
+    return off
+  },
+
+  create: async (input) => {
+    try {
+      set({ servers: await invoke('mcp:create', input) })
+      return true
+    } catch (err) {
+      notify.error('Could not add the server', err)
+      return false
+    }
+  },
+
+  update: async (input) => {
+    try {
+      set({ servers: await invoke('mcp:update', input) })
+      return true
+    } catch (err) {
+      notify.error('Could not save the server', err)
+      return false
+    }
+  },
+
+  remove: async (id) => {
+    await invoke('mcp:delete', { id }).catch((err) => notify.error('Could not delete the server', err))
+  },
+
+  reconnect: async (id) => {
+    await invoke('mcp:reconnect', { id }).catch((err) => notify.error('Could not reconnect', err))
+  },
+
+  previewImport: async () => {
+    try {
+      return await invoke('mcp:importPreview')
+    } catch (err) {
+      notify.error('Could not read that file', err)
+      return null
+    }
+  },
+
+  importServers: async (path, names) => {
+    try {
+      set({ servers: await invoke('mcp:import', { path, names }) })
+      notify.success(`Imported ${names.length} server${names.length > 1 ? 's' : ''}`)
+      return true
+    } catch (err) {
+      notify.error('Import failed', err)
+      return false
+    }
+  }
+}))

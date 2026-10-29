@@ -179,7 +179,14 @@ export function describeTool(name: string, input: Record<string, unknown>, cwd: 
     case 'Bash':
     case 'PowerShell':
     case 'Monitor':
+    case 'run_command':
       return str('command')
+    case 'read_file':
+    case 'write_file':
+    case 'edit_file':
+      return relative(str('path'))
+    case 'list_files':
+      return str('path') ? relative(str('path')) : '.'
     case 'Read':
     case 'Write':
     case 'Edit':
