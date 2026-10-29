@@ -76,6 +76,14 @@ export function SettingsPage() {
               onBlur={(e) => void update('terminalShell', e.target.value.trim())}
             />
           </Row>
+          <Row label="Claude Code executable" hint="Leave empty to use the one bundled with Atelier.">
+            <Input
+              className="h-8 w-64 font-mono text-xs"
+              placeholder="bundled"
+              defaultValue={settings.claudeCodePath}
+              onBlur={(e) => void update('claudeCodePath', e.target.value.trim())}
+            />
+          </Row>
         </section>
       </div>
     </div>

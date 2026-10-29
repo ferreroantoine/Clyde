@@ -9,6 +9,10 @@ export type ErrorCode =
   | 'io_error'
   | 'pty_error'
   | 'search_error'
+  | 'secrets_unavailable'
+  | 'not_allowed'
+  | 'claude_code_missing'
+  | 'agent_error'
   | 'internal'
 
 /** Error with a stable code that survives the IPC boundary. */

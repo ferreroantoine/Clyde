@@ -10,6 +10,7 @@ import { useLayout } from '@/stores/layout'
 import { useSettings } from '@/stores/settings'
 import { useWorkspace } from '@/stores/workspace'
 import { useEditor } from '@/stores/editor'
+import { useProfiles } from '@/stores/profiles'
 
 export function App() {
   const theme = useSettings((s) => s.settings.theme)
@@ -27,10 +28,12 @@ export function App() {
         else off = unsubscribe
       })
     const offTerminals = useTerminals.getState().init()
+    const offProfiles = useProfiles.getState().init()
     return () => {
       disposed = true
       off?.()
       offTerminals()
+      offProfiles()
     }
   }, [])
 

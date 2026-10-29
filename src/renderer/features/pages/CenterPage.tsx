@@ -1,18 +1,14 @@
-import { Bot, Gauge, KeyRound, Plug } from 'lucide-react'
+import { Bot, Gauge, Plug } from 'lucide-react'
 import type { CenterView } from '@/stores/layout'
 import { EmptyState } from '@/components/EmptyState'
 import { SettingsPage } from '@/features/settings/SettingsPage'
+import { AccountsPage } from '@/features/accounts/AccountsPage'
 
 const PLACEHOLDERS = {
   agents: {
     icon: Bot,
     title: 'Agents',
     description: 'Run several agents in parallel, each on its own branch and worktree, and review their diffs on a Kanban board.'
-  },
-  accounts: {
-    icon: KeyRound,
-    title: 'Accounts',
-    description: 'Claude, Anthropic API, OpenAI, Mistral and Ollama profiles, each with its own color and label.'
   },
   mcp: {
     icon: Plug,
@@ -28,6 +24,7 @@ const PLACEHOLDERS = {
 
 export function CenterPage({ view }: { view: Exclude<CenterView, 'editor'> }) {
   if (view === 'settings') return <SettingsPage />
+  if (view === 'accounts') return <AccountsPage />
   const page = PLACEHOLDERS[view]
   return <EmptyState icon={page.icon} title={page.title} description={page.description} />
 }

@@ -1,6 +1,14 @@
 import { z } from 'zod'
 import type { EventChannel, InvokeChannel } from './channels'
 import type { Settings } from '../settings'
+import { profileCreateSchema, profileIdSchema, profileUpdateSchema, type ConnectionResult, type Profile } from '../profiles'
+import {
+  agentStartSchema,
+  approvalAnswerSchema,
+  sessionIdSchema,
+  type AgentEventEnvelope,
+  type AgentSessionInfo
+} from '../agent'
 import type {
   AppInfo,
   DirEntry,
@@ -35,7 +43,19 @@ export const requestSchemas = {
   'pty:resize': z.object({ id: ptyId, ...dims }),
   'pty:kill': z.object({ id: ptyId }),
   'settings:getAll': z.undefined(),
-  'settings:set': z.object({ key: z.string().min(1).max(128), value: z.unknown() })
+  'settings:set': z.object({ key: z.string().min(1).max(128), value: z.unknown() }),
+  'profiles:list': z.undefined(),
+  'profiles:create': profileCreateSchema,
+  'profiles:update': profileUpdateSchema,
+  'profiles:delete': z.object({ id: profileIdSchema }),
+  'profiles:test': z.object({ id: profileIdSchema }),
+  'profiles:login': z.object({ id: profileIdSchema, ...dims }),
+  'agent:list': z.undefined(),
+  'agent:start': agentStartSchema,
+  'agent:send': z.object({ sessionId: sessionIdSchema, text: z.string().trim().min(1).max(100_000) }),
+  'agent:interrupt': z.object({ sessionId: sessionIdSchema }),
+  'agent:stop': z.object({ sessionId: sessionIdSchema }),
+  'agent:approve': approvalAnswerSchema
 } satisfies Record<InvokeChannel, z.ZodType>
 
 export interface InvokeResponses {
@@ -53,6 +73,18 @@ export interface InvokeResponses {
   'pty:kill': null
   'settings:getAll': Settings
   'settings:set': Settings
+  'profiles:list': Profile[]
+  'profiles:create': Profile
+  'profiles:update': Profile
+  'profiles:delete': null
+  'profiles:test': ConnectionResult
+  'profiles:login': PtyInfo
+  'agent:list': AgentSessionInfo[]
+  'agent:start': AgentSessionInfo
+  'agent:send': null
+  'agent:interrupt': null
+  'agent:stop': null
+  'agent:approve': null
 }
 
 export interface EventPayloads {
@@ -60,6 +92,9 @@ export interface EventPayloads {
   'fs:changed': FsChange[]
   'pty:data': { id: string; data: string }
   'pty:exit': { id: string; exitCode: number }
+  'profiles:changed': Profile[]
+  'agent:session': AgentSessionInfo
+  'agent:event': AgentEventEnvelope
 }
 
 export type InvokeRequest<C extends InvokeChannel> = z.input<(typeof requestSchemas)[C]>

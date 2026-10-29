@@ -11,6 +11,13 @@ import { MemorySettingsRepository, SettingsService } from './services/settings'
 import { WorkspaceService } from './services/workspace'
 import { PtyService } from './services/pty'
 import { registerTerminalHandlers } from './ipc/terminal'
+import { registerProfileHandlers } from './ipc/profiles'
+import { registerAgentHandlers } from './ipc/agents'
+import { SecretsService, safeStorageCipher } from './services/secrets'
+import { ProfilesService } from './services/profiles'
+import { AgentManager } from './agents/manager'
+import { loadQuery, type QueryFn } from './agents/claude-code/provider'
+import { DISTRIBUTION } from './build-flags'
 
 const log = createLogger('main')
 
@@ -19,6 +26,9 @@ app.setAppUserModelId('dev.atelier.app')
 // Lets scripts and tests run against a throwaway profile.
 const userDataOverride = process.env['ATELIER_USER_DATA']
 if (userDataOverride) app.setPath('userData', userDataOverride)
+
+let queryFn: Promise<QueryFn> | null = null
+const query = () => (queryFn ??= loadQuery())
 
 /** Opens and migrates the app database; on failure the app still starts, with settings kept in memory. */
 function openAppDatabase(): Db | null {
@@ -36,6 +46,12 @@ function openAppDatabase(): Db | null {
     )
     return null
   }
+}
+
+function memoryDatabase(): Db {
+  const mem = openDatabase(':memory:')
+  migrate(mem)
+  return mem
 }
 
 process.on('uncaughtException', (err) => log.error('uncaught exception', err))
@@ -69,7 +85,31 @@ if (!app.requestSingleInstanceLock()) {
     registerAppHandlers(settings)
     registerWorkspaceHandlers(workspace)
     registerTerminalHandlers(ptys, workspace)
+
+    const clientApp = `atelier/${app.getVersion()}`
+    const claudeCodePath = () => settings.getAll().claudeCodePath
+    // Without the app database, profiles live in memory for this session, like settings.
+    const profileDb = db ?? memoryDatabase()
+    const profiles = new ProfilesService(profileDb, new SecretsService(profileDb, safeStorageCipher), {
+      profilesRoot: join(app.getPath('userData'), 'claude-profiles'),
+      distribution: DISTRIBUTION,
+      onChanged: (list) => broadcast('profiles:changed', list)
+    })
+    const agents = new AgentManager({
+      profiles,
+      claudeCodePath,
+      workspaceRoot: () => workspace.current()?.root ?? null,
+      query,
+      onEvent: (envelope) => broadcast('agent:event', envelope),
+      onSession: (info) => broadcast('agent:session', info),
+      clientApp,
+      log: createLogger('agents')
+    })
+    registerProfileHandlers({ profiles, ptys, claudeCodePath, query, clientApp })
+    registerAgentHandlers(agents)
+
     app.on('will-quit', () => {
+      agents.stopAll()
       ptys.killAll()
       void workspace.dispose()
       db?.close()

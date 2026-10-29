@@ -11,9 +11,9 @@ const memoryDb = () => new Database(':memory:')
 describe('migrate', () => {
   it('applies migrations once and records the version', () => {
     const db = memoryDb()
-    expect(migrate(db)).toBe(1)
-    expect(migrate(db)).toBe(1)
-    expect(db.pragma('user_version', { simple: true })).toBe(1)
+    expect(migrate(db)).toBe(2)
+    expect(migrate(db)).toBe(2)
+    expect(db.pragma('user_version', { simple: true })).toBe(2)
   })
 
   it('applies only pending migrations, in order', () => {
