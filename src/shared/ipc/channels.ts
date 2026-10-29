@@ -22,6 +22,7 @@ export const INVOKE_CHANNELS = [
   'profiles:delete',
   'profiles:test',
   'profiles:login',
+  'cli:status',
   'agent:list',
   'agent:start',
   'agent:send',

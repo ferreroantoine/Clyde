@@ -4,7 +4,7 @@ Agent-centric desktop IDE for Windows: several AI accounts and providers side by
 
 Stack: Electron 45, React 19, TypeScript (strict), electron-vite, Tailwind CSS v4 + shadcn/ui, Monaco, xterm.js + node-pty, SQLite (better-sqlite3).
 
-Docs: [original spec](docs/SPEC.md) (French), [approved plan](docs/PLAN.md).
+Docs: [original spec](docs/SPEC.md) (French), [approved plan](docs/PLAN.md), [iteration 2 plan](docs/PLAN-ITERATION-2.md) (French).
 
 ## Status
 
@@ -15,6 +15,8 @@ Docs: [original spec](docs/SPEC.md) (French), [approved plan](docs/PLAN.md).
 | 3 | API providers (Anthropic, OpenAI, Mistral, Ollama), in-house agent loop, MCP | done |
 | 4 | Parallel agents, git worktrees, Kanban, diff review and merge | done |
 | 5 | Supervision dashboard, metrics, command palette, polish, packaging | done |
+
+Iteration 2 (see its plan): providers (step 2) done; usage limits, settings, animations, chat, dictation, MCP catalog and memory to come.
 
 ## Install on Windows
 
@@ -68,17 +70,27 @@ Both install commands end by downloading the Electron binary (`install-electron`
 - **Keyboard**: `Ctrl+B` sidebar, `Ctrl+J` or `` Ctrl+` `` terminal, `Ctrl+Alt+B` agent panel, `Ctrl+Shift+E` files, `Ctrl+Shift+F` search, `Ctrl+S` save, `Ctrl+,` settings.
 - **Terminal**: pwsh when installed, otherwise Windows PowerShell; another shell can be set in Settings. `Ctrl+C` copies when text is selected (otherwise it interrupts) and `Ctrl+V` pastes, as in Windows Terminal.
 - **Editor**: if a file changes on disk while you have unsaved edits, a banner lets you load the disk version or keep yours.
-- **Accounts** (key icon in the activity bar): each account has a name, a short label and a color.
-  - *Claude subscription* and *Claude Code + API key* run Claude Code. A subscription account opens a terminal running Claude Code's own `claude auth login`; the browser does the rest.
-  - *Anthropic API*, *OpenAI*, *Mistral* and *Ollama* (with its server URL, `http://localhost:11434` by default) run Atelier's own agent loop.
+- **Accounts** (key icon in the activity bar): each account has a name, a short label and a color. Accounts are grouped by vendor, each with a CLI that runs on your subscription and an API:
+
+  | Vendor | Subscription (CLI) | API key (Atelier's agent loop) |
+  | --- | --- | --- |
+  | Claude | Claude Code, signed in with `claude auth login` (or Claude Code with a Console key) | Anthropic API |
+  | ChatGPT | Codex CLI, signed in with `codex login` | OpenAI API |
+  | Gemini | Antigravity CLI (`agy`), signed in on its first start | Gemini API (AI Studio key) |
+  | Local | | Ollama (server URL, `http://localhost:11434` by default) |
+
+  - Signing in opens the CLI's own login in an embedded terminal; the browser does the rest and Atelier never sees the credentials.
   - **Test connection** checks the sign-in or the key and lists the models, without sending a prompt.
+  - The page shows which CLIs Atelier found and their versions. Claude Code ships with Atelier; install Codex with `npm install -g @openai/codex` and Antigravity from [antigravity.google](https://antigravity.google), or set their paths in Settings.
+  - Antigravity keeps its sign-in in the Windows credential store, once per Windows user, so Atelier allows one Antigravity account.
+  - Mistral is no longer supported. Updating removes Mistral accounts and the saved agents that used them, says so once, and keeps their past sessions in the history.
 - **MCP servers** (plug icon): add local commands (stdio) or remote URLs (streamable HTTP, with a fallback to SSE), or import the `mcpServers` of `claude_desktop_config.json`. Each server shows its status, its error if any, and its tools. Environment variables and headers are encrypted like API keys and never shown again.
 - **Agents** (right panel): pick an account, an optional model, a permission level, the MCP tools the agent may use (none by default) and an optional system prompt, then chat. API agents get five built-in tools: `read_file`, `write_file`, `edit_file`, `list_files` and `run_command` (PowerShell on Windows, bash elsewhere). Tool calls appear as collapsible cards; anything that needs your approval shows inline with *Allow once*, *Allow for the session* (the exact command, for shell tools) and *Deny*, where you can tell the agent what to do instead. Up to 4 agents run at once. Each agent's shell commands also appear, read-only, in a terminal tab named after its account (live output for API agents; Claude Code reports output when the command ends).
 - **Agents screen** (robot icon):
   - *Saved agents*: an account, a model, a permission level, MCP tools and a system prompt. *Chat in this folder* starts one in the agent panel.
   - *Board*: To do → In progress → To review → Done, for the open git repository. Creating a task makes a branch `atelier/<slug>` and a git worktree outside the repository (`%LOCALAPPDATA%\Atelier\worktrees`), from the branch checked out at that moment. *Start* runs the task's agent there, with the task as its first message; when it finishes its turn the task moves to *To review*.
   - *Review*: the changed files (the agent's commits plus what it left uncommitted) and a side-by-side diff. *Merge* commits what is left and merges with `--no-ff` into the branch the task started from, in your main folder; on a conflict the merge is undone and the files are listed. *Request changes* sends your comments to the agent in the same worktree. *Abandon* deletes the worktree and the branch.
-- **Supervision** (gauge icon): per account, active sessions, sessions, tokens, cost and the latest usage limit Claude Code reported; tokens and cost per day; the history of sessions, each with its transcript. Claude Code's cost is the one it reports; API costs are estimates from **Settings › Prices**, which ships with the Anthropic list prices and Mistral Large (October 2026) and lets you add the models you use (OpenAI prices are not filled in). Ollama counts as free.
+- **Supervision** (gauge icon): per account, active sessions, sessions, tokens, cost and the latest usage limit Claude Code reported; tokens and cost per day; the history of sessions, each with its transcript. Claude Code's cost is the one it reports; API costs are estimates from **Settings › Prices**, which ships with the Anthropic, OpenAI and Gemini list prices (October 2026) and lets you add the models you use. Ollama counts as free, and so do Codex and Antigravity turns, which run on a subscription.
 
 ### Permission levels
 
@@ -88,7 +100,9 @@ Both install commands end by downloading the Electron binary (`install-electron`
 | Files auto, commands validated | run | run | ask | ask |
 | Autonomous in its folder | run | run | run, except `git push` and `cd` out of the folder | refused |
 
-The levels apply the same way to both kinds of agents: the built-in tools of API agents map onto the same rules. MCP tools and tools Atelier does not know ask first, except MCP tools in autonomous mode, and an MCP tool the agent was not given is refused at every level (Claude Code does not even see it). The checks run in a `PreToolUse` hook, which Claude Code calls before its own allow rules, so allow rules in your Claude settings cannot skip them. A shell command cannot be fully sandboxed this way: in autonomous mode, a command can still write outside the folder through absolute paths or scripts. Use the other levels when that matters.
+The levels apply the same way to every kind of agent: the built-in tools of API agents map onto the same rules, and Codex sends its approval requests (commands, file changes, more sandbox access) to the same engine. For Codex, the level also picks its sandbox and approval policy: *Validate everything* runs it read-only, the two others let it write in the folder.
+
+Antigravity is the exception: in headless mode it cannot ask, so anything that would need approval is refused instead. *Validate everything* is read only, *Files auto* edits files but runs no commands, *Autonomous* runs commands in the folder with `git push` refused. Atelier writes these rules, and the agent's MCP servers, into the account's own folder before each run (`HOME` points there for `agy`), so your own `~/.gemini` settings are left alone; two Antigravity sessions of one account must therefore use the same level and MCP tools. MCP tools and tools Atelier does not know ask first, except MCP tools in autonomous mode, and an MCP tool the agent was not given is refused at every level (Claude Code does not even see it). The checks run in a `PreToolUse` hook, which Claude Code calls before its own allow rules, so allow rules in your Claude settings cannot skip them. A shell command cannot be fully sandboxed this way: in autonomous mode, a command can still write outside the folder through absolute paths or scripts. Use the other levels when that matters.
 
 ## Architecture
 
@@ -101,6 +115,8 @@ Main process
    ipc/         one file per domain; every request is validated with zod
    services/    workspace, files, watcher, search (ripgrep), pty, settings, db, secrets, profiles
    agents/      AgentManager, claude-code/ (provider, runtime, message translator),
+                codex/ (app-server JSON-RPC client, session, translator), antigravity/ (pty stream reader,
+                session, rules), cli/ (finding the CLIs, process and pty helpers),
                 api/ (chat adapters, agent loop, built-in tools)
    permissions/ engine (pure allow/ask/deny) and approval broker
    mcp/         hub (one client per server), store, claude_desktop_config importer
@@ -114,8 +130,11 @@ Main process
 - Logs (`%APPDATA%\Atelier\logs\main.log`) go through a redaction pass that masks API keys and tokens.
 - Data lives in `%APPDATA%\Atelier\atelier.db` (SQLite, WAL). Migrations are append-only in `src/main/services/db/migrations.ts` and tracked with `PRAGMA user_version`.
 - API keys are encrypted with Electron `safeStorage` (DPAPI on Windows) and stored as ciphertext. They are decrypted in main only when an agent starts and never cross IPC. MCP environment variables and headers are stored the same way. On Linux without a keyring, Atelier refuses to store a key rather than keep it in clear.
-- Each account has its own Claude Code folder, `%APPDATA%\Atelier\claude-profiles\<id>`, used as `CLAUDE_CONFIG_DIR`. Deleting the account deletes the folder. Claude Code processes, and the commands of API agents, get the app's environment minus every `ANTHROPIC_*`, `CLAUDE*`, `OPENAI_*` and `MISTRAL_*` variable, so an account cannot pick up another one's key or token.
-- API agents talk to their provider through the official SDKs (`@anthropic-ai/sdk`, and `openai` for OpenAI, Mistral and Ollama's `/v1`). The key and URL are always passed explicitly, and requests go through Electron's `net.fetch`, so Windows proxy settings apply.
+- Each CLI account has its own folder under `%APPDATA%\Atelier`: `claude-profiles\<id>` (used as `CLAUDE_CONFIG_DIR`), `codex-profiles\<id>` (`CODEX_HOME`) and `antigravity-profiles\<id>` (the home folder `agy` sees). Deleting the account deletes the folder. CLI processes, and the commands of API agents, get the app's environment minus every `ANTHROPIC_*`, `CLAUDE*`, `OPENAI_*`, `CODEX_*`, `GEMINI_*`, `AGY_*`, `MISTRAL_*` and Google credential variable, so an account cannot pick up another one's key or token.
+- Codex runs as `codex app-server` (JSON-RPC over stdio), one process per session. Atelier finds `codex` on PATH, or uses the path set in Settings, and starts the native binary behind npm's `codex.cmd`. The agent's MCP servers are passed in the thread config, limited to its tools.
+- Antigravity runs `agy -p … --output-format stream-json` once per message, resuming the conversation with `--conversation`. `agy` prints nothing when its output is not a terminal, so it runs in a pseudo-terminal. Its flags come from the documentation at antigravity.google; check them with `agy --help` if a run fails.
+- API agents talk to their provider through the official SDKs (`@anthropic-ai/sdk`, and `openai` for OpenAI, Gemini's OpenAI-compatible endpoint and Ollama's `/v1`). The key and URL are always passed explicitly, and requests go through Electron's `net.fetch`, so Windows proxy settings apply.
+- Settings are one versioned document (`schemaVersion`), validated with zod; a structural change comes with a migration step, and a document written by a newer build is read but never overwritten.
 - Claude Code is the binary bundled with `@anthropic-ai/claude-agent-sdk`, or the path set in Settings. Sessions load your user, project and local Claude Code settings, like `claude` does.
 - Every session, its transcript (without the streaming fragments), its usage per turn and the rate-limit events are stored, so the history outlives the session and the account it ran on.
 - Renderer state lives in zustand stores; components stay presentational. Error boundaries around each screen show a readable error instead of a blank window.
@@ -130,9 +149,9 @@ src/
               stores/, lib/ (ipc client, monaco, terminal registry, theme, transcript reducer), components/ui (shadcn)
 ```
 
-## Claude accounts and distribution builds
+## Subscription accounts and distribution builds
 
-You sign in to a subscription account through Claude Code's own login, and the IDE never reads the credentials. The Agent SDK documentation states that third-party products may not offer claude.ai login unless Anthropic has approved them. Subscription accounts are therefore marked "Personal use", and a distribution build (`npm run build` with `ATELIER_DISTRIBUTION=1` set, `$env:ATELIER_DISTRIBUTION=1` in PowerShell) only allows API key accounts. Subscription accounts created by a personal build show as disabled there.
+You sign in to a subscription account through the CLI's own login, and the IDE never reads the credentials. The Agent SDK documentation states that third-party products may not offer claude.ai login unless Anthropic has approved them. Subscription accounts are therefore marked "Personal use", and a distribution build (`npm run build` with `ATELIER_DISTRIBUTION=1` set, `$env:ATELIER_DISTRIBUTION=1` in PowerShell) only allows API key accounts. Subscription accounts created by a personal build show as disabled there.
 
 ## Packaging
 

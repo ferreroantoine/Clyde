@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ChevronRight, FolderGit2, KeyRound, Play, Plug } from 'lucide-react'
-import { PERMISSION_LEVELS, PERMISSION_LEVEL_LABELS, type PermissionLevel } from '@shared/agent'
+import { ANTIGRAVITY_LEVEL_HINTS, PERMISSION_LEVELS, PERMISSION_LEVEL_LABELS, type PermissionLevel } from '@shared/agent'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/EmptyState'
@@ -208,7 +208,9 @@ export function NewSession() {
             />
             <span>
               <span className="block font-medium">{PERMISSION_LEVEL_LABELS[l]}</span>
-              <span className="block text-[11px] text-muted-foreground">{LEVEL_HINTS[l]}</span>
+              <span className="block text-[11px] text-muted-foreground">
+                {selected?.kind === 'antigravity' ? ANTIGRAVITY_LEVEL_HINTS[l] : LEVEL_HINTS[l]}
+              </span>
             </span>
           </label>
         ))}
