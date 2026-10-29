@@ -1,9 +1,10 @@
 import { Terminal, type ITheme } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
-import type { ResolvedTheme } from '@/lib/theme'
+import { tokenToHex, type ResolvedTheme } from '@/lib/theme'
 
 const THEMES: Record<ResolvedTheme, ITheme> = {
+  // `background` is replaced at runtime by the --terminal token so the terminal matches its panel.
   light: {
     background: '#fbfbfc',
     foreground: '#2b2f38',
@@ -52,6 +53,12 @@ const THEMES: Record<ResolvedTheme, ITheme> = {
   }
 }
 
+function themeFor(theme: ResolvedTheme): ITheme {
+  const base = THEMES[theme]
+  const background = tokenToHex('--terminal') ?? base.background
+  return { ...base, ...(background ? { background, cursorAccent: background } : {}) }
+}
+
 export interface TerminalHandlers {
   onInput: (data: string) => void
   onResize: (cols: number, rows: number) => void
@@ -83,7 +90,7 @@ export const terminals = {
       disableStdin: opts.readOnly,
       scrollback: 10000,
       allowProposedApi: false,
-      theme: THEMES[currentTheme],
+      theme: themeFor(currentTheme),
       ...(opts.windowsBuild ? { windowsPty: { backend: 'conpty' as const, buildNumber: opts.windowsBuild } } : {})
     })
     const fit = new FitAddon()
@@ -158,7 +165,8 @@ export const terminals = {
 
   setTheme(theme: ResolvedTheme): void {
     currentTheme = theme
-    for (const { term } of entries.values()) term.options.theme = THEMES[theme]
+    const resolved = themeFor(theme)
+    for (const { term } of entries.values()) term.options.theme = resolved
   },
 
   setFontSize(size: number): void {
