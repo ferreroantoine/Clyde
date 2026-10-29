@@ -6,15 +6,26 @@ import { migrate } from '../services/db/database'
 import { localDay } from '@shared/metrics'
 import { MetricsService } from './metrics'
 
-const profile = (id: string, kind: Profile['kind'], name: string) => ({ id, kind, name, color: '#6366f1' }) as Profile
+const profile = (id: string, kind: Profile['kind'], name: string, auth: Profile['auth'] = 'api-key') =>
+  ({ id, kind, name, auth, color: '#6366f1' }) as Profile
 
 function setup() {
   const db = new Database(':memory:')
   migrate(db)
   let now = new Date(2026, 9, 28, 10, 0).getTime()
   const active: AgentSessionInfo[] = []
-  const profiles = [profile('p-claude', 'claude-code', 'Claude perso'), profile('p-api', 'anthropic', 'API'), profile('p-oai', 'openai', 'OpenAI')]
-  const metrics = new MetricsService(db, { profiles: () => profiles, activeSessions: () => active, now: () => now })
+  const profiles = [
+    profile('p-claude', 'claude-code', 'Claude key'),
+    profile('p-api', 'anthropic', 'API'),
+    profile('p-oai', 'openai', 'OpenAI'),
+    profile('p-sub', 'claude-code', 'Claude perso', 'subscription')
+  ]
+  const metrics = new MetricsService(db, {
+    profiles: () => profiles,
+    activeSessions: () => active,
+    sessionLimits: (id) => (id === 'as-4' ? [{ window: 'five_hour', label: '5-hour window', deltaPct: 2.5, badge: 'official' }] : []),
+    now: () => now
+  })
   const session = (id: string, profileId: string, kind: Profile['kind'], model: string): AgentSessionInfo => ({
     id,
     profileId,
@@ -65,7 +76,7 @@ describe('MetricsService', () => {
     const d = h.metrics.dashboard('7d')
     const by = Object.fromEntries(d.profiles.map((p) => [p.profileId, p]))
     expect(by['p-claude']).toMatchObject({ activeSessions: 1, sessions: 1, inputTokens: 10_000, costUsd: 0.04, costEstimated: false })
-    expect(by['p-claude']?.rateLimit).toMatchObject({ status: 'allowed_warning', utilization: 0.82 })
+    expect(by['p-claude']?.billing).toBe('api')
     expect(by['p-api']?.costUsd).toBeCloseTo(6) // 1M in at $4 + 100k out at $20
     expect(by['p-api']?.costEstimated).toBe(true)
     expect(by['p-oai']).toMatchObject({ costUsd: 0, unpricedTurns: 1, costEstimated: true })
@@ -75,6 +86,17 @@ describe('MetricsService', () => {
 
     const t = h.metrics.transcript('as-1')
     expect(t.events.map((e) => e.event.type)).toEqual(['user', 'text', 'turn_end', 'rate_limit'])
+  })
+
+  it('shows plan points, not a price, for subscription sessions', () => {
+    const h = setup()
+    const sub = h.session('as-4', 'p-sub', 'claude-code', 'claude-opus-5-5')
+    h.metrics.onSession(sub)
+    // Claude Code reports an API-equivalent cost even on a plan; it is not what the plan costs.
+    h.emit('as-4', h.turn(0.9, 50_000, 2000))
+    const d = h.metrics.dashboard('7d')
+    expect(d.profiles.find((p) => p.profileId === 'p-sub')).toMatchObject({ billing: 'subscription', costUsd: 0, costEstimated: false, inputTokens: 50_000 })
+    expect(d.sessions[0]).toMatchObject({ billing: 'subscription', limits: [{ window: 'five_hour', deltaPct: 2.5, badge: 'official' }] })
   })
 
   it('limits the dashboard to the range and closes sessions left open by a crash', () => {

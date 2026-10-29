@@ -22,6 +22,7 @@ import { describeApiError, type ApiTarget } from './api/clients'
 import { ApiSession } from './api/loop'
 import { BASE_TOOLS, BaseToolExecutor, defaultShell, toEngineRequest } from './api/tools'
 import type { Logger } from '../logger'
+import type { LimitReading } from '@shared/limits'
 import { CodexSession } from './codex/session'
 import { buildCodexEnv, codexMcpServers } from './codex/runtime'
 import { spawnCli, type SpawnCli } from './cli/process'
@@ -56,6 +57,8 @@ export interface AgentManagerDeps {
   /** Whether PowerShell 7 is installed, for API agents' run_command on Windows. */
   hasPwsh: () => boolean
   onEvent: (envelope: AgentEventEnvelope) => void
+  /** Plan limits a session read (subscription accounts). */
+  onLimits?: (profileId: string, sessionId: string, readings: LimitReading[]) => void
   onSession: (info: AgentSessionInfo) => void
   clientApp: string
   baseEnv?: NodeJS.ProcessEnv
@@ -201,7 +204,14 @@ export class AgentManager {
         mcpServers: mcp.servers,
         disallowedTools: mcp.disallowed
       },
-      { ...common, query, log: (line) => log.debug(`[${info.id}] ${line}`) }
+      {
+        ...common,
+        query,
+        log: (line) => log.debug(`[${info.id}] ${line}`),
+        ...(profile.auth === 'subscription' && this.deps.onLimits
+          ? { onLimits: (readings: LimitReading[]) => this.deps.onLimits?.(profile.id, info.id, readings) }
+          : {})
+      }
     )
   }
 
@@ -227,7 +237,12 @@ export class AgentManager {
         mcpServers: codexMcpServers(this.deps.mcp.agentServers(allowed)),
         clientVersion: this.deps.clientApp.split('/')[1] ?? '0.0.0'
       },
-      { ...common, spawn: this.deps.spawnCli ?? spawnCli, log: (line) => log.debug(`[${info.id}] ${line}`) }
+      {
+        ...common,
+        spawn: this.deps.spawnCli ?? spawnCli,
+        log: (line) => log.debug(`[${info.id}] ${line}`),
+        onLimits: (readings) => this.deps.onLimits?.(profile.id, info.id, readings)
+      }
     )
   }
 

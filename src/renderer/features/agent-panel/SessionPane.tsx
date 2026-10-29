@@ -9,6 +9,8 @@ import { ENDED_STATUSES, useAgents } from '@/stores/agents'
 import { profileById, useProfiles } from '@/stores/profiles'
 import { cn } from '@/lib/utils'
 import { RichText } from './RichText'
+import { SessionLimitLine } from '@/features/limits/LimitGauge'
+import { useLimits } from '@/stores/limits'
 import { ToolCard } from './ToolCard'
 
 export const STATUS_LABELS: Record<AgentStatus, string> = {
@@ -39,7 +41,8 @@ export const usd = (n: number) => (n < 0.01 && n > 0 ? '<$0.01' : `$${n.toFixed(
 export const tokens = (n: number) =>
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
 
-export function Item({ item, cwd, ended }: { item: TranscriptItem; cwd: string; ended: boolean }) {
+/** `subscription` hides per-turn prices: on a plan, Claude Code's cost is not what you pay. */
+export function Item({ item, cwd, ended, subscription = false }: { item: TranscriptItem; cwd: string; ended: boolean; subscription?: boolean }) {
   switch (item.kind) {
     case 'user':
       return (
@@ -58,7 +61,7 @@ export function Item({ item, cwd, ended }: { item: TranscriptItem; cwd: string; 
           {item.isError ? item.errors[0] ?? `Turn ended: ${item.subtype.replace(/_/g, ' ')}` : 'Done'}
           <span>
             · {(item.durationMs / 1000).toFixed(1)}s · {tokens(item.inputTokens)} in / {tokens(item.outputTokens)} out
-            {item.costUsd !== null && ` · ${usd(item.costUsd)}`}
+            {item.costUsd !== null && !subscription && ` · ${usd(item.costUsd)}`}
           </span>
         </p>
       )
@@ -155,6 +158,13 @@ export function SessionPane({ view }: { view: SessionView }) {
   }, [view.items.length, last])
 
   const limit = view.rateLimit
+  const subscription = profile?.auth === 'subscription'
+  const sessionId = view.info.id
+  const planUse = useLimits((s) => s.sessions[sessionId])
+  const loadPlanUse = useLimits((s) => s.loadSession)
+  useEffect(() => {
+    if (subscription) void loadPlanUse(sessionId)
+  }, [subscription, sessionId, loadPlanUse])
   return (
     <div className="flex h-full min-h-0 flex-col" data-session={view.info.id} data-status={view.info.status}>
       <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b px-3 py-2 text-[11px] text-muted-foreground">
@@ -164,7 +174,7 @@ export function SessionPane({ view }: { view: SessionView }) {
         <span className="ml-auto flex items-center gap-1.5">
           <StatusDot status={view.info.status} />
           {STATUS_LABELS[view.info.status]}
-          {view.totals.costUsd > 0 && <span>· {usd(view.totals.costUsd)}</span>}
+          {!subscription && view.totals.costUsd > 0 && <span>· {usd(view.totals.costUsd)}</span>}
         </span>
       </div>
       {limit && limit.status !== 'allowed' && (
@@ -176,9 +186,14 @@ export function SessionPane({ view }: { view: SessionView }) {
         >
           <Gauge className="size-3.5" />
           {limit.status === 'rejected' ? 'Usage limit reached' : 'Close to the usage limit'}
-          {limit.utilization !== null && ` (${Math.round(limit.utilization * 100)}%)`}
           {limit.resetsAt && ` · resets ${new Date(limit.resetsAt * 1000).toLocaleTimeString()}`}
         </p>
+      )}
+      {subscription && (
+        <div className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-[11px] text-muted-foreground" aria-label="Plan use of this session">
+          <span>This session</span>
+          <SessionLimitLine usage={planUse ?? []} />
+        </div>
       )}
       <div
         ref={scroller}
@@ -195,7 +210,7 @@ export function SessionPane({ view }: { view: SessionView }) {
           </p>
         )}
         {view.items.map((item) => (
-          <Item key={itemKey(item)} item={item} cwd={view.info.cwd} ended={ended} />
+          <Item key={itemKey(item)} item={item} cwd={view.info.cwd} ended={ended} subscription={subscription} />
         ))}
         {view.info.status === 'running' && last?.kind !== 'text' && (
           <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">

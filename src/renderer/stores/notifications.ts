@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type NoticeLevel = 'info' | 'success' | 'error'
+export type NoticeLevel = 'info' | 'success' | 'warning' | 'error'
 
 export interface Notice {
   id: number
@@ -44,6 +44,8 @@ export const notify = {
     useNotifications.getState().push({ level: 'info', title, ...(detail ? { detail } : {}) }),
   success: (title: string, detail?: string) =>
     useNotifications.getState().push({ level: 'success', title, ...(detail ? { detail } : {}) }),
+  warning: (title: string, detail?: string) =>
+    useNotifications.getState().push({ level: 'warning', title, ...(detail ? { detail } : {}) }),
   error: (title: string, err?: unknown) => {
     const detail = detailOf(err)
     useNotifications.getState().push({ level: 'error', title, ...(detail ? { detail } : {}) })

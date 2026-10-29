@@ -120,6 +120,12 @@ export interface RateLimitSnapshot {
   planType: string | null
 }
 
+export interface GetAccountRateLimitsResponse {
+  rateLimits: RateLimitSnapshot
+  /** Extra buckets, e.g. per model, keyed by limit id. */
+  rateLimitsByLimitId: Record<string, RateLimitSnapshot | undefined> | null
+}
+
 export interface GetAccountResponse {
   account: { type: 'chatgpt'; email: string | null; planType: string } | { type: string } | null
   requiresOpenaiAuth: boolean

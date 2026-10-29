@@ -314,6 +314,30 @@ describe('CodexSession', () => {
     await expect(done).resolves.toBeUndefined()
   })
 
+  it('reads the plan limits after each turn and when Codex says they changed', async () => {
+    const fake = new FakeCodex((msg) =>
+      msg.method === 'account/rateLimits/read'
+        ? {
+            rateLimits: { limitId: 'codex', limitName: null, primary: { usedPercent: 40, windowDurationMins: 300, resetsAt: 2 }, secondary: null },
+            rateLimitsByLimitId: null
+          }
+        : standardAnswers(msg)
+    )
+    const onLimits = vi.fn()
+    const s = new CodexSession(
+      { binary: 'c', env: {}, cwd: '/r', model: '', permissionLevel: 'autonomous', platform: 'linux', instructions: '', mcpServers: {}, clientVersion: '1' },
+      { spawn: () => fake, emit: () => undefined, decide: () => ({ decision: 'allow' }), ask: async () => ({ behavior: 'allow' }), onLimits }
+    )
+    void s.start()
+    await vi.waitFor(() => expect(fake.requests('thread/start')).toHaveLength(1))
+    fake.notify('turn/completed', { threadId: 'th-1', turn: { id: 't', status: 'completed', error: null, durationMs: 1 } })
+    await vi.waitFor(() => expect(onLimits).toHaveBeenCalledTimes(1))
+    expect(onLimits).toHaveBeenCalledWith([{ window: 'five_hour', label: '5-hour window', usedPct: 40, resetsAt: 2000, source: 'codex' }])
+    fake.notify('account/rateLimits/updated', { rateLimits: { limitId: 'codex', primary: null, secondary: null } })
+    await vi.waitFor(() => expect(onLimits).toHaveBeenCalledTimes(2))
+    s.stop()
+  })
+
   it('maps permission levels to Codex sandbox and approval policies', () => {
     expect(codexPolicy('validate-all')).toEqual({ sandbox: 'read-only', approvalPolicy: 'untrusted' })
     expect(codexPolicy('files-auto')).toEqual({ sandbox: 'workspace-write', approvalPolicy: 'untrusted' })
@@ -441,12 +465,16 @@ describe('Codex runtime', () => {
 
     const signedIn = new FakeCodex((msg) => {
       if (msg.method === 'account/read') return { account: { type: 'chatgpt', email: 'me@x.org', planType: 'plus' }, requiresOpenaiAuth: true }
-      if (msg.method === 'account/rateLimits/read') return { rateLimits: { limitId: 'codex', limitName: null, primary: null, secondary: { usedPercent: 12, windowDurationMins: 10080, resetsAt: 1 }, planType: 'plus' } }
+      if (msg.method === 'account/rateLimits/read')
+        return {
+          rateLimits: { limitId: 'codex', limitName: null, primary: null, secondary: { usedPercent: 12, windowDurationMins: 10080, resetsAt: 1 }, planType: 'plus' },
+          rateLimitsByLimitId: null
+        }
       if (msg.method === 'model/list') return { data: [], nextCursor: null }
       return msg.method === 'initialize' ? INIT : undefined
     })
     const probe = await probeCodex(() => signedIn, target)
-    expect(probe.rateLimits?.secondary?.usedPercent).toBe(12)
+    expect(probe.rateLimits?.rateLimits.secondary?.usedPercent).toBe(12)
     expect(await testCodexConnection(async () => probe)).toMatchObject({ ok: true, email: 'me@x.org', subscriptionType: 'plus' })
   })
 })

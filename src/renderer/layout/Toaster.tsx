@@ -1,8 +1,8 @@
-import { CircleAlert, CircleCheck, Info, X } from 'lucide-react'
+import { CircleAlert, CircleCheck, Info, TriangleAlert, X } from 'lucide-react'
 import { useNotifications, type NoticeLevel } from '@/stores/notifications'
 import { cn } from '@/lib/utils'
 
-const ICONS: Record<NoticeLevel, typeof Info> = { info: Info, success: CircleCheck, error: CircleAlert }
+const ICONS: Record<NoticeLevel, typeof Info> = { info: Info, success: CircleCheck, warning: TriangleAlert, error: CircleAlert }
 
 export function Toaster() {
   const notices = useNotifications((s) => s.notices)
@@ -23,6 +23,7 @@ export function Toaster() {
                 'mt-0.5 size-4 shrink-0',
                 n.level === 'error' && 'text-destructive',
                 n.level === 'success' && 'text-success',
+                n.level === 'warning' && 'text-warning',
                 n.level === 'info' && 'text-primary'
               )}
             />

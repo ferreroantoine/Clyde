@@ -2,6 +2,7 @@
 const PATTERNS: Array<[RegExp, string]> = [
   [/sk-ant-[A-Za-z0-9_-]{8,}/g, 'sk-ant-***'],
   [/\bsk-[A-Za-z0-9_-]{16,}/g, 'sk-***'],
+  [/\bAIza[0-9A-Za-z_-]{20,}/g, 'AIza***'],
   [/(authorization["']?\s*[:=]\s*["']?)(?:(?:bearer|basic)\s+)?[^\s"',}]{4,}/gi, '$1***'],
   [/(bearer\s+)[A-Za-z0-9._~+/=-]{8,}/gi, '$1***'],
   [/((?:api[_-]?key|token|secret|password)["']?\s*[:=]\s*["']?)[^\s"',}]{4,}/gi, '$1***']
