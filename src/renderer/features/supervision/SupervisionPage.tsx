@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { CircleAlert, Gauge, History, RefreshCw, TriangleAlert } from 'lucide-react'
 import { daysIn, type Dashboard, type MetricsRange, type ProfileUsage, type SessionRecord } from '@shared/metrics'
-import { PROFILE_KIND_LABELS } from '@shared/profiles'
+import { kindLabel } from '@shared/profiles'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/EmptyState'
@@ -70,7 +70,7 @@ function ProfileCard({ usage }: { usage: ProfileUsage }) {
       <header className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="truncate text-sm font-semibold">{usage.name}</h3>
-          <p className="text-[11px] text-muted-foreground">{PROFILE_KIND_LABELS[usage.kind]}</p>
+          <p className="text-[11px] text-muted-foreground">{kindLabel(usage.kind)}</p>
         </div>
         <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
           <StatusDot status={usage.activeSessions ? 'running' : 'stopped'} />

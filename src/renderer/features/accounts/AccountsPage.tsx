@@ -14,7 +14,6 @@ import {
   Sparkles,
   Trash2,
   UserRound,
-  Wind,
   type LucideIcon
 } from 'lucide-react'
 import { PROFILE_KIND_LABELS, type Profile } from '@shared/profiles'
@@ -76,7 +75,6 @@ function kindLine(profile: Profile): { icon: LucideIcon; text: string } {
   const icons: Record<Exclude<Profile['kind'], 'claude-code'>, LucideIcon> = {
     anthropic: Sparkles,
     openai: Bot,
-    mistral: Wind,
     ollama: Cpu
   }
   const text = profile.kind === 'ollama' ? `Ollama · ${profile.baseUrl}` : `${PROFILE_KIND_LABELS[profile.kind]} · API key`
@@ -206,7 +204,7 @@ export function AccountsPage() {
             <EmptyState
               icon={KeyRound}
               title="No account yet"
-              description="Add a Claude subscription, an API key for Anthropic, OpenAI or Mistral, or a local Ollama."
+              description="Add a Claude subscription, an API key for Anthropic or OpenAI, or a local Ollama."
               action={
                 <Button size="sm" variant="outline" onClick={() => setEditing('new')}>
                   <Plus /> Add account

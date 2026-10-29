@@ -4,7 +4,7 @@ import { z } from 'zod'
  * `claude-code` drives Claude Code through the Agent SDK. The others are API providers that
  * run Atelier's own agent loop.
  */
-export const PROFILE_KINDS = ['claude-code', 'anthropic', 'openai', 'mistral', 'ollama'] as const
+export const PROFILE_KINDS = ['claude-code', 'anthropic', 'openai', 'ollama'] as const
 export type ProfileKind = (typeof PROFILE_KINDS)[number]
 export type ApiProfileKind = Exclude<ProfileKind, 'claude-code'>
 
@@ -12,8 +12,14 @@ export const PROFILE_KIND_LABELS: Record<ProfileKind, string> = {
   'claude-code': 'Claude Code',
   anthropic: 'Anthropic API',
   openai: 'OpenAI',
-  mistral: 'Mistral',
   ollama: 'Ollama'
+}
+
+/** Label for a kind found in the history, including kinds this build no longer supports. */
+export function kindLabel(kind: string): string {
+  if (kind in PROFILE_KIND_LABELS) return PROFILE_KIND_LABELS[kind as ProfileKind]
+  if (kind === 'mistral') return 'Mistral (removed)'
+  return kind
 }
 
 export function isApiKind(kind: ProfileKind): kind is ApiProfileKind {
@@ -34,7 +40,6 @@ export const KIND_AUTH: Record<ProfileKind, readonly AuthMode[]> = {
   'claude-code': ['subscription', 'api-key'],
   anthropic: ['api-key'],
   openai: ['api-key'],
-  mistral: ['api-key'],
   ollama: ['none']
 }
 

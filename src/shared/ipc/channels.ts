@@ -2,6 +2,7 @@
 
 export const INVOKE_CHANNELS = [
   'app:getInfo',
+  'app:notices',
   'workspace:pick',
   'workspace:open',
   'workspace:current',

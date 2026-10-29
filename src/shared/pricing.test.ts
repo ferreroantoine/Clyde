@@ -10,7 +10,7 @@ const row = (kind: PriceRow['kind'], modelPrefix: string, inputPerMTok: number, 
   source: 'seed',
   updatedAt: 0
 })
-const rows = [row('anthropic', 'claude-opus-5', 5, 25), row('anthropic', 'claude-opus-5-5', 4, 20), row('mistral', 'mistral-large', 0.5, 1.5)]
+const rows = [row('anthropic', 'claude-opus-5', 5, 25), row('anthropic', 'claude-opus-5-5', 4, 20), row('openai', 'gpt-6', 2, 8)]
 
 describe('pricing', () => {
   it('picks the longest matching prefix within the provider', () => {
@@ -21,7 +21,7 @@ describe('pricing', () => {
 
   it('estimates per million tokens, free for Ollama, unknown without a price', () => {
     expect(estimateCost(rows, 'anthropic', 'claude-opus-5-5', 1_000_000, 100_000)).toBeCloseTo(6)
-    expect(estimateCost(rows, 'mistral', 'mistral-large-latest', 2000, 1000)).toBeCloseTo(0.0025)
+    expect(estimateCost(rows, 'openai', 'gpt-6-mini', 2000, 1000)).toBeCloseTo(0.012)
     expect(estimateCost(rows, 'ollama', 'qwen3', 5000, 5000)).toBe(0)
     expect(estimateCost(rows, 'openai', 'gpt-5', 10, 10)).toBeNull()
   })

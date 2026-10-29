@@ -16,6 +16,7 @@ import {
 } from '../tasks'
 import { priceInputSchema, type PriceRow } from '../pricing'
 import type { Dashboard, SessionTranscript } from '../metrics'
+import type { AppNotice } from '../notices'
 import { mcpIdSchema, mcpServerInputSchema, mcpServerUpdateSchema, type McpImportPreview, type McpServer } from '../mcp'
 import {
   agentStartSchema,
@@ -41,6 +42,7 @@ const dims = { cols: z.number().int().min(1).max(1000), rows: z.number().int().m
 /** Request payload schemas, validated in main before any handler runs. */
 export const requestSchemas = {
   'app:getInfo': z.undefined(),
+  'app:notices': z.undefined(),
   'workspace:pick': z.undefined(),
   'workspace:open': z.object({ root: z.string().min(1).max(4096) }),
   'workspace:current': z.undefined(),
@@ -101,6 +103,7 @@ export const requestSchemas = {
 
 export interface InvokeResponses {
   'app:getInfo': AppInfo
+  'app:notices': AppNotice[]
   'workspace:pick': WorkspaceInfo | null
   'workspace:open': WorkspaceInfo
   'workspace:current': WorkspaceInfo | null

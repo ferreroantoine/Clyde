@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { ProfileKind } from './profiles'
 
 /** Kinds Atelier estimates a cost for. Claude Code reports its own; Ollama runs locally for free. */
-export const PRICED_KINDS = ['anthropic', 'openai', 'mistral'] as const
+export const PRICED_KINDS = ['anthropic', 'openai'] as const
 export type PricedKind = (typeof PRICED_KINDS)[number]
 
 export const priceInputSchema = z.object({

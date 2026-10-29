@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { Bot, Check, Cpu, KeyRound, Sparkles, UserRound, Wind } from 'lucide-react'
+import { Bot, Check, Cpu, KeyRound, Sparkles, UserRound } from 'lucide-react'
 import {
   DEFAULT_OLLAMA_URL,
   PROFILE_COLORS,
@@ -65,7 +65,6 @@ const CHOICES: Choice[] = [
     keyPlaceholder: 'sk-ant-…'
   },
   { kind: 'openai', auth: 'api-key', icon: Bot, title: 'OpenAI', description: 'GPT models.', keyPlaceholder: 'sk-…' },
-  { kind: 'mistral', auth: 'api-key', icon: Wind, title: 'Mistral', description: 'La Plateforme models.', keyPlaceholder: 'API key' },
   { kind: 'ollama', auth: 'none', icon: Cpu, title: 'Ollama', description: 'Local models, no key.' }
 ]
 
