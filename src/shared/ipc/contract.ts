@@ -34,6 +34,7 @@ import {
 import type { DataPaths, ImportSummary } from '../config-export'
 import type { LimitAlert, LimitDiagnostic, LimitHistory, ProfileLimits, SessionLimitUsage } from '../limits'
 import { mcpIdSchema, mcpServerInputSchema, mcpServerUpdateSchema, type McpImportPreview, type McpServer } from '../mcp'
+import { presetInstallSchema, userPresetInputSchema, type McpPreset, type McpProbe } from '../mcp-catalog'
 import {
   agentStartSchema,
   approvalAnswerSchema,
@@ -105,6 +106,12 @@ export const requestSchemas = {
   'mcp:reconnect': z.object({ id: mcpIdSchema }),
   'mcp:importPreview': z.undefined(),
   'mcp:import': z.object({ path: z.string().min(1).max(4096), names: z.array(z.string().max(200)).max(200) }),
+  'mcp:presets': z.undefined(),
+  'mcp:installPreset': presetInstallSchema,
+  /** Starts a preset with these values (or a server config) without saving it, and lists its tools. */
+  'mcp:test': z.union([presetInstallSchema, z.object({ server: mcpServerInputSchema })]),
+  'mcp:savePreset': userPresetInputSchema,
+  'mcp:deletePreset': z.object({ id: z.uuid() }),
   'agents:list': z.undefined(),
   'agents:create': agentDefinitionInputSchema,
   'agents:update': agentDefinitionUpdateSchema,
@@ -198,6 +205,11 @@ export interface InvokeResponses {
   'mcp:reconnect': null
   'mcp:importPreview': McpImportPreview | null
   'mcp:import': McpServer[]
+  'mcp:presets': McpPreset[]
+  'mcp:installPreset': McpServer[]
+  'mcp:test': McpProbe
+  'mcp:savePreset': McpPreset[]
+  'mcp:deletePreset': McpPreset[]
   'agents:list': AgentDefinition[]
   'agents:create': AgentDefinition
   'agents:update': AgentDefinition

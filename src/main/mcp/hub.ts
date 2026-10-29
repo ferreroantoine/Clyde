@@ -8,7 +8,8 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js'
 import { AppError } from '@shared/errors'
-import { qualifiedToolName, type McpServer, type McpServerInput, type McpServerUpdate, type McpStatus } from '@shared/mcp'
+import { mcpServerInputSchema, qualifiedToolName, slugify, type McpServer, type McpServerInput, type McpServerUpdate, type McpStatus } from '@shared/mcp'
+import type { McpProbe } from '@shared/mcp-catalog'
 import type { ToolSpec } from '../agents/api/chat'
 import { clip, type ToolOutput } from '../agents/api/tools'
 import type { Logger } from '../logger'
@@ -63,6 +64,16 @@ export function contentText(content: unknown): string {
     .join('\n')
 }
 
+/**
+ * Proxy and certificate settings the SDK's minimal environment leaves out: without them, npx
+ * and uvx cannot download a server behind a corporate proxy.
+ */
+export function networkEnv(env: NodeJS.ProcessEnv): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(env).filter((e): e is [string, string] => typeof e[1] === 'string' && /^(https?_proxy|no_proxy|all_proxy|node_extra_ca_certs|ssl_cert_file|requests_ca_bundle)$/i.test(e[0]))
+  )
+}
+
 /** The SDK client over stdio, or streamable HTTP with an SSE fallback for older servers. */
 export const connectWithSdk: ConnectFn = async (server) => {
   const open = async (transport: Transport) => {
@@ -76,7 +87,7 @@ export const connectWithSdk: ConnectFn = async (server) => {
       new StdioClientTransport({
         command: server.command,
         args: server.args,
-        env: { ...getDefaultEnvironment(), ...server.env },
+        env: { ...getDefaultEnvironment(), ...networkEnv(process.env), ...server.env },
         stderr: 'ignore'
       })
     )
@@ -127,6 +138,21 @@ export const connectWithSdk: ConnectFn = async (server) => {
   }
 }
 
+/** Size of a tool definition as models receive it: name, description and input schema. */
+export function definitionChars(tool: { name: string; description: string; inputSchema?: Record<string, unknown> }): number {
+  return JSON.stringify({ name: tool.name, description: tool.description, inputSchema: tool.inputSchema ?? {} }).length
+}
+
+/**
+ * On Windows, `npx`, `uvx` and friends are .cmd scripts that CLIs (Claude Code, Codex,
+ * Antigravity) cannot start without a shell; they run through `cmd /c`. Atelier's own client
+ * finds them by itself (cross-spawn).
+ */
+export function cliCommand(command: string, args: string[], platform: NodeJS.Platform): { command: string; args: string[] } {
+  if (platform === 'win32' && /^(npx|npm|pnpm|pnpx|yarn|bunx|uvx|uv)$/i.test(command)) return { command: 'cmd', args: ['/c', command, ...args] }
+  return { command, args }
+}
+
 /** OpenAI caps function names at 64 characters; long MCP names get a short stable hash. */
 export function apiToolName(qualified: string): string {
   if (qualified.length <= 64) return qualified
@@ -142,8 +168,12 @@ export class McpHub {
 
   constructor(
     private readonly store: McpStore,
-    private readonly opts: { onChanged: (servers: McpServer[]) => void; connect?: ConnectFn; log: Logger }
+    private readonly opts: { onChanged: (servers: McpServer[]) => void; connect?: ConnectFn; log: Logger; platform?: NodeJS.Platform }
   ) {}
+
+  private platform(): NodeJS.Platform {
+    return this.opts.platform ?? process.platform
+  }
 
   list(): McpServer[] {
     return this.store.list().map((record) => {
@@ -159,12 +189,14 @@ export class McpHub {
         envKeys: Object.keys(record.env),
         headerKeys: Object.keys(record.headers),
         enabled: record.enabled,
+        presetId: record.presetId,
         status: record.enabled ? (state?.status ?? 'connecting') : 'disabled',
         error: record.enabled ? (state?.error ?? null) : null,
         tools: (record.enabled && state?.status === 'connected' ? state.tools : []).map((t) => ({
           name: t.name,
           qualifiedName: qualifiedToolName(record.slug, t.name),
-          description: t.description
+          description: t.description,
+          chars: definitionChars(t)
         }))
       }
     })
@@ -175,8 +207,37 @@ export class McpHub {
     for (const record of this.store.list()) if (record.enabled) void this.connect(record.id)
   }
 
-  create(input: McpServerInput): McpServer[] {
-    const record = this.store.create(input)
+  /** Starts a server from its config without saving it, lists its tools, and stops it. */
+  async probe(input: McpServerInput): Promise<McpProbe> {
+    const data = mcpServerInputSchema.parse(input)
+    const record: McpServerRecord = {
+      id: 'probe',
+      name: data.name,
+      slug: slugify(data.name),
+      transport: data.transport,
+      command: data.transport === 'stdio' ? data.command : '',
+      args: data.transport === 'stdio' ? data.args : [],
+      url: data.transport === 'http' ? data.url : '',
+      env: data.transport === 'stdio' ? data.env : {},
+      headers: data.transport === 'http' ? data.headers : {},
+      enabled: true,
+      presetId: null,
+      createdAt: Date.now()
+    }
+    let connection: McpConnection | null = null
+    try {
+      connection = await (this.opts.connect ?? connectWithSdk)(record)
+      const tools = await connection.listTools()
+      return { ok: true, error: null, tools: tools.map((t) => ({ name: t.name, description: t.description, chars: definitionChars(t) })) }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message, tools: [] }
+    } finally {
+      await connection?.close().catch(() => undefined)
+    }
+  }
+
+  create(input: McpServerInput, presetId: string | null = null): McpServer[] {
+    const record = this.store.create(input, presetId)
     if (record.enabled) void this.connect(record.id)
     this.changed()
     return this.list()
@@ -261,7 +322,7 @@ export class McpHub {
       if (![...allowed].some((name) => name.startsWith(prefix))) continue
       servers[record.slug] =
         record.transport === 'stdio'
-          ? { type: 'stdio', command: record.command, args: record.args, env: record.env }
+          ? { type: 'stdio', ...cliCommand(record.command, record.args, this.platform()), env: record.env }
           : { type: 'http', url: record.url, headers: record.headers }
       disallowed.push(...known.filter((name) => !allowed.has(name)))
     }
@@ -281,7 +342,7 @@ export class McpHub {
       if (tools.length === 0) continue
       out.push(
         record.transport === 'stdio'
-          ? { slug: record.slug, transport: 'stdio', command: record.command, args: record.args, env: record.env, tools }
+          ? { slug: record.slug, transport: 'stdio', ...cliCommand(record.command, record.args, this.platform()), env: record.env, tools }
           : { slug: record.slug, transport: 'http', url: record.url, headers: record.headers, tools }
       )
     }

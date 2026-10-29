@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { t, tn } from '@shared/i18n'
 import type { McpImportPreview, McpServer, McpServerInput, McpServerUpdate } from '@shared/mcp'
+import type { McpPreset, McpProbe } from '@shared/mcp-catalog'
 import { invoke, on } from '@/lib/ipc'
 import { notify } from './notifications'
 
@@ -19,11 +20,67 @@ interface McpState {
   startImport: () => Promise<void>
   closeImport: () => void
   importServers: (path: string, names: string[]) => Promise<boolean>
+  /** The catalog: built-in presets and the user's own. */
+  presets: McpPreset[]
+  loadPresets: () => Promise<void>
+  installPreset: (presetId: string, values: Record<string, string>) => Promise<boolean>
+  /** Starts a preset (or a server) without saving it and lists its tools. */
+  test: (request: { presetId: string; values: Record<string, string> } | { server: McpServerInput }) => Promise<McpProbe | null>
+  savePreset: (serverId: string, title: string, description: string) => Promise<boolean>
+  deletePreset: (id: string) => Promise<void>
 }
 
 export const useMcp = create<McpState>()((set) => ({
   servers: [],
   loaded: false,
+  presets: [],
+
+  loadPresets: async () => {
+    try {
+      set({ presets: await invoke('mcp:presets') })
+    } catch (err) {
+      notify.error(t('Could not load the catalog'), err)
+    }
+  },
+
+  installPreset: async (presetId, values) => {
+    try {
+      set({ servers: await invoke('mcp:installPreset', { presetId, values }) })
+      return true
+    } catch (err) {
+      notify.error(t('Could not add the server'), err)
+      return false
+    }
+  },
+
+  test: async (request) => {
+    try {
+      return await invoke('mcp:test', request)
+    } catch (err) {
+      notify.error(t('The test could not run'), err)
+      return null
+    }
+  },
+
+  savePreset: async (serverId, title, description) => {
+    try {
+      set({ presets: [...(await invoke('mcp:presets')).filter((p) => p.builtin), ...(await invoke('mcp:savePreset', { serverId, title, description }))] })
+      notify.success(t('Preset saved'), t('It is in the catalog; its secrets will be asked at install.'))
+      return true
+    } catch (err) {
+      notify.error(t('Could not save the preset'), err)
+      return false
+    }
+  },
+
+  deletePreset: async (id) => {
+    try {
+      const own = await invoke('mcp:deletePreset', { id })
+      set((s) => ({ presets: [...s.presets.filter((p) => p.builtin), ...own] }))
+    } catch (err) {
+      notify.error(t('Could not delete the preset'), err)
+    }
+  },
   preview: null,
   picking: false,
 
