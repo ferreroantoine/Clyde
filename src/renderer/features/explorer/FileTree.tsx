@@ -1,4 +1,5 @@
 import { ChevronRight, LoaderCircle } from 'lucide-react'
+import { t } from '@shared/i18n'
 import type { DirEntry } from '@shared/types'
 import { useExplorer } from '@/stores/explorer'
 import { useEditor } from '@/stores/editor'
@@ -64,8 +65,7 @@ function Children({ path, depth }: { path: string; depth: number }) {
   if (entries.length === 0 && depth > 0) {
     return (
       <div style={{ paddingLeft: 8 + depth * INDENT + 20 }} className="h-6 text-xs leading-6 text-muted-foreground italic">
-        Empty
-      </div>
+        {t('Empty')}</div>
     )
   }
   return (

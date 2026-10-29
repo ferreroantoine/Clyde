@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t } from '@shared/i18n'
 import { defaultSettings, withSetting, type SettingPath, type Settings, type SettingValue } from '@shared/settings'
 import { invoke } from '@/lib/ipc'
 import { notify } from './notifications'
@@ -18,7 +19,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
       set({ settings: await invoke('settings:getAll'), loaded: true })
     } catch (err) {
       set({ loaded: true })
-      notify.error('Could not load settings', err)
+      notify.error(t('Could not load settings'), err)
     }
   },
   update: async (path, value) => {
@@ -28,7 +29,7 @@ export const useSettings = create<SettingsState>()((set, get) => ({
       set({ settings: await invoke('settings:set', { path, value }) })
     } catch (err) {
       set({ settings: previous })
-      notify.error('Could not save setting', err)
+      notify.error(t('Could not save setting'), err)
     }
   }
 }))

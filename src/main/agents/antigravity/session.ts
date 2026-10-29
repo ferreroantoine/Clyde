@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import type { AgentEvent, PermissionLevel } from '@shared/agent'
 import type { AgentMcpServer } from '../../mcp/hub'
 import type { PtyProcess, SpawnPty } from '../cli/pty-process'
@@ -91,13 +92,13 @@ export class AntigravitySession {
     this.turns++
     const prompt = first && this.cfg.instructions.trim() ? `${this.cfg.instructions.trim()}\n\n---\n\n${text}` : text
     if (prompt.length > MAX_PROMPT_CHARS) {
-      this.fail(`The message is too long for Antigravity (${prompt.length} characters, ${MAX_PROMPT_CHARS} at most).`)
+      this.fail(t('The message is too long for Antigravity ({length} characters, {max} at most).', { length: prompt.length, max: MAX_PROMPT_CHARS }))
       return
     }
     try {
       ;(this.deps.writeConfig ?? writeAgyConfig)(this.cfg.home, { level: this.cfg.permissionLevel, servers: this.cfg.servers })
     } catch (err) {
-      this.fail(`Could not write Antigravity's settings: ${(err as Error).message}`)
+      this.fail(t("Could not write Antigravity's settings: {message}", { message: (err as Error).message }))
       return
     }
     this.run(prompt)
@@ -133,7 +134,7 @@ export class AntigravitySession {
     try {
       proc = this.deps.spawn({ file: this.cfg.binary, args, env: this.cfg.env, cwd: this.cfg.cwd })
     } catch (err) {
-      this.fail(`Antigravity did not start: ${(err as Error).message}`)
+      this.fail(t('Antigravity did not start: {message}', { message: (err as Error).message }))
       return
     }
     this.current = proc
@@ -145,7 +146,7 @@ export class AntigravitySession {
       if (!translator.sawResult && !this.stopped) {
         const last = notices.filter((l) => l.trim()).at(-1) ?? ''
         if (this.interrupted) this.turnEnd('interrupted', [])
-        else this.fail(last ? describeAgyFailure(last) : `Antigravity exited with code ${code} without an answer.`)
+        else this.fail(last ? describeAgyFailure(last) : t('Antigravity exited with code {code} without an answer.', { code }))
         return
       }
       this.next()

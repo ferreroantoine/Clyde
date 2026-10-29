@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { t, tk } from '@shared/i18n'
 import {
   Ban,
   Check,
@@ -46,10 +47,10 @@ const ICONS: Record<string, LucideIcon> = {
 }
 
 const DECISION_LABEL = {
-  'allow-once': 'Allowed once',
-  'allow-session': 'Allowed for this session',
-  deny: 'Denied',
-  cancelled: 'Cancelled'
+  'allow-once': tk('Allowed once'),
+  'allow-session': tk('Allowed for this session'),
+  deny: tk('Denied'),
+  cancelled: tk('Cancelled')
 } as const
 
 function Approval({ tool }: { tool: ToolItem }) {
@@ -63,12 +64,12 @@ function Approval({ tool }: { tool: ToolItem }) {
   if (approval.state !== 'pending') {
     return (
       <p className="border-t px-3 py-1.5 text-[11px] text-muted-foreground">
-        {DECISION_LABEL[approval.state]}
+        {t(DECISION_LABEL[approval.state])}
       </p>
     )
   }
   return (
-    <div className="space-y-2 border-t border-warning/40 bg-warning/10 px-3 py-2.5" role="group" aria-label="Approval request">
+    <div className="space-y-2 border-t border-warning/40 bg-warning/10 px-3 py-2.5" role="group" aria-label={t('Approval request')}>
       <p className="flex items-start gap-1.5 text-xs">
         <ShieldQuestion className="mt-px size-3.5 shrink-0 text-warning" />
         <span>{approval.reason}</span>
@@ -85,29 +86,26 @@ function Approval({ tool }: { tool: ToolItem }) {
             autoFocus
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Tell the agent what to do instead (optional)"
+            placeholder={t('Tell the agent what to do instead (optional)')}
             className="h-7 text-xs"
           />
           <Button type="submit" size="xs" variant="destructive">
-            Deny
-          </Button>
+            {t('Deny')}</Button>
         </form>
       ) : (
         <div className="flex flex-wrap gap-1.5">
           <Button size="xs" onClick={() => void answer(approval.requestId, 'allow-once')}>
-            Allow once
-          </Button>
+            {t('Allow once')}</Button>
           <Button
             size="xs"
             variant="outline"
-            title={shell ? 'Allows this exact command until the session ends' : `Allows ${tool.name} until the session ends`}
+            title={shell ? t('Allows this exact command until the session ends') : t('Allows {tool} until the session ends', { tool: tool.name })}
             onClick={() => void answer(approval.requestId, 'allow-session')}
           >
-            {shell ? 'Allow this command for the session' : `Allow ${tool.name} for the session`}
+            {shell ? t('Allow this command for the session') : t('Allow {tool} for the session', { tool: tool.name })}
           </Button>
           <Button size="xs" variant="ghost" onClick={() => setDenying(true)}>
-            Deny…
-          </Button>
+            {t('Deny…')}</Button>
         </div>
       )}
     </div>
@@ -157,7 +155,7 @@ export function ToolCard({ tool, cwd, ended }: { tool: ToolItem; cwd: string; en
           <pre className="max-h-48 overflow-auto font-mono text-[11px] leading-snug whitespace-pre-wrap text-muted-foreground">
             {JSON.stringify(tool.input, null, 2)}
           </pre>
-          {tool.denied && <p className="text-[11px] text-muted-foreground">Refused: {tool.denied}</p>}
+          {tool.denied && <p className="text-[11px] text-muted-foreground">{t('Refused: {reason}', { reason: tool.denied })}</p>}
           {tool.result && (
             <pre
               className={cn(
@@ -165,7 +163,7 @@ export function ToolCard({ tool, cwd, ended }: { tool: ToolItem; cwd: string; en
                 tool.result.isError && 'border-destructive/40 text-destructive'
               )}
             >
-              {tool.result.content || '(no output)'}
+              {tool.result.content || t('(no output)')}
             </pre>
           )}
         </div>

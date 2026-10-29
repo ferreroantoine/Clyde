@@ -1,15 +1,17 @@
 import { BrowserWindow, dialog } from 'electron'
 import { handle } from './router'
+import { t } from '@shared/i18n'
 import type { WorkspaceService } from '../services/workspace'
 import { listDir, readText, writeText } from '../services/files'
 import { listFiles, searchText } from '../services/search'
 
-export function registerWorkspaceHandlers(workspace: WorkspaceService): void {
+export function registerWorkspaceHandlers(workspace: WorkspaceService, projectsFolder: () => string = () => ''): void {
   handle('workspace:current', () => workspace.current())
   handle('workspace:open', ({ root }) => workspace.open(root))
   handle('workspace:pick', async (_req, event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
-    const options = { title: 'Open folder', properties: ['openDirectory' as const] }
+    const start = projectsFolder()
+    const options = { title: t('Open folder'), properties: ['openDirectory' as const], ...(start ? { defaultPath: start } : {}) }
     const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
     const [path] = result.filePaths
     if (result.canceled || !path) return null

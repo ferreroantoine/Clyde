@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
@@ -35,7 +36,7 @@ export function registerMcpHandlers(hub: McpHub): void {
     const suggested = claudeDesktopConfigPath(process.platform)
     const win = BrowserWindow.fromWebContents(event.sender)
     const options = {
-      title: 'Import MCP servers',
+      title: t('Import MCP servers'),
       defaultPath: existsSync(suggested) ? suggested : dirname(suggested),
       properties: ['openFile' as const],
       filters: [{ name: 'JSON', extensions: ['json'] }]
@@ -59,7 +60,7 @@ export function registerMcpHandlers(hub: McpHub): void {
     }
   })
   handle('mcp:import', async ({ path, names }) => {
-    if (!picked || path !== picked) throw new AppError('forbidden', 'Pick the file again before importing')
+    if (!picked || path !== picked) throw new AppError('forbidden', t('Pick the file again before importing'))
     const wanted = new Set(names)
     const parsed = await parse(path)
     let servers = hub.list()

@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { net } from 'electron'
 import { AppError } from '@shared/errors'
 import { isApiKind } from '@shared/profiles'
@@ -74,12 +75,12 @@ export function registerProfileHandlers({
       return testApiConnection(createAdapter(api, fetch), api)
     }
     if (profile.kind === 'codex') {
-      const t = codexTarget(id)
-      return testCodexConnection(() => probeCodex(spawnCli, { ...t, clientVersion }))
+      const tgt = codexTarget(id)
+      return testCodexConnection(() => probeCodex(spawnCli, { ...tgt, clientVersion }))
     }
     if (profile.kind === 'antigravity') {
-      const t = agyTarget(id)
-      return testAntigravityConnection((args) => runAgy(spawnPty, t, args))
+      const tgt = agyTarget(id)
+      return testAntigravityConnection((args) => runAgy(spawnPty, tgt, args))
     }
     // net.fetch goes through Chromium's network stack, so system proxies apply.
     return testConnection({ query, fetch: (url, init) => net.fetch(url, init) }, target(id))
@@ -88,28 +89,28 @@ export function registerProfileHandlers({
   handle('profiles:login', ({ id, cols, rows }) => {
     const profile = profiles.requireUsable(id)
     if (profile.kind === 'codex') {
-      const t = codexTarget(id)
+      const tgt = codexTarget(id)
       return ptys.create({
-        cwd: t.cwd,
+        cwd: tgt.cwd,
         cols,
         rows,
-        command: { file: t.binary, args: ['login'], env: t.env, title: `Sign in: ${profile.name}` }
+        command: { file: tgt.binary, args: ['login'], env: tgt.env, title: t('Sign in: {name}', { name: profile.name }) }
       })
     }
     if (profile.kind === 'antigravity') {
       // Antigravity signs in on its first interactive start.
-      const t = agyTarget(id)
-      return ptys.create({ cwd: t.cwd, cols, rows, command: { file: t.binary, args: [], env: t.env, title: `Sign in: ${profile.name}` } })
+      const tgt = agyTarget(id)
+      return ptys.create({ cwd: tgt.cwd, cols, rows, command: { file: tgt.binary, args: [], env: tgt.env, title: t('Sign in: {name}', { name: profile.name }) } })
     }
-    const t = target(id)
-    if (t.profile.kind !== 'claude-code' || t.profile.auth !== 'subscription') {
-      throw new AppError('invalid_request', 'Only subscription accounts sign in')
+    const tgt = target(id)
+    if (tgt.profile.kind !== 'claude-code' || tgt.profile.auth !== 'subscription') {
+      throw new AppError('invalid_request', t('Only subscription accounts sign in'))
     }
     return ptys.create({
-      cwd: t.cwd,
+      cwd: tgt.cwd,
       cols,
       rows,
-      command: { file: t.binary, args: ['auth', 'login', '--claudeai'], env: t.env, title: `Sign in: ${t.profile.name}` }
+      command: { file: tgt.binary, args: ['auth', 'login', '--claudeai'], env: tgt.env, title: t('Sign in: {name}', { name: tgt.profile.name }) }
     })
   })
 }

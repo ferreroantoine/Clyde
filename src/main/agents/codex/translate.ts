@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import type { AgentEvent } from '@shared/agent'
 import type { FileUpdateChange, Notifications, ThreadItem, TokenUsageBreakdown, Turn, TurnError } from './protocol'
 
@@ -31,13 +32,13 @@ function statusOf(error: TurnError): number | null {
 export function describeCodexError(error: TurnError): string {
   const info = error.codexErrorInfo
   if (info === 'unauthorized' || statusOf(error) === 401) {
-    return 'Codex is not signed in for this account, or its sign-in expired. Open Accounts to sign in again.'
+    return t('Codex is not signed in for this account, or its sign-in expired. Open Accounts to sign in again.')
   }
-  if (info === 'usageLimitExceeded') return 'The ChatGPT plan hit a usage limit. Wait for the reset or switch to another account.'
-  if (info === 'rateLimitExceeded' || statusOf(error) === 429) return 'Codex is rate limited. Try again in a moment.'
-  if (info === 'contextWindowExceeded') return 'The conversation no longer fits the model’s context window. Start a new session.'
-  if (info === 'modelNotFound') return 'This model is not available for the account. Pick another model.'
-  if (info === 'serverOverloaded') return 'The model is overloaded. Try again in a moment.'
+  if (info === 'usageLimitExceeded') return t('The ChatGPT plan hit a usage limit. Wait for the reset or switch to another account.')
+  if (info === 'rateLimitExceeded' || statusOf(error) === 429) return t('Codex is rate limited. Try again in a moment.')
+  if (info === 'contextWindowExceeded') return t('The conversation no longer fits the model’s context window. Start a new session.')
+  if (info === 'modelNotFound') return t('This model is not available for the account. Pick another model.')
+  if (info === 'serverOverloaded') return t('The model is overloaded. Try again in a moment.')
   return error.message
 }
 
@@ -165,7 +166,7 @@ export class CodexTranslator {
         this.fileChanges.delete(it.id)
         if (it.status === 'declined') return result('The change was declined.', true)
         const files = it.changes.map((c) => `${changeKind(c)} ${c.path}`).join('\n')
-        return result(it.status === 'failed' ? `The change failed.\n${files}` : files, it.status === 'failed')
+        return result(it.status === 'failed' ? t('The change failed.\n{files}', { files }) : files, it.status === 'failed')
       }
       case 'mcpToolCall': {
         const it = item as Extract<ThreadItem, { type: 'mcpToolCall' }>
@@ -173,7 +174,7 @@ export class CodexTranslator {
         return result(clip(mcpResultText(it.result)), it.status === 'failed')
       }
       case 'webSearch':
-        return result(`Searched: ${(item as Extract<ThreadItem, { type: 'webSearch' }>).query}`, false)
+        return result(t('Searched: {query}', { query: (item as Extract<ThreadItem, { type: 'webSearch' }>).query }), false)
       default:
         return []
     }

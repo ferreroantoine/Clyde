@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { existsSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { posix, win32 } from 'node:path'
@@ -103,9 +104,9 @@ export function resolveCodexBinary(override: string, ctx: ResolveContext = defau
     return pkg ? codexNativeBinary(pkg, ctx) : null
   }
   if (override.trim()) {
-    if (!ctx.fs.exists(override)) throw new AppError('cli_missing', `Codex was not found at ${override}`)
+    if (!ctx.fs.exists(override)) throw new AppError('cli_missing', t('Codex was not found at {override}', { override }))
     const native = fromShim(override)
-    if (!native) throw new AppError('cli_missing', `${override} is not a Codex executable Atelier can start. Point to codex.exe.`)
+    if (!native) throw new AppError('cli_missing', t('{override} is not a Codex executable Atelier can start. Point to codex.exe.', { override }))
     return native
   }
   const names = ctx.platform === 'win32' ? ['codex.exe', 'codex.cmd'] : ['codex']
@@ -115,7 +116,7 @@ export function resolveCodexBinary(override: string, ctx: ResolveContext = defau
   }
   throw new AppError(
     'cli_missing',
-    'Codex CLI was not found. Install it (npm install -g @openai/codex), or set its path in Settings.'
+    t('Codex CLI was not found. Install it (npm install -g @openai/codex), or set its path in Settings.')
   )
 }
 
@@ -125,7 +126,7 @@ export function resolveCodexBinary(override: string, ctx: ResolveContext = defau
  */
 export function resolveAntigravityBinary(override: string, ctx: ResolveContext = defaultContext()): string {
   if (override.trim()) {
-    if (!ctx.fs.exists(override)) throw new AppError('cli_missing', `Antigravity CLI was not found at ${override}`)
+    if (!ctx.fs.exists(override)) throw new AppError('cli_missing', t('Antigravity CLI was not found at {override}', { override }))
     return override
   }
   const names = ctx.platform === 'win32' ? ['agy.exe'] : ['agy']
@@ -134,6 +135,6 @@ export function resolveAntigravityBinary(override: string, ctx: ResolveContext =
   if (found) return found
   throw new AppError(
     'cli_missing',
-    'Antigravity CLI (agy) was not found. Install it from antigravity.google, or set its path in Settings.'
+    t('Antigravity CLI (agy) was not found. Install it from antigravity.google, or set its path in Settings.')
   )
 }

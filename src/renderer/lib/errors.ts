@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { t } from '@shared/i18n'
 import { notify } from '@/stores/notifications'
 
 const REPEAT_MS = 5000
@@ -14,8 +15,8 @@ export function useGlobalErrorToasts(): void {
       seen.set(message, now)
       notify.error(title, err)
     }
-    const onError = (e: ErrorEvent) => report('Something went wrong', e.error ?? e.message)
-    const onRejection = (e: PromiseRejectionEvent) => report('An action failed', e.reason)
+    const onError = (e: ErrorEvent) => report(t('Something went wrong'), e.error ?? e.message)
+    const onRejection = (e: PromiseRejectionEvent) => report(t('An action failed'), e.reason)
     window.addEventListener('error', onError)
     window.addEventListener('unhandledrejection', onRejection)
     return () => {

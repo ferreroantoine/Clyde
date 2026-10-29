@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { t, tk } from './i18n'
 
 /**
  * CLI kinds drive a vendor's coding CLI, signed in with its own login: Claude Code (Agent SDK),
@@ -27,13 +28,13 @@ export const PROVIDER_FAMILIES = [
   { id: 'claude', label: 'Claude', kinds: ['claude-code', 'anthropic'] },
   { id: 'chatgpt', label: 'ChatGPT', kinds: ['codex', 'openai'] },
   { id: 'gemini', label: 'Gemini', kinds: ['antigravity', 'gemini'] },
-  { id: 'local', label: 'Local', kinds: ['ollama'] }
+  { id: 'local', label: tk('Local'), kinds: ['ollama'] }
 ] as const satisfies ReadonlyArray<{ id: string; label: string; kinds: readonly ProfileKind[] }>
 
 /** Label for a kind found in the history, including kinds this build no longer supports. */
 export function kindLabel(kind: string): string {
   if (kind in PROFILE_KIND_LABELS) return PROFILE_KIND_LABELS[kind as ProfileKind]
-  if (kind === 'mistral') return 'Mistral (removed)'
+  if (kind === 'mistral') return t('Mistral (removed)')
   return kind
 }
 
@@ -88,7 +89,7 @@ export const PROFILE_COLORS = [
 
 export const profileIdSchema = z.uuid()
 
-const name = z.string().trim().min(1, 'Name is required').max(60)
+const name = z.string().trim().min(1, tk('Name is required')).max(60)
 const label = z.string().trim().max(12)
 const color = z.enum(PROFILE_COLORS)
 const model = z.string().trim().max(200)
@@ -96,7 +97,7 @@ const baseUrl = z
   .string()
   .trim()
   .max(500)
-  .refine((v) => v === '' || /^https?:\/\/[^\s]+$/i.test(v), 'Enter an http:// or https:// URL')
+  .refine((v) => v === '' || /^https?:\/\/[^\s]+$/i.test(v), tk('Enter an http:// or https:// URL'))
 
 export const profileCreateSchema = z.object({
   kind: z.enum(PROFILE_KINDS).default('claude-code'),

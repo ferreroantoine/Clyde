@@ -6,6 +6,7 @@ import { useApplyTheme, useResolvedTheme } from '@/lib/theme'
 import { terminals } from '@/lib/terminal/registry'
 import { useTerminals } from '@/stores/terminals'
 import { useShortcuts, type Shortcut } from '@/lib/shortcuts'
+import { effectiveBindings } from '@shared/keybindings'
 import { useLayout } from '@/stores/layout'
 import { useSettings } from '@/stores/settings'
 import { useWorkspace } from '@/stores/workspace'
@@ -19,16 +20,45 @@ import { usePalette } from '@/stores/palette'
 import { CommandPalette } from '@/features/palette/CommandPalette'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useGlobalErrorToasts } from '@/lib/errors'
-import { invoke } from '@/lib/ipc'
+import { invoke, on } from '@/lib/ipc'
+import { chime } from '@/lib/sound'
 import { useNotifications } from '@/stores/notifications'
 import { describeNotice } from '@shared/notices'
+import { resolveLocale, setLocale } from '@shared/i18n'
 
 export function App() {
   const theme = useSettings((s) => s.settings.appearance.theme)
   useApplyTheme(theme)
+  const { accent, density } = useSettings((s) => s.settings.appearance)
+  useEffect(() => {
+    document.documentElement.dataset['accent'] = accent
+    document.documentElement.dataset['density'] = density
+  }, [accent, density])
+  const language = useSettings((s) => s.settings.general.language)
+  const locale = resolveLocale(language, navigator.language)
+  // Set before the children render, so they already read the new language.
+  setLocale(locale)
+  useEffect(() => {
+    document.documentElement.lang = locale
+  }, [locale])
 
   useEffect(() => {
-    void useSettings.getState().load()
+    void useSettings
+      .getState()
+      .load()
+      .then(() => {
+        // Settings › General › Start view.
+        const view = useSettings.getState().settings.general.startView
+        const layout = useLayout.getState()
+        if (view === 'agents' || view === 'supervision') layout.showCenter(view)
+        else layout.showCenter('editor')
+      })
+    // Settings › Notifications › Sounds.
+    const offSounds = on('agent:event', ({ event }) => {
+      if (!useSettings.getState().settings.notifications.sounds) return
+      if (event.type === 'turn_end') chime('done')
+      else if (event.type === 'approval_request') chime('attention')
+    })
     let off: (() => void) | undefined
     let disposed = false
     void useWorkspace
@@ -52,6 +82,7 @@ export function App() {
     return () => {
       offBoard()
       offLimits()
+      offSounds()
       offMcp()
       offAgents()
       disposed = true
@@ -65,29 +96,37 @@ export function App() {
   const terminalFontSize = useSettings((s) => s.settings.terminal.fontSize)
   useEffect(() => terminals.setTheme(resolvedTheme), [resolvedTheme])
   useEffect(() => terminals.setFontSize(terminalFontSize), [terminalFontSize])
+  const { fontFamily: terminalFont, scrollback } = useSettings((s) => s.settings.terminal)
+  useEffect(() => terminals.setOptions({ fontFamily: terminalFont, scrollback }), [terminalFont, scrollback])
 
+  const overrides = useSettings((s) => s.settings.shortcuts.bindings)
   const shortcuts = useMemo<Shortcut[]>(() => {
     const layout = useLayout.getState
-    return [
-      { combo: 'ctrl+b', run: () => layout().toggleSidebar() },
-      { combo: 'ctrl+j', run: () => layout().toggleTerminal() },
-      { combo: 'ctrl+`', run: () => layout().toggleTerminal() },
-      { combo: 'ctrl+alt+b', run: () => layout().toggleAgentPanel() },
-      { combo: 'ctrl+shift+e', run: () => layout().showSidebarTab('files') },
-      { combo: 'ctrl+shift+f', run: () => layout().showSidebarTab('search') },
-      { combo: 'ctrl+,', run: () => layout().showCenter('settings') },
-      { combo: 'ctrl+s', run: () => void useEditor.getState().save() },
-      { combo: 'ctrl+o', run: () => void useWorkspace.getState().pick() },
-      { combo: 'ctrl+k', run: () => usePalette.getState().show('all') },
-      { combo: 'ctrl+shift+p', run: () => usePalette.getState().show('all') },
-      { combo: 'ctrl+p', run: () => usePalette.getState().show('files') }
-    ]
-  }, [])
+    const actions: Record<string, () => void> = {
+      'view.palette': () => usePalette.getState().show('all'),
+      'view.paletteAlt': () => usePalette.getState().show('all'),
+      'file.quickOpen': () => usePalette.getState().show('files'),
+      'file.save': () => void useEditor.getState().save(),
+      'file.openFolder': () => void useWorkspace.getState().pick(),
+      'view.chat': () => layout().showCenter('editor'),
+      'view.explorer': () => layout().showSidebarTab('files'),
+      'view.search': () => layout().showSidebarTab('search'),
+      'view.settings': () => layout().showSettings(),
+      'layout.sidebar': () => layout().toggleSidebar(),
+      'layout.terminal': () => layout().toggleTerminal(),
+      'layout.terminalAlt': () => layout().toggleTerminal(),
+      'layout.agentPanel': () => layout().toggleAgentPanel()
+    }
+    return Object.entries(effectiveBindings(overrides))
+      .filter(([id, combo]) => combo && actions[id])
+      .map(([id, combo]) => ({ combo, run: actions[id] as () => void }))
+  }, [overrides])
   useShortcuts(shortcuts)
   useGlobalErrorToasts()
 
   return (
-    <TooltipProvider delayDuration={400}>
+    // Keyed on the language so every screen renders again in it.
+    <TooltipProvider key={locale} delayDuration={400}>
       <ErrorBoundary scope="Atelier">
         <Shell />
       </ErrorBoundary>

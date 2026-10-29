@@ -1,4 +1,5 @@
 import type { AgentEvent, AgentEventEnvelope, AgentSessionInfo, ApprovalDecision } from '@shared/agent'
+import { t } from '@shared/i18n'
 
 export interface Approval {
   requestId: string
@@ -213,7 +214,7 @@ export function describeTool(name: string, input: Record<string, unknown>, cwd: 
     case 'Task':
       return str('description') || str('prompt')
     case 'TodoWrite':
-      return 'Update the to-do list'
+      return t('Update the to-do list')
     default: {
       const first = Object.values(input).find((v) => typeof v === 'string')
       return typeof first === 'string' ? first : ''

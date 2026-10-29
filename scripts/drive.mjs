@@ -1,7 +1,7 @@
 // Launches the built app (run `npm run build` first), runs a list of steps, screenshots each one.
 // Usage: node scripts/drive.mjs <outDir> '<steps json>'
 // Steps: {"ss":"name"} | {"click":"css"} | {"press":"Control+B"} | {"type":"text"}
-//        | {"wait":"css"} | {"eval":"js expression"} | {"sleep":ms}
+//        | {"wait":"css"} | {"select":["css","value"]} | {"eval":"js expression"} | {"sleep":ms}
 import { _electron as electron } from 'playwright-core'
 import { mkdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -39,6 +39,8 @@ try {
       await page.keyboard.type(step.type, { delay: 20 })
     } else if (step.wait) {
       await page.waitForSelector(step.wait, { timeout: 10_000 })
+    } else if (step.select) {
+      await page.selectOption(step.select[0], step.select[1], { timeout: 5_000 })
     } else if (step.eval) {
       console.log('eval:', JSON.stringify(await page.evaluate(step.eval)))
     } else if (step.sleep) {

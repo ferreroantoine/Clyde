@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { randomUUID } from 'node:crypto'
 import { AppError } from '@shared/errors'
 import { mcpServerInputSchema, mcpServerUpdateSchema, slugify, type McpServerInput, type McpServerUpdate } from '@shared/mcp'
@@ -46,7 +47,7 @@ export class McpStore {
 
   get(id: string): McpServerRecord {
     const row = this.db.prepare('SELECT * FROM mcp_servers WHERE id = ?').get(id) as Row | undefined
-    if (!row) throw new AppError('not_found', 'This MCP server no longer exists')
+    if (!row) throw new AppError('not_found', t('This MCP server no longer exists'))
     return this.toRecord(row)
   }
 
@@ -125,7 +126,7 @@ export class McpStore {
     if (!this.cipher.available()) {
       throw new AppError(
         'secrets_unavailable',
-        'Environment variables and headers can hold tokens, and this system has no secure storage for them. On Linux, install and unlock a keyring.'
+        t('Environment variables and headers can hold tokens, and this system has no secure storage for them. On Linux, install and unlock a keyring.')
       )
     }
     return this.cipher.encrypt(JSON.stringify({ env, headers }))

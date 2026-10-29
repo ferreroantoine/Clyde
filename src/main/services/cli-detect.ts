@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { execFile } from 'node:child_process'
 import { parseVersion, type CliStatus } from '@shared/cli'
 import type { CliProfileKind } from '@shared/profiles'
@@ -69,7 +70,7 @@ export class CliDetectService {
       const output = await (this.deps.version ?? defaultVersion)(kind, path)
       return { kind, installed: true, path, version: parseVersion(output), bundled, detail: null }
     } catch (err) {
-      return { kind, installed: true, path, version: null, bundled, detail: `It did not report its version: ${(err as Error).message}` }
+      return { kind, installed: true, path, version: null, bundled, detail: t('It did not report its version: {message}', { message: (err as Error).message }) }
     }
   }
 }

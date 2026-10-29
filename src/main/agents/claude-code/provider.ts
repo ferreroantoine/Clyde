@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import type {
   CanUseTool,
   HookCallback,
@@ -101,12 +102,12 @@ export async function checkApiKey(fetchFn: FetchFn, apiKey: string): Promise<{ o
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }
     }))
   } catch (err) {
-    return { ok: false, detail: `Could not reach the Anthropic API: ${(err as Error).message}` }
+    return { ok: false, detail: t('Could not reach the Anthropic API: {message}', { message: (err as Error).message }) }
   }
   if (status === 200) return { ok: true, detail: null }
-  if (status === 401) return { ok: false, detail: 'The API key was rejected (401).' }
-  if (status === 403) return { ok: false, detail: 'The API key is not allowed to use the API (403).' }
-  return { ok: false, detail: `The Anthropic API answered ${status}.` }
+  if (status === 401) return { ok: false, detail: t('The API key was rejected (401).') }
+  if (status === 403) return { ok: false, detail: t('The API key is not allowed to use the API (403).') }
+  return { ok: false, detail: t('The Anthropic API answered {status}.', { status }) }
 }
 
 export interface ConnectionDeps {
@@ -136,14 +137,14 @@ export async function testConnection(
   result.subscriptionType = auth.subscriptionType
   if (!auth.loggedIn) {
     result.detail = target.apiKey
-      ? 'Claude Code did not accept the stored key.'
-      : 'Open the sign-in terminal and log in with the account this profile should use.'
+      ? t('Claude Code did not accept the stored key.')
+      : t('Open the sign-in terminal and log in with the account this profile should use.')
     return result
   }
   if (target.apiKey) {
     const key = await checkApiKey(deps.fetch, target.apiKey)
     if (!key.ok) {
-      result.status = 'Key rejected'
+      result.status = t('Key rejected')
       result.detail = key.detail
       return result
     }
@@ -155,12 +156,12 @@ export async function testConnection(
     result.organization ??= probe.account.organization ?? null
     result.subscriptionType ??= probe.account.subscriptionType ?? null
   } catch (err) {
-    result.status = 'Signed in'
-    result.detail = `Claude Code started but did not list its models: ${(err as Error).message}`
+    result.status = t('Signed in')
+    result.detail = t('Claude Code started but did not list its models: {message}', { message: (err as Error).message })
     return result
   }
   result.ok = true
-  result.status = 'Signed in'
+  result.status = t('Signed in')
   return result
 }
 
@@ -272,7 +273,7 @@ export class ClaudeCodeSession {
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: outcome.behavior,
-          permissionDecisionReason: outcome.behavior === 'allow' ? 'Allowed by Atelier' : outcome.message
+          permissionDecisionReason: outcome.behavior === 'allow' ? t('Allowed by Atelier') : outcome.message
         }
       }
     }
@@ -285,7 +286,7 @@ export class ClaudeCodeSession {
           toolUseId: opts.toolUseID,
           toolName,
           input,
-          reason: opts.title ?? opts.decisionReason ?? 'Claude Code asks for approval'
+          reason: opts.title ?? opts.decisionReason ?? t('Claude Code asks for approval')
         },
         opts.signal
       )

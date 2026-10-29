@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import type { AgentEventEnvelope, AgentSessionInfo, AgentStart } from '@shared/agent'
@@ -74,6 +75,8 @@ export class TaskService {
       sessions: SessionControl
       workspaceRoot: () => string | null
       onChanged: (tasks: Task[]) => void
+      /** Settings › Agents: remove the worktree and branch once merged. */
+      deleteMergedWorktrees?: () => boolean
     }
   ) {}
 
@@ -87,7 +90,7 @@ export class TaskService {
 
   get(id: string): Task {
     const row = this.db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as Row | undefined
-    if (!row) throw new AppError('not_found', 'This task no longer exists')
+    if (!row) throw new AppError('not_found', t('This task no longer exists'))
     return toTask(row)
   }
 
@@ -113,7 +116,7 @@ export class TaskService {
   /** Starts the task's agent in its worktree with the task as first message. */
   async start(id: string): Promise<Task> {
     const task = this.get(id)
-    if (task.status !== 'todo') throw new AppError('invalid_request', 'Only tasks in To do can start')
+    if (task.status !== 'todo') throw new AppError('invalid_request', t('Only tasks in To do can start'))
     await this.runAgent(task, `${task.title}\n\n${task.description}`)
     return this.get(id)
   }
@@ -121,7 +124,7 @@ export class TaskService {
   /** Sends the review comments to the agent, live or restarted in the same worktree. */
   async requestChanges(id: string, comments: string): Promise<Task> {
     const task = this.get(id)
-    if (task.status !== 'review') throw new AppError('invalid_request', 'Only tasks in To review take change requests')
+    if (task.status !== 'review') throw new AppError('invalid_request', t('Only tasks in To review take change requests'))
     const live = task.sessionId ? this.deps.sessions.get(task.sessionId) : null
     const message = `Changes requested in review:\n\n${comments.trim()}`
     if (live && !ENDED.has(live.status)) {
@@ -143,15 +146,15 @@ export class TaskService {
   async fileDiff(id: string, path: string): Promise<TaskFileDiff> {
     const task = this.requireWorktree(id)
     const change = (await this.deps.worktrees.changes(this.ref(task))).find((c) => c.path === path)
-    if (!change) throw new AppError('not_found', `${path} has no change in this task`)
+    if (!change) throw new AppError('not_found', t('{path} has no change in this task', { path }))
     return this.deps.worktrees.fileDiff(this.ref(task), change)
   }
 
   async merge(id: string): Promise<MergeResult> {
     const task = this.get(id)
-    if (task.status !== 'review') throw new AppError('invalid_request', 'Only tasks in To review can be merged')
+    if (task.status !== 'review') throw new AppError('invalid_request', t('Only tasks in To review can be merged'))
     this.stopSession(task)
-    const result = await this.deps.worktrees.merge(this.ref(task), task.title)
+    const result = await this.deps.worktrees.merge(this.ref(task), task.title, { cleanup: this.deps.deleteMergedWorktrees?.() ?? true })
     if (result.ok) {
       this.update(id, { status: 'done', outcome: 'merged', merge_commit: result.commit, session_id: null, note: null })
     } else {
@@ -165,7 +168,7 @@ export class TaskService {
   /** Drops the work: the worktree and the branch are deleted. */
   async abandon(id: string): Promise<Task> {
     const task = this.get(id)
-    if (task.status === 'done') throw new AppError('invalid_request', 'This task is already done')
+    if (task.status === 'done') throw new AppError('invalid_request', t('This task is already done'))
     this.stopSession(task)
     await this.deps.worktrees.remove(this.ref(task), { deleteBranch: true })
     this.update(id, { status: 'done', outcome: 'abandoned', session_id: null, note: null })
@@ -176,7 +179,7 @@ export class TaskService {
   async delete(id: string): Promise<void> {
     const task = this.get(id)
     if (task.status === 'in_progress' || task.status === 'review') {
-      throw new AppError('invalid_request', 'Merge or abandon the task before deleting it')
+      throw new AppError('invalid_request', t('Merge or abandon the task before deleting it'))
     }
     if (task.status === 'todo') await this.deps.worktrees.remove(this.ref(task), { deleteBranch: true })
     this.db.prepare('DELETE FROM tasks WHERE id = ?').run(id)
@@ -189,7 +192,7 @@ export class TaskService {
     const task = this.bySession(envelope.sessionId)
     if (!task || task.status !== 'in_progress') return
     const event = envelope.event
-    const note = event.isError && event.subtype !== 'success' ? (event.errors[0] ?? 'The agent stopped with an error') : null
+    const note = event.isError && event.subtype !== 'success' ? (event.errors[0] ?? t('The agent stopped with an error')) : null
     this.update(task.id, { status: 'review', note })
     void this.changed()
   }
@@ -198,7 +201,7 @@ export class TaskService {
     if (!ENDED.has(info.status)) return
     const task = this.bySession(info.id)
     if (!task) return
-    if (task.status === 'in_progress') this.update(task.id, { status: 'review', note: 'The agent session ended before finishing its turn.' })
+    if (task.status === 'in_progress') this.update(task.id, { status: 'review', note: t('The agent session ended before finishing its turn.') })
     void this.changed()
   }
 
@@ -214,8 +217,8 @@ export class TaskService {
   }
 
   private async runAgent(task: Task, prompt: string): Promise<void> {
-    if (!task.agentId) throw new AppError('invalid_request', 'This task has no agent any more. Create it again with an agent.')
-    if (!existsSync(task.worktreePath)) throw new AppError('not_found', `The worktree ${task.worktreePath} is gone`)
+    if (!task.agentId) throw new AppError('invalid_request', t('This task has no agent any more. Create it again with an agent.'))
+    if (!existsSync(task.worktreePath)) throw new AppError('not_found', t('The worktree {worktreePath} is gone', { worktreePath: task.worktreePath }))
     const agent = this.deps.agents.get(task.agentId)
     const session = await this.deps.sessions.start({
       profileId: agent.profileId,
@@ -243,7 +246,7 @@ export class TaskService {
 
   private requireWorktree(id: string): Task {
     const task = this.get(id)
-    if (task.status === 'done') throw new AppError('invalid_request', 'This task is done; its worktree is gone')
+    if (task.status === 'done') throw new AppError('invalid_request', t('This task is done; its worktree is gone'))
     return task
   }
 
@@ -266,9 +269,9 @@ export class TaskService {
 
   private async repoRoot(): Promise<string> {
     const folder = this.deps.workspaceRoot()
-    if (!folder) throw new AppError('no_workspace', 'Open a folder first')
+    if (!folder) throw new AppError('no_workspace', t('Open a folder first'))
     if (!(await this.deps.worktrees.isRepo(folder))) {
-      throw new AppError('invalid_request', 'Tasks need a git repository. Open a folder that is one, or run git init.')
+      throw new AppError('invalid_request', t('Tasks need a git repository. Open a folder that is one, or run git init.'))
     }
     return this.deps.worktrees.topLevel(folder)
   }

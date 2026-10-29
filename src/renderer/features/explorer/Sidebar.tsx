@@ -1,4 +1,5 @@
 import { ChevronsDownUp, FolderOpen, RefreshCw } from 'lucide-react'
+import { t } from '@shared/i18n'
 import { IconButton } from '@/components/IconButton'
 import { useLayout, type SidebarTab } from '@/stores/layout'
 import { useWorkspace } from '@/stores/workspace'
@@ -43,9 +44,9 @@ export function Sidebar() {
         </div>
         {tab === 'files' && (
           <div className="flex items-center gap-0.5">
-            <IconButton icon={FolderOpen} label="Open folder" onClick={() => void pick()} />
-            <IconButton icon={RefreshCw} label="Refresh" onClick={() => void refresh()} />
-            <IconButton icon={ChevronsDownUp} label="Collapse all" onClick={collapseAll} />
+            <IconButton icon={FolderOpen} label={t('Open folder')} onClick={() => void pick()} />
+            <IconButton icon={RefreshCw} label={t('Refresh')} onClick={() => void refresh()} />
+            <IconButton icon={ChevronsDownUp} label={t('Collapse all')} onClick={collapseAll} />
           </div>
         )}
       </div>

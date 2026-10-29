@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
@@ -43,7 +44,7 @@ export const PROFILE_DIRS: Record<CliProfileKind, string> = {
   antigravity: 'antigravity-profiles'
 }
 
-const SUBSCRIPTION_DISABLED = 'Subscription sign-in is disabled in this build. Use an API key profile.'
+const SUBSCRIPTION_DISABLED = t('Subscription sign-in is disabled in this build. Use an API key profile.')
 
 export interface ProfilesOptions {
   /** Parent of the per-CLI folders of profile config dirs (the app's data folder). */
@@ -85,7 +86,7 @@ export class ProfilesService {
 
   get(id: string): Profile {
     const row = this.db.prepare('SELECT * FROM profiles WHERE id = ?').get(id) as Row | undefined
-    if (!row) throw new AppError('not_found', 'This profile no longer exists')
+    if (!row) throw new AppError('not_found', t('This profile no longer exists'))
     return this.toProfile(row)
   }
 
@@ -101,18 +102,18 @@ export class ProfilesService {
   create(input: ProfileCreate): Profile {
     const data = profileCreateSchema.parse(input)
     if (!KIND_AUTH[data.kind].includes(data.auth)) {
-      throw new AppError('invalid_request', `${PROFILE_KIND_LABELS[data.kind]} accounts cannot use ${data.auth} sign-in`)
+      throw new AppError('invalid_request', t('{kind} accounts cannot use {auth} sign-in', { kind: PROFILE_KIND_LABELS[data.kind], auth: data.auth }))
     }
     if (data.auth === 'subscription' && this.opts.distribution) throw new AppError('not_allowed', SUBSCRIPTION_DISABLED)
     if (SINGLE_PROFILE_KINDS.includes(data.kind) && this.list().some((p) => p.kind === data.kind)) {
       throw new AppError(
         'not_allowed',
-        `There is already a ${PROFILE_KIND_LABELS[data.kind]} account. It signs in once per Windows user, so a second one would use the same account.`
+        t('There is already a {kind} account. It signs in once per Windows user, so a second one would use the same account.', { kind: PROFILE_KIND_LABELS[data.kind] })
       )
     }
-    if (data.auth === 'api-key' && !data.apiKey) throw new AppError('invalid_request', 'An API key is required')
+    if (data.auth === 'api-key' && !data.apiKey) throw new AppError('invalid_request', t('An API key is required'))
     if (data.auth !== 'api-key' && data.apiKey) {
-      throw new AppError('invalid_request', 'This account does not use an API key')
+      throw new AppError('invalid_request', t('This account does not use an API key'))
     }
     const baseUrl = data.kind === 'ollama' ? normalizeUrl(data.baseUrl || DEFAULT_OLLAMA_URL) : ''
     const id = randomUUID()
@@ -135,7 +136,7 @@ export class ProfilesService {
     const data = profileUpdateSchema.parse(input)
     const current = this.get(data.id)
     if (data.apiKey && current.auth !== 'api-key') {
-      throw new AppError('invalid_request', 'This account does not use an API key')
+      throw new AppError('invalid_request', t('This account does not use an API key'))
     }
     const baseUrl =
       current.kind === 'ollama' && data.baseUrl !== undefined ? normalizeUrl(data.baseUrl || DEFAULT_OLLAMA_URL) : current.baseUrl
@@ -177,7 +178,7 @@ export class ProfilesService {
    */
   configDir(id: string): string {
     const profile = this.get(id)
-    if (!isCliKind(profile.kind)) throw new AppError('invalid_request', 'API accounts have no config folder')
+    if (!isCliKind(profile.kind)) throw new AppError('invalid_request', t('API accounts have no config folder'))
     // Ids are UUIDs generated here, so they are always a single safe path segment.
     const dir = join(this.opts.dataRoot, PROFILE_DIRS[profile.kind], id)
     mkdirSync(dir, { recursive: true })

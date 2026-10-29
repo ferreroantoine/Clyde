@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { formatCountdown, type LimitBadge as Badge, type SessionLimitUsage, type WindowState } from '@shared/limits'
+import { intlLocale, t, tk } from '@shared/i18n'
+import { formatCountdown, windowLabel, type LimitBadge as Badge, type SessionLimitUsage, type WindowState } from '@shared/limits'
 import { cn } from '@/lib/utils'
 
 /** The current time, ticking every 30 s, for countdowns. */
@@ -12,17 +13,17 @@ export function useNow(intervalMs = 30_000): number {
   return now
 }
 
-const BADGE_TEXT: Record<Badge, string> = { official: 'Official', estimated: 'Estimated', unavailable: 'Unavailable' }
+const BADGE_TEXT: Record<Badge, string> = { official: tk('Official'), estimated: tk('Estimated'), unavailable: tk('Unavailable') }
 const BADGE_HINT: Record<Badge, string> = {
-  official: 'Reported by the CLI',
-  estimated: 'Computed by Atelier: several sessions shared the account',
-  unavailable: 'The CLI does not report this value'
+  official: tk('Reported by the CLI'),
+  estimated: tk('Computed by Atelier: several sessions shared the account'),
+  unavailable: tk('The CLI does not report this value')
 }
 
 export function LimitBadge({ badge, className }: { badge: Badge; className?: string }) {
   return (
     <span
-      title={BADGE_HINT[badge]}
+      title={t(BADGE_HINT[badge])}
       data-badge={badge}
       className={cn(
         'inline-flex shrink-0 items-center rounded px-1 text-[10px] leading-4 font-medium',
@@ -32,7 +33,7 @@ export function LimitBadge({ badge, className }: { badge: Badge; className?: str
         className
       )}
     >
-      {BADGE_TEXT[badge]}
+      {t(BADGE_TEXT[badge])}
     </span>
   )
 }
@@ -44,17 +45,22 @@ export function levelColor(pct: number, color?: string): string {
   return color ?? 'var(--primary)'
 }
 
-const resetDate = (ms: number) => new Date(ms).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+const resetDate = (ms: number) => new Date(ms).toLocaleString(intlLocale(), { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
 /** One plan window: use, countdown to the reset, its date, and where the value comes from. */
 export function LimitGauge({ state, color }: { state: WindowState; color?: string }) {
   const now = useNow()
   const pct = state.usedPct
+  const label = windowLabel(state.window, state.label)
   return (
-    <div className="space-y-1" aria-label={`${state.label}: ${pct === null ? 'unavailable' : `${pct}% used`}`} data-window={state.window}>
+    <div
+      className="space-y-1"
+      aria-label={pct === null ? t('{window}: unavailable', { window: label }) : t('{window}: {pct}% used', { window: label, pct })}
+      data-window={state.window}
+    >
       <div className="flex items-center justify-between gap-2 text-[11px]">
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className="truncate font-medium">{state.label}</span>
+          <span className="truncate font-medium">{label}</span>
           <LimitBadge badge={state.badge} />
         </span>
         <span className="tabular-nums">{pct === null ? '—' : `${pct}%`}</span>
@@ -66,10 +72,10 @@ export function LimitGauge({ state, color }: { state: WindowState; color?: strin
       </div>
       <p className="text-[11px] text-muted-foreground tabular-nums">
         {state.resetsAt !== null && pct !== null
-          ? `Resets in ${formatCountdown(state.resetsAt - now)} · ${resetDate(state.resetsAt)}`
+          ? t('Resets in {time} · {date}', { time: formatCountdown(state.resetsAt - now), date: resetDate(state.resetsAt) })
           : state.badge === 'unavailable'
-            ? 'No reading yet'
-            : 'Reset time unknown'}
+            ? t('No reading yet')
+            : t('Reset time unknown')}
       </p>
     </div>
   )
@@ -79,10 +85,17 @@ export function LimitGauge({ state, color }: { state: WindowState; color?: strin
 export function MiniGauge({ state, color, short }: { state: WindowState; color: string; short: string }) {
   const now = useNow()
   const pct = state.usedPct
+  const label = windowLabel(state.window, state.label)
   const title =
     pct === null
-      ? `${state.label}: unavailable`
-      : `${state.label}: ${pct}% used${state.resetsAt ? `, resets in ${formatCountdown(state.resetsAt - now)}` : ''} (${BADGE_TEXT[state.badge].toLowerCase()})`
+      ? t('{window}: unavailable', { window: label })
+      : [
+          t('{window}: {pct}% used', { window: label, pct }),
+          state.resetsAt ? t('resets in {time}', { time: formatCountdown(state.resetsAt - now) }) : '',
+          `(${t(BADGE_TEXT[state.badge]).toLowerCase()})`
+        ]
+          .filter(Boolean)
+          .join(', ')
   return (
     <span className="flex items-center gap-1" title={title} data-window={state.window}>
       <span className="opacity-70">{short}</span>
@@ -94,17 +107,17 @@ export function MiniGauge({ state, color, short }: { state: WindowState; color: 
   )
 }
 
-const SHORT: Record<string, string> = { five_hour: '5h', seven_day: 'Week' }
+const SHORT: Record<string, string> = { five_hour: tk('5h'), seven_day: tk('Week') }
 
 /** "5h +3.2 pts · Week +0.8 pts": what a session took from its plan. */
 export function SessionLimitLine({ usage, className }: { usage: SessionLimitUsage[]; className?: string }) {
   const main = usage.filter((u) => u.window in SHORT)
-  if (main.length === 0) return <span className={cn('text-muted-foreground', className)}>No plan use measured yet</span>
+  if (main.length === 0) return <span className={cn('text-muted-foreground', className)}>{t('No plan use measured yet')}</span>
   return (
     <span className={cn('inline-flex flex-wrap items-center gap-x-2 gap-y-0.5', className)}>
       {main.map((u) => (
-        <span key={u.window} className="inline-flex items-center gap-1 tabular-nums" title={`${u.label}: ${u.deltaPct.toFixed(2)} points`}>
-          {SHORT[u.window]} +{u.deltaPct < 0.1 && u.deltaPct > 0 ? '<0.1' : u.deltaPct.toFixed(1)} pts
+        <span key={u.window} className="inline-flex items-center gap-1 tabular-nums" title={t('{window}: {points} points', { window: windowLabel(u.window, u.label), points: u.deltaPct.toFixed(2) })}>
+          {t('{window} +{points} pts', { window: t(SHORT[u.window] as string), points: u.deltaPct < 0.1 && u.deltaPct > 0 ? '<0.1' : u.deltaPct.toFixed(1) })}
           <LimitBadge badge={u.badge} />
         </span>
       ))}

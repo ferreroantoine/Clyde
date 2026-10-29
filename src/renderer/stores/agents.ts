@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t } from '@shared/i18n'
 import type { AgentSessionInfo, AgentStart, ApprovalDecision } from '@shared/agent'
 import { invoke, on } from '@/lib/ipc'
 import { applyEvent, emptyView, type SessionView } from '@/lib/transcript'
@@ -73,7 +74,7 @@ export const useAgents = create<AgentsState>()((set, get) => {
         set({ activeId: info.id })
         return true
       } catch (err) {
-        notify.error('Could not start the agent', err)
+        notify.error(t('Could not start the agent'), err)
         return false
       } finally {
         set({ starting: false })
@@ -87,7 +88,7 @@ export const useAgents = create<AgentsState>()((set, get) => {
         await invoke('agent:send', { sessionId: id, text })
         return true
       } catch (err) {
-        notify.error('Could not send the message', err)
+        notify.error(t('Could not send the message'), err)
         return false
       }
     },
@@ -95,19 +96,19 @@ export const useAgents = create<AgentsState>()((set, get) => {
     interrupt: async () => {
       const id = get().activeId
       if (!id) return
-      await invoke('agent:interrupt', { sessionId: id }).catch((err) => notify.error('Could not interrupt the agent', err))
+      await invoke('agent:interrupt', { sessionId: id }).catch((err) => notify.error(t('Could not interrupt the agent'), err))
     },
 
     stop: async (id = get().activeId ?? undefined) => {
       if (!id) return
-      await invoke('agent:stop', { sessionId: id }).catch((err) => notify.error('Could not stop the agent', err))
+      await invoke('agent:stop', { sessionId: id }).catch((err) => notify.error(t('Could not stop the agent'), err))
     },
 
     answer: async (requestId, decision, message) => {
       const id = get().activeId
       if (!id) return
       await invoke('agent:approve', { sessionId: id, requestId, decision, ...(message ? { message } : {}) }).catch((err) =>
-        notify.error('Could not answer the request', err)
+        notify.error(t('Could not answer the request'), err)
       )
     },
 

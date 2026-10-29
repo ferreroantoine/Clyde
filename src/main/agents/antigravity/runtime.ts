@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PermissionLevel } from '@shared/agent'
@@ -164,23 +165,23 @@ export async function testAntigravityConnection(
   try {
     models = await run(['models'])
   } catch (err) {
-    result.status = 'Not connected'
-    result.detail = `Antigravity did not start: ${(err as Error).message}`
+    result.status = t('Not connected')
+    result.detail = t('Antigravity did not start: {message}', { message: (err as Error).message })
     return result
   }
   const text = models.output.trim()
   if (models.code !== 0) {
     const last = text.split('\n').filter(Boolean).at(-1) ?? ''
     if (/not signed in/.test(describeAgyFailure(last))) {
-      result.detail = 'Open the sign-in terminal and log in with your Google account.'
+      result.detail = t('Open the sign-in terminal and log in with your Google account.')
       return result
     }
-    result.status = 'Not connected'
-    result.detail = models.code === null ? 'Antigravity did not answer in time.' : last || `agy exited with code ${models.code}.`
+    result.status = t('Not connected')
+    result.detail = models.code === null ? t('Antigravity did not answer in time.') : last || t('agy exited with code {code}.', { code: models.code })
     return result
   }
   result.ok = true
-  result.status = 'Signed in'
+  result.status = t('Signed in')
   result.models = parseAgyModels(text)
   return result
 }

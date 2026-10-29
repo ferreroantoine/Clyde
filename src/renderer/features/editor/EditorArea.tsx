@@ -1,4 +1,7 @@
 import { CircleAlert, Code2, FileWarning, LoaderCircle } from 'lucide-react'
+import { t } from '@shared/i18n'
+import { effectiveBindings, formatCombo, KEY_COMMANDS } from '@shared/keybindings'
+import { useSettings } from '@/stores/settings'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/EmptyState'
 import { useEditor } from '@/stores/editor'
@@ -6,32 +9,31 @@ import { useWorkspace } from '@/stores/workspace'
 import { MonacoHost } from './MonacoHost'
 import { TabBar } from './TabBar'
 
-const SHORTCUTS: Array<[string, string]> = [
-  ['Toggle sidebar', 'Ctrl+B'],
-  ['Search in files', 'Ctrl+Shift+F'],
-  ['Toggle terminal', 'Ctrl+J'],
-  ['Toggle agent panel', 'Ctrl+Alt+B'],
-  ['Save file', 'Ctrl+S'],
-  ['Settings', 'Ctrl+,']
-]
+/** Shortcuts shown on the welcome screen, with the keys currently bound to them. */
+const WELCOME_COMMANDS = ['layout.sidebar', 'view.search', 'layout.terminal', 'layout.agentPanel', 'file.save', 'view.settings']
 
 function Welcome() {
   const info = useWorkspace((s) => s.info)
   const pick = useWorkspace((s) => s.pick)
+  const bindings = effectiveBindings(useSettings((s) => s.settings.shortcuts.bindings))
+  const shortcuts = WELCOME_COMMANDS.flatMap((id) => {
+    const spec = KEY_COMMANDS.find((c) => c.id === id)
+    const combo = bindings[id]
+    return spec && combo ? [[t(spec.label), formatCombo(combo)] as const] : []
+  })
   return (
     <EmptyState
       icon={Code2}
-      title={info ? 'No file open' : 'Welcome to Atelier'}
-      description={info ? 'Pick a file in the explorer to open it here.' : 'Open a folder to get started.'}
+      title={info ? t('No file open') : t('Welcome to Atelier')}
+      description={info ? t('Pick a file in the explorer to open it here.') : t('Open a folder to get started.')}
       action={
         <div className="flex flex-col items-center gap-4">
           {!info && (
             <Button size="sm" onClick={() => void pick()}>
-              Open folder
-            </Button>
+              {t('Open folder')}</Button>
           )}
           <dl className="grid grid-cols-[auto_auto] gap-x-6 gap-y-1.5 text-xs">
-            {SHORTCUTS.map(([label, keys]) => (
+            {shortcuts.map(([label, keys]) => (
               <div key={label} className="contents">
                 <dt className="text-right text-muted-foreground">{label}</dt>
                 <dd>
@@ -54,17 +56,15 @@ function ConflictBanner({ path, kind }: { path: string; kind: 'modified' | 'dele
       <CircleAlert className="size-3.5 text-warning" />
       <span className="flex-1">
         {kind === 'deleted'
-          ? 'This file was deleted on disk. Saving will recreate it.'
-          : 'This file changed on disk while you were editing it.'}
+          ? t('This file was deleted on disk. Saving will recreate it.')
+          : t('This file changed on disk while you were editing it.')}
       </span>
       {kind === 'modified' && (
         <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => void reload(path)}>
-          Load disk version
-        </Button>
+          {t('Load disk version')}</Button>
       )}
       <Button size="sm" className="h-6 text-xs" onClick={() => void save(path)}>
-        Keep mine and save
-      </Button>
+        {t('Keep mine and save')}</Button>
     </div>
   )
 }
@@ -98,16 +98,16 @@ export function EditorArea() {
             {tab.status === 'unsupported' && (
               <EmptyState
                 icon={FileWarning}
-                title={tab.unsupported === 'binary' ? 'Binary file' : 'File too large'}
+                title={tab.unsupported === 'binary' ? t('Binary file') : t('File too large')}
                 description={
                   tab.unsupported === 'binary'
-                    ? 'This file is not text, so it cannot be shown in the editor.'
-                    : 'Files over 5 MB are not opened in the editor.'
+                    ? t('This file is not text, so it cannot be shown in the editor.')
+                    : t('Files over 5 MB are not opened in the editor.')
                 }
               />
             )}
             {tab.status === 'error' && (
-              <EmptyState icon={CircleAlert} title="Could not open file" description={tab.error} />
+              <EmptyState icon={CircleAlert} title={t('Could not open file')} description={tab.error} />
             )}
           </div>
         )}

@@ -23,6 +23,7 @@ import { ApiSession } from './api/loop'
 import { BASE_TOOLS, BaseToolExecutor, defaultShell, toEngineRequest } from './api/tools'
 import type { Logger } from '../logger'
 import type { LimitReading } from '@shared/limits'
+import { t } from '@shared/i18n'
 import { CodexSession } from './codex/session'
 import { buildCodexEnv, codexMcpServers } from './codex/runtime'
 import { spawnCli, type SpawnCli } from './cli/process'
@@ -36,6 +37,9 @@ export const MAX_ACTIVE_SESSIONS = 4
 
 export interface AgentManagerDeps {
   profiles: ProfilesService
+  /** Settings › Agents: how many agents may run at once, and the model when none is set. */
+  maxParallel?: () => number
+  defaultModel?: () => string
   mcp: Pick<McpHub, 'toolSpecs' | 'callTool' | 'claudeCodeConfig' | 'agentServers'>
   claudeCodePath: () => string
   /** Codex executable from Settings; empty means the one on PATH. */
@@ -113,15 +117,16 @@ export class AgentManager {
   async start(request: AgentStart): Promise<AgentSessionInfo> {
     const req = agentStartSchema.parse(request)
     const active = this.list().filter((s) => !ENDED.includes(s.status)).length
-    if (active >= MAX_ACTIVE_SESSIONS) {
-      throw new AppError('not_allowed', `${MAX_ACTIVE_SESSIONS} agents are already running. Stop one first.`)
+    const max = this.deps.maxParallel?.() ?? MAX_ACTIVE_SESSIONS
+    if (active >= max) {
+      throw new AppError('not_allowed', t('{count} agents are already running. Stop one first, or raise the limit in Settings › Agents.', { count: max }))
     }
     const profile = this.deps.profiles.requireUsable(req.profileId)
     const cwd = req.cwd ?? this.deps.workspaceRoot()
-    if (!cwd) throw new AppError('no_workspace', 'Open a folder first: the agent works inside it.')
-    if (!existsSync(cwd)) throw new AppError('not_found', `The folder ${cwd} does not exist`)
+    if (!cwd) throw new AppError('no_workspace', t('Open a folder first: the agent works inside it.'))
+    if (!existsSync(cwd)) throw new AppError('not_found', t('The folder {cwd} does not exist', { cwd }))
     const apiKey = profile.auth === 'api-key' ? this.deps.profiles.apiKey(profile.id) : null
-    if (profile.auth === 'api-key' && !apiKey) throw new AppError('invalid_request', 'This profile has no API key')
+    if (profile.auth === 'api-key' && !apiKey) throw new AppError('invalid_request', t('This profile has no API key'))
 
     const id = `as-${randomUUID()}`
     const platform = this.deps.platform ?? process.platform
@@ -130,7 +135,7 @@ export class AgentManager {
       id,
       profileId: profile.id,
       kind: profile.kind,
-      model: req.model || profile.defaultModel,
+      model: req.model || profile.defaultModel || (this.deps.defaultModel?.() ?? ''),
       permissionLevel: req.permissionLevel,
       cwd,
       mcpTools: req.mcpTools,
@@ -142,7 +147,7 @@ export class AgentManager {
     // MCP tools outside the allow-list are refused, whatever the permission level says.
     const gate = (tool: ToolRequest) =>
       tool.name.startsWith('mcp__') && !allowed.has(tool.name)
-        ? { decision: 'deny' as const, reason: `${tool.name} is not in this agent's MCP tools` }
+        ? { decision: 'deny' as const, reason: t("{name} is not in this agent's MCP tools", { name: tool.name }) }
         : decide({ level: info.permissionLevel, cwd, platform }, tool)
     const common = {
       emit: (event: AgentEvent) => this.emit(id, event),
@@ -262,7 +267,7 @@ export class AgentManager {
     if (other) {
       throw new AppError(
         'not_allowed',
-        'Another Antigravity session of this account runs with a different permission level or MCP tools. Stop it first, or use the same settings.'
+        t('Another Antigravity session of this account runs with a different permission level or MCP tools. Stop it first, or use the same settings.')
       )
     }
   }
@@ -312,7 +317,7 @@ export class AgentManager {
         throw new AppError('agent_error', describeApiError(err, target))
       })
       info.model = models[0]?.value ?? ''
-      if (!info.model) throw new AppError('invalid_request', 'This account lists no model. Choose one by name.')
+      if (!info.model) throw new AppError('invalid_request', t('This account lists no model. Choose one by name.'))
     }
     const mcpTools = this.deps.mcp.toolSpecs(allowed)
     const qualified = new Map(mcpTools.map((t) => [t.name, t.qualifiedName]))
@@ -345,7 +350,7 @@ export class AgentManager {
 
   send(sessionId: string, text: string): void {
     const entry = this.require(sessionId)
-    if (ENDED.includes(entry.info.status)) throw new AppError('not_allowed', 'This session has ended. Start a new one.')
+    if (ENDED.includes(entry.info.status)) throw new AppError('not_allowed', t('This session has ended. Start a new one.'))
     this.emit(sessionId, { type: 'user', id: randomUUID(), text })
     this.setStatus(sessionId, 'running')
     entry.session?.send(text)
@@ -381,7 +386,7 @@ export class AgentManager {
 
   private require(sessionId: string): Entry {
     const entry = this.sessions.get(sessionId)
-    if (!entry) throw new AppError('not_found', 'This agent session no longer exists')
+    if (!entry) throw new AppError('not_found', t('This agent session no longer exists'))
     return entry
   }
 

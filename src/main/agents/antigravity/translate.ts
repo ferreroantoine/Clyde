@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import type { AgentEvent } from '@shared/agent'
 import type { AgyEvent, AgyToolInfo } from './stream'
 
@@ -21,9 +22,9 @@ function errorText(error: unknown): string {
 /** A sentence for the panel from what agy printed when a run fails. */
 export function describeAgyFailure(text: string): string {
   if (/authentication (required|expired)|log back in|not signed in/i.test(text)) {
-    return 'Antigravity is not signed in, or its sign-in expired. Open Accounts to sign in again.'
+    return t('Antigravity is not signed in, or its sign-in expired. Open Accounts to sign in again.')
   }
-  if (/credits balance is too low|quota/i.test(text)) return `Antigravity hit a usage limit: ${text}`
+  if (/credits balance is too low|quota/i.test(text)) return t('Antigravity hit a usage limit: {text}', { text })
   return text
 }
 

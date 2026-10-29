@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { createHash } from 'node:crypto'
 import type { McpServerConfig } from '@anthropic-ai/claude-agent-sdk'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -199,7 +200,7 @@ export class McpHub {
 
   async reconnect(id: string): Promise<void> {
     const record = this.store.get(id)
-    if (!record.enabled) throw new AppError('invalid_request', 'Enable the server first')
+    if (!record.enabled) throw new AppError('invalid_request', t('Enable the server first'))
     await this.disconnect(id)
     await this.connect(id)
   }
@@ -313,7 +314,7 @@ export class McpHub {
         if (generation !== state.generation) return
         Object.assign(state, {
           status: 'error',
-          error: error ? error.message : 'The server closed the connection',
+          error: error ? error.message : t('The server closed the connection'),
           connection: null,
           tools: []
         })

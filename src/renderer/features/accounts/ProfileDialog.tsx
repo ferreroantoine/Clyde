@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { t, tk } from '@shared/i18n'
 import { Bot, Check, Cpu, Gem, KeyRound, Orbit, Sparkles, SquareTerminal, UserRound } from 'lucide-react'
 import {
   DEFAULT_OLLAMA_URL,
@@ -48,62 +49,62 @@ const CHOICES: Choice[] = [
     kind: 'claude-code',
     auth: 'subscription',
     icon: UserRound,
-    title: 'Claude subscription',
-    description: 'Claude Code, signed in with your plan. Personal use.'
+    title: tk('Claude subscription'),
+    description: tk('Claude Code, signed in with your plan. Personal use.')
   },
   {
     kind: 'claude-code',
     auth: 'api-key',
     icon: KeyRound,
-    title: 'Claude Code + API key',
-    description: 'Claude Code, billed to a Console key.',
+    title: tk('Claude Code + API key'),
+    description: tk('Claude Code, billed to a Console key.'),
     keyPlaceholder: 'sk-ant-…'
   },
   {
     kind: 'anthropic',
     auth: 'api-key',
     icon: Sparkles,
-    title: 'Anthropic API',
-    description: 'Claude models in Atelier’s own agent loop.',
+    title: tk('Anthropic API'),
+    description: tk('Claude models in Atelier’s own agent loop.'),
     keyPlaceholder: 'sk-ant-…'
   },
   {
     kind: 'codex',
     auth: 'subscription',
     icon: SquareTerminal,
-    title: 'ChatGPT subscription',
-    description: 'Codex CLI, signed in with your ChatGPT plan. Personal use.'
+    title: tk('ChatGPT subscription'),
+    description: tk('Codex CLI, signed in with your ChatGPT plan. Personal use.')
   },
-  { kind: 'openai', auth: 'api-key', icon: Bot, title: 'OpenAI API', description: 'GPT models in Atelier’s own loop.', keyPlaceholder: 'sk-…' },
+  { kind: 'openai', auth: 'api-key', icon: Bot, title: tk('OpenAI API'), description: tk('GPT models in Atelier’s own loop.'), keyPlaceholder: 'sk-…' },
   {
     kind: 'antigravity',
     auth: 'subscription',
     icon: Orbit,
-    title: 'Google subscription',
-    description: 'Antigravity CLI, signed in with your Google account. Personal use.'
+    title: tk('Google subscription'),
+    description: tk('Antigravity CLI, signed in with your Google account. Personal use.')
   },
   {
     kind: 'gemini',
     auth: 'api-key',
     icon: Gem,
-    title: 'Gemini API',
-    description: 'Gemini models with an AI Studio key.',
+    title: tk('Gemini API'),
+    description: tk('Gemini models with an AI Studio key.'),
     keyPlaceholder: 'AIza…'
   },
-  { kind: 'ollama', auth: 'none', icon: Cpu, title: 'Ollama', description: 'Local models, no key.' }
+  { kind: 'ollama', auth: 'none', icon: Cpu, title: tk('Ollama'), description: tk('Local models, no key.') }
 ]
 
 /** What the dialog says about each kind, under its title. */
 function kindDescription(kind: ProfileKind): string {
   switch (kind) {
     case 'claude-code':
-      return 'Each Claude Code account gets its own configuration folder, so several accounts can work side by side.'
+      return t('Each Claude Code account gets its own configuration folder, so several accounts can work side by side.')
     case 'codex':
-      return 'Each Codex account gets its own CODEX_HOME folder, so several ChatGPT accounts can work side by side.'
+      return t('Each Codex account gets its own CODEX_HOME folder, so several ChatGPT accounts can work side by side.')
     case 'antigravity':
-      return 'Antigravity keeps its sign-in in the Windows credential store, once per Windows user, so Atelier allows one Antigravity account.'
+      return t('Antigravity keeps its sign-in in the Windows credential store, once per Windows user, so Atelier allows one Antigravity account.')
     default:
-      return 'Runs Atelier’s own agent loop: read, write, list files and run commands, plus the MCP tools you allow.'
+      return t('Runs Atelier’s own agent loop: read, write, list files and run commands, plus the MCP tools you allow.')
   }
 }
 
@@ -219,7 +220,7 @@ function ProfileForm({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{editing ? `Edit ${choice.title} account` : 'Add an account'}</DialogTitle>
+        <DialogTitle>{editing ? t('Edit {kind} account', { kind: t(choice.title) }) : t('Add an account')}</DialogTitle>
         <DialogDescription>
           {kindDescription(kind)}
         </DialogDescription>
@@ -233,10 +234,10 @@ function ProfileForm({
         }}
       >
         {!editing && (
-          <div className="grid max-h-[46vh] gap-3 overflow-y-auto pr-1" role="group" aria-label="Provider">
+          <div className="grid max-h-[46vh] gap-3 overflow-y-auto pr-1" role="group" aria-label={t('Provider')}>
             {PROVIDER_FAMILIES.map((family) => (
               <section key={family.id} className="grid gap-1.5">
-                <h3 className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{family.label}</h3>
+                <h3 className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{t(family.label)}</h3>
                 <div className="grid grid-cols-2 gap-2">
                   {CHOICES.filter((c) => (family.kinds as readonly ProfileKind[]).includes(c.kind)).map((c) => {
                     const blocked = distribution && c.auth === 'subscription'
@@ -247,9 +248,9 @@ function ProfileForm({
                         active={c === choice}
                         disabled={blocked || taken}
                         icon={c.icon}
-                        title={c.title}
+                        title={t(c.title)}
                         description={
-                          blocked ? 'Not available in this build.' : taken ? 'You already have this account.' : c.description
+                          blocked ? t('Not available in this build.') : taken ? t('You already have this account.') : t(c.description)
                         }
                         onClick={() => setChoice(c)}
                       />
@@ -262,21 +263,21 @@ function ProfileForm({
         )}
 
         <div className="grid grid-cols-[1fr_7rem] gap-3">
-          <Field label="Name">
+          <Field label={t('Name')}>
             <Input
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Claude perso"
+              placeholder={t('Claude perso')}
               maxLength={60}
             />
           </Field>
-          <Field label="Label">
-            <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="PERSO" maxLength={12} />
+          <Field label={t('Label')}>
+            <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t('PERSO')} maxLength={12} />
           </Field>
         </div>
 
-        <Field label="Color">
+        <Field label={t('Color')}>
           <div className="flex flex-wrap gap-1.5">
             {PROFILE_COLORS.map((c) => (
               <button
@@ -299,8 +300,8 @@ function ProfileForm({
 
         {auth === 'api-key' && (
           <Field
-            label={editing ? 'Replace API key' : 'API key'}
-            hint="Encrypted with the operating system's secure storage. It never leaves the main process."
+            label={editing ? t('Replace API key') : t('API key')}
+            hint={t('Encrypted with the operating system\'s secure storage. It never leaves the main process.')}
           >
             <Input
               type="password"
@@ -308,14 +309,14 @@ function ProfileForm({
               spellCheck={false}
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder={editing && profile.hasApiKey ? 'Stored, leave empty to keep it' : (choice.keyPlaceholder ?? 'API key')}
+              placeholder={editing && profile.hasApiKey ? t('Stored, leave empty to keep it') : (choice.keyPlaceholder ?? t('API key'))}
               className="font-mono text-xs"
             />
           </Field>
         )}
 
         {kind === 'ollama' && (
-          <Field label="Server URL" hint="Where Ollama listens. Atelier talks to its OpenAI-compatible /v1 API.">
+          <Field label={t('Server URL')} hint={t('Where Ollama listens. Atelier talks to its OpenAI-compatible /v1 API.')}>
             <Input
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
@@ -327,20 +328,20 @@ function ProfileForm({
         )}
 
         <Field
-          label="Default model"
+          label={t('Default model')}
           hint={
             models.length
               ? undefined
               : isCliKind(kind)
-                ? 'Empty uses the CLI’s default. Test the connection to list models.'
-                : 'Empty picks the provider’s first chat model. Test the connection to list them.'
+                ? t('Empty uses the CLI’s default. Test the connection to list models.')
+                : t('Empty picks the provider’s first chat model. Test the connection to list them.')
           }
         >
           <Input
             list="profile-models"
             value={defaultModel}
             onChange={(e) => setDefaultModel(e.target.value)}
-            placeholder="default"
+            placeholder={t('default')}
             className="font-mono text-xs"
           />
           <datalist id="profile-models">
@@ -354,10 +355,9 @@ function ProfileForm({
 
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={close}>
-            Cancel
-          </Button>
+            {t('Cancel')}</Button>
           <Button type="submit" disabled={!canSave}>
-            {editing ? 'Save' : 'Add account'}
+            {editing ? t('Save') : t('Add account')}
           </Button>
         </DialogFooter>
       </form>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { t, tk, tn } from '@shared/i18n'
 import {
   ChevronRight,
   CircleAlert,
@@ -31,10 +32,10 @@ import { cn } from '@/lib/utils'
 import { McpServerDialog } from './McpServerDialog'
 
 const STATUS = {
-  connected: { label: 'Connected', dot: 'bg-success' },
-  connecting: { label: 'Connecting', dot: 'animate-pulse bg-muted-foreground' },
-  error: { label: 'Error', dot: 'bg-destructive' },
-  disabled: { label: 'Off', dot: 'bg-muted-foreground/40' }
+  connected: { label: tk('Connected'), dot: 'bg-success' },
+  connecting: { label: tk('Connecting'), dot: 'animate-pulse bg-muted-foreground' },
+  error: { label: tk('Error'), dot: 'bg-destructive' },
+  disabled: { label: tk('Off'), dot: 'bg-muted-foreground/40' }
 } as const
 
 function ServerCard({ server, onEdit, onDelete }: { server: McpServer; onEdit: () => void; onDelete: () => void }) {
@@ -46,7 +47,7 @@ function ServerCard({ server, onEdit, onDelete }: { server: McpServer; onEdit: (
   const summary = server.transport === 'stdio' ? [server.command, ...server.args].join(' ') : server.url
 
   return (
-    <article className="rounded-xl border bg-card shadow-xs" aria-label={`MCP server ${server.name}`} data-status={server.status}>
+    <article className="rounded-xl border bg-card shadow-xs" aria-label={t('MCP server {name}', { name: server.name })} data-status={server.status}>
       <header className="flex items-center gap-3 px-4 py-3">
         <Icon className="size-4 shrink-0 text-muted-foreground" />
         <div className="min-w-0 flex-1">
@@ -54,8 +55,8 @@ function ServerCard({ server, onEdit, onDelete }: { server: McpServer; onEdit: (
             <h3 className="truncate text-sm font-semibold">{server.name}</h3>
             <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
               <span className={cn('size-1.5 rounded-full', status.dot)} />
-              {status.label}
-              {server.status === 'connected' && ` · ${server.tools.length} tool${server.tools.length === 1 ? '' : 's'}`}
+              {t(status.label)}
+              {server.status === 'connected' && ` · ${tn('{count} tool', '{count} tools', server.tools.length)}`}
             </span>
           </div>
           <p className="truncate font-mono text-[11px] text-muted-foreground" title={summary}>
@@ -66,27 +67,24 @@ function ServerCard({ server, onEdit, onDelete }: { server: McpServer; onEdit: (
           size="xs"
           variant="outline"
           onClick={() => void update({ id: server.id, enabled: !server.enabled })}
-          aria-label={server.enabled ? `Turn off ${server.name}` : `Turn on ${server.name}`}
+          aria-label={server.enabled ? t('Turn off {name}', { name: server.name }) : t('Turn on {name}', { name: server.name })}
         >
-          <Power /> {server.enabled ? 'Turn off' : 'Turn on'}
+          <Power /> {server.enabled ? t('Turn off') : t('Turn on')}
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-xs" aria-label={`Actions for ${server.name}`}>
+            <Button variant="ghost" size="icon-xs" aria-label={t('Actions for {name}', { name: server.name })}>
               <MoreHorizontal />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem disabled={!server.enabled} onSelect={() => void reconnect(server.id)}>
-              <RefreshCw /> Reconnect
-            </DropdownMenuItem>
+              <RefreshCw /> {' '}{t('Reconnect')}</DropdownMenuItem>
             <DropdownMenuItem onSelect={onEdit}>
-              <Pencil /> Edit
-            </DropdownMenuItem>
+              <Pencil /> {' '}{t('Edit')}</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-              <Trash2 /> Delete
-            </DropdownMenuItem>
+              <Trash2 /> {' '}{t('Delete')}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
@@ -105,8 +103,7 @@ function ServerCard({ server, onEdit, onDelete }: { server: McpServer; onEdit: (
             className="flex w-full items-center gap-1.5 px-4 py-2 text-left text-xs text-muted-foreground hover:bg-accent/40"
           >
             <ChevronRight className={cn('size-3 transition-transform', open && 'rotate-90')} />
-            Tools
-          </button>
+            {t('Tools')}</button>
           {open && (
             <ul className="space-y-1.5 px-4 pb-3">
               {server.tools.map((tool) => (
@@ -138,10 +135,10 @@ function ImportDialog({ preview, onClose }: { preview: McpImportPreview | null; 
     <Dialog open={!!preview} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Import MCP servers</DialogTitle>
+          <DialogTitle>{t('Import MCP servers')}</DialogTitle>
           <DialogDescription className="truncate font-mono text-[11px]">{preview?.path}</DialogDescription>
         </DialogHeader>
-        {preview && preview.servers.length === 0 && <p className="text-sm text-muted-foreground">No server to import in this file.</p>}
+        {preview && preview.servers.length === 0 && <p className="text-sm text-muted-foreground">{t('No server to import in this file.')}</p>}
         <ul className="max-h-80 space-y-1.5 overflow-y-auto">
           {preview?.servers.map((s) => (
             <li key={s.name}>
@@ -155,12 +152,12 @@ function ImportDialog({ preview, onClose }: { preview: McpImportPreview | null; 
                 <span className="min-w-0 flex-1">
                   <span className="block font-medium">
                     {s.name}
-                    {s.exists && <span className="font-normal text-muted-foreground"> · already added</span>}
+                    {s.exists && <span className="font-normal text-muted-foreground"> · {t('already added')}</span>}
                   </span>
                   <span className="block truncate font-mono text-[11px] text-muted-foreground">{s.summary}</span>
                   {s.envKeys.length > 0 && (
                     <span className="block text-[11px] text-muted-foreground">
-                      {s.transport === 'stdio' ? 'Environment' : 'Headers'}: {s.envKeys.join(', ')} (stored encrypted)
+                      {t(s.transport === 'stdio' ? 'Environment: {keys} (stored encrypted)' : 'Headers: {keys} (stored encrypted)', { keys: s.envKeys.join(', ') })}
                     </span>
                   )}
                 </span>
@@ -170,13 +167,12 @@ function ImportDialog({ preview, onClose }: { preview: McpImportPreview | null; 
         </ul>
         {preview && preview.skipped.length > 0 && (
           <p className="text-[11px] text-muted-foreground">
-            Skipped: {preview.skipped.map((s) => `${s.name} (${s.reason.toLowerCase()})`).join(', ')}
+            {t('Skipped: {list}', { list: preview.skipped.map((s) => `${s.name} (${s.reason.toLowerCase()})`).join(', ') })}
           </p>
         )}
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
+            {t('Cancel')}</Button>
           <Button
             disabled={selected.size === 0}
             onClick={() => {
@@ -184,7 +180,7 @@ function ImportDialog({ preview, onClose }: { preview: McpImportPreview | null; 
               void importServers(preview.path, [...selected]).then((ok) => ok && onClose())
             }}
           >
-            Import {selected.size || ''}
+            {selected.size ? t('Import {count}', { count: selected.size }) : t('Import')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -192,7 +188,8 @@ function ImportDialog({ preview, onClose }: { preview: McpImportPreview | null; 
   )
 }
 
-export function McpPage() {
+/** `embedded` drops the page frame and title, for Settings. */
+export function McpPage({ embedded = false }: { embedded?: boolean } = {}) {
   const servers = useMcp((s) => s.servers)
   const loaded = useMcp((s) => s.loaded)
   const remove = useMcp((s) => s.remove)
@@ -207,22 +204,20 @@ export function McpPage() {
   const pick = () => void startImport()
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-4xl px-8 py-10">
+    <div className={embedded ? undefined : 'h-full overflow-y-auto'}>
+      <div className={embedded ? 'pb-2' : 'mx-auto max-w-4xl px-8 py-10'}>
         <div className="flex items-end justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold tracking-tight">MCP servers</h1>
+            {!embedded && <h1 className="text-lg font-semibold tracking-tight">{t('MCP servers')}</h1>}
             <p className="mt-1 text-sm text-muted-foreground">
-              Tools for your agents. An agent only sees the tools you tick when you start it.
-            </p>
+              {t('Tools for your agents. An agent only sees the tools you tick when you start it.')}</p>
           </div>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={pick} disabled={picking}>
-              {picking ? <LoaderCircle className="animate-spin" /> : <FileInput />} Import claude_desktop_config.json
+              {picking ? <LoaderCircle className="animate-spin" /> : <FileInput />} {t('Import claude_desktop_config.json')}
             </Button>
             <Button size="sm" onClick={() => setEditing('new')}>
-              <Plus /> Add server
-            </Button>
+              <Plus /> {' '}{t('Add server')}</Button>
           </div>
         </div>
 
@@ -230,8 +225,8 @@ export function McpPage() {
           <div className="mt-10 rounded-xl border border-dashed py-14">
             <EmptyState
               icon={Plug}
-              title="No MCP server yet"
-              description="Add a local command or a remote URL, or import the servers you already use in Claude Desktop."
+              title={t('No MCP server yet')}
+              description={t('Add a local command or a remote URL, or import the servers you already use in Claude Desktop.')}
             />
           </div>
         ) : (
@@ -256,13 +251,12 @@ export function McpPage() {
       <Dialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete {deleting?.name}?</DialogTitle>
-            <DialogDescription>Agents started from now on lose its tools. Its stored variables are deleted too.</DialogDescription>
+            <DialogTitle>{t('Delete {name}?', { name: deleting?.name ?? '' })}</DialogTitle>
+            <DialogDescription>{t('Agents started from now on lose its tools. Its stored variables are deleted too.')}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDeleting(null)}>
-              Cancel
-            </Button>
+              {t('Cancel')}</Button>
             <Button
               variant="destructive"
               onClick={() => {
@@ -270,8 +264,7 @@ export function McpPage() {
                 setDeleting(null)
               }}
             >
-              Delete
-            </Button>
+              {t('Delete')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

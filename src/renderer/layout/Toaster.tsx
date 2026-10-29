@@ -1,4 +1,5 @@
 import { CircleAlert, CircleCheck, Info, TriangleAlert, X } from 'lucide-react'
+import { t } from '@shared/i18n'
 import { useNotifications, type NoticeLevel } from '@/stores/notifications'
 import { cn } from '@/lib/utils'
 
@@ -33,7 +34,7 @@ export function Toaster() {
             </div>
             <button
               type="button"
-              aria-label="Dismiss"
+              aria-label={t('Dismiss')}
               onClick={() => dismiss(n.id)}
               className="text-muted-foreground hover:text-foreground"
             >

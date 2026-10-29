@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t } from '@shared/i18n'
 import type { Dashboard, MetricsRange, SessionTranscript } from '@shared/metrics'
 import type { PriceInput, PriceRow } from '@shared/pricing'
 import { invoke } from '@/lib/ipc'
@@ -30,7 +31,7 @@ export const useSupervision = create<SupervisionState>()((set, get) => ({
     try {
       set({ dashboard: await invoke('metrics:dashboard', { range }) })
     } catch (err) {
-      notify.error('Could not load the dashboard', err)
+      notify.error(t('Could not load the dashboard'), err)
     } finally {
       set({ loading: false })
     }
@@ -40,7 +41,7 @@ export const useSupervision = create<SupervisionState>()((set, get) => ({
     try {
       set({ transcript: await invoke('metrics:transcript', { sessionId }) })
     } catch (err) {
-      notify.error('Could not open this session', err)
+      notify.error(t('Could not open this session'), err)
     }
   },
 
@@ -50,7 +51,7 @@ export const useSupervision = create<SupervisionState>()((set, get) => ({
     try {
       set({ prices: await invoke('pricing:list') })
     } catch (err) {
-      notify.error('Could not load prices', err)
+      notify.error(t('Could not load prices'), err)
     }
   },
 
@@ -59,7 +60,7 @@ export const useSupervision = create<SupervisionState>()((set, get) => ({
       set({ prices: await invoke('pricing:save', input) })
       return true
     } catch (err) {
-      notify.error('Could not save the price', err)
+      notify.error(t('Could not save the price'), err)
       return false
     }
   },
@@ -68,7 +69,7 @@ export const useSupervision = create<SupervisionState>()((set, get) => ({
     try {
       set({ prices: await invoke('pricing:delete', { id }) })
     } catch (err) {
-      notify.error('Could not delete the price', err)
+      notify.error(t('Could not delete the price'), err)
     }
   }
 }))

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t } from '@shared/i18n'
 import type {
   AgentDefinition,
   AgentDefinitionInput,
@@ -86,7 +87,7 @@ export const useBoard = create<BoardState>()((set, get) => {
       try {
         set({ tasks: await invoke('tasks:list') })
       } catch (err) {
-        notify.error('Could not load the board', err)
+        notify.error(t('Could not load the board'), err)
       }
     },
 
@@ -94,43 +95,43 @@ export const useBoard = create<BoardState>()((set, get) => {
       try {
         return 'id' in input ? await invoke('agents:update', input) : await invoke('agents:create', input)
       } catch (err) {
-        notify.error('Could not save the agent', err)
+        notify.error(t('Could not save the agent'), err)
         return null
       }
     },
 
     deleteAgent: async (id) => {
-      await invoke('agents:delete', { id }).catch((err) => notify.error('Could not delete the agent', err))
+      await invoke('agents:delete', { id }).catch((err) => notify.error(t('Could not delete the agent'), err))
     },
 
-    createTask: (input) => act('new-task', 'Could not create the task', () => invoke('tasks:create', input)),
+    createTask: (input) => act('new-task', t('Could not create the task'), () => invoke('tasks:create', input)),
 
     startTask: async (id) => {
-      await act(id, 'Could not start the task', () => invoke('tasks:start', { id }))
+      await act(id, t('Could not start the task'), () => invoke('tasks:start', { id }))
     },
 
     requestChanges: async (id, comments) => {
-      const task = await act(id, 'Could not send the changes', () => invoke('tasks:requestChanges', { id, comments }))
+      const task = await act(id, t('Could not send the changes'), () => invoke('tasks:requestChanges', { id, comments }))
       if (task) set({ review: null })
       return !!task
     },
 
     merge: async (id) => {
-      const result = await act(id, 'Merge failed', () => invoke('tasks:merge', { id }))
+      const result = await act(id, t('Merge failed'), () => invoke('tasks:merge', { id }))
       if (result?.ok) {
-        notify.success('Merged', `Commit ${result.commit.slice(0, 8)}`)
+        notify.success(t('Merged'), t('Commit {sha}', { sha: result.commit.slice(0, 8) }))
         set({ review: null })
-      } else if (result) notify.error('Not merged', result.reason)
+      } else if (result) notify.error(t('Not merged'), result.reason)
       return result
     },
 
     abandon: async (id) => {
-      const task = await act(id, 'Could not abandon the task', () => invoke('tasks:abandon', { id }))
+      const task = await act(id, t('Could not abandon the task'), () => invoke('tasks:abandon', { id }))
       if (task) set({ review: null })
     },
 
     deleteTask: async (id) => {
-      await act(id, 'Could not delete the task', () => invoke('tasks:delete', { id }))
+      await act(id, t('Could not delete the task'), () => invoke('tasks:delete', { id }))
     },
 
     openReview: async (taskId) => {
@@ -141,7 +142,7 @@ export const useBoard = create<BoardState>()((set, get) => {
         const first = changes[0]
         if (first) await get().selectFile(first.path)
       } catch (err) {
-        notify.error('Could not load the changes', err)
+        notify.error(t('Could not load the changes'), err)
         set({ review: null })
       }
     },
@@ -155,7 +156,7 @@ export const useBoard = create<BoardState>()((set, get) => {
         const current = get().review
         if (current?.selected === path) set({ review: { ...current, diff, loading: false } })
       } catch (err) {
-        notify.error('Could not load this file', err)
+        notify.error(t('Could not load this file'), err)
       }
     },
 

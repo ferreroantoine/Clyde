@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { tk } from './i18n'
 import { profileIdSchema, type ProfileKind } from './profiles'
 
 /**
@@ -12,9 +13,9 @@ export const PERMISSION_LEVELS = ['validate-all', 'files-auto', 'autonomous'] as
 export type PermissionLevel = (typeof PERMISSION_LEVELS)[number]
 
 export const PERMISSION_LEVEL_LABELS: Record<PermissionLevel, string> = {
-  'validate-all': 'Validate everything',
-  'files-auto': 'Files auto, commands validated',
-  autonomous: 'Autonomous in its folder'
+  'validate-all': tk('Validate everything'),
+  'files-auto': tk('Files auto, commands validated'),
+  autonomous: tk('Autonomous in its folder')
 }
 
 /**
@@ -22,9 +23,9 @@ export const PERMISSION_LEVEL_LABELS: Record<PermissionLevel, string> = {
  * anything that would need it is refused instead.
  */
 export const ANTIGRAVITY_LEVEL_HINTS: Record<PermissionLevel, string> = {
-  'validate-all': 'Antigravity cannot ask: it only reads.',
-  'files-auto': 'Edits files in its folder; commands are refused (it cannot ask).',
-  autonomous: 'Edits and runs commands in its folder; git push is refused.'
+  'validate-all': tk('Antigravity cannot ask: it only reads.'),
+  'files-auto': tk('Edits files in its folder; commands are refused (it cannot ask).'),
+  autonomous: tk('Edits and runs commands in its folder; git push is refused.')
 }
 
 export const sessionIdSchema = z.string().regex(/^as-[a-z0-9-]{1,40}$/)
