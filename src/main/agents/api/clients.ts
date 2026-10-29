@@ -13,6 +13,8 @@ export interface ApiTarget {
 }
 
 const ANTHROPIC_URL = 'https://api.anthropic.com'
+/** Gemini's OpenAI-compatible endpoint (ai.google.dev/gemini-api/docs/openai). */
+export const GEMINI_OPENAI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/'
 
 /**
  * Builds the adapter for one profile. Key and URL are always passed explicitly so the SDKs
@@ -31,6 +33,11 @@ export function createAdapter(target: ApiTarget, fetch: typeof globalThis.fetch)
       return new OpenAICompatAdapter(
         new OpenAI({ ...common, apiKey: key(), baseURL: 'https://api.openai.com/v1', organization: null, project: null }),
         'openai'
+      )
+    case 'gemini':
+      return new OpenAICompatAdapter(
+        new OpenAI({ ...common, apiKey: key(), baseURL: GEMINI_OPENAI_URL, organization: null, project: null }),
+        'gemini'
       )
     case 'ollama':
       // Ollama ignores the key, but the SDK requires one.

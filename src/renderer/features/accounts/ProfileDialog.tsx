@@ -1,8 +1,11 @@
 import { useState, type ReactNode } from 'react'
-import { Bot, Check, Cpu, KeyRound, Sparkles, UserRound } from 'lucide-react'
+import { Bot, Check, Cpu, Gem, KeyRound, Orbit, Sparkles, SquareTerminal, UserRound } from 'lucide-react'
 import {
   DEFAULT_OLLAMA_URL,
+  isCliKind,
   PROFILE_COLORS,
+  PROVIDER_FAMILIES,
+  SINGLE_PROFILE_KINDS,
   type AuthMode,
   type Profile,
   type ProfileKind
@@ -39,7 +42,7 @@ interface Choice {
   keyPlaceholder?: string
 }
 
-/** Every way to add an account, in the order the dialog shows them. */
+/** Every way to add an account, grouped by vendor in the order the dialog shows them. */
 const CHOICES: Choice[] = [
   {
     kind: 'claude-code',
@@ -64,9 +67,45 @@ const CHOICES: Choice[] = [
     description: 'Claude models in Atelier’s own agent loop.',
     keyPlaceholder: 'sk-ant-…'
   },
-  { kind: 'openai', auth: 'api-key', icon: Bot, title: 'OpenAI', description: 'GPT models.', keyPlaceholder: 'sk-…' },
+  {
+    kind: 'codex',
+    auth: 'subscription',
+    icon: SquareTerminal,
+    title: 'ChatGPT subscription',
+    description: 'Codex CLI, signed in with your ChatGPT plan. Personal use.'
+  },
+  { kind: 'openai', auth: 'api-key', icon: Bot, title: 'OpenAI API', description: 'GPT models in Atelier’s own loop.', keyPlaceholder: 'sk-…' },
+  {
+    kind: 'antigravity',
+    auth: 'subscription',
+    icon: Orbit,
+    title: 'Google subscription',
+    description: 'Antigravity CLI, signed in with your Google account. Personal use.'
+  },
+  {
+    kind: 'gemini',
+    auth: 'api-key',
+    icon: Gem,
+    title: 'Gemini API',
+    description: 'Gemini models with an AI Studio key.',
+    keyPlaceholder: 'AIza…'
+  },
   { kind: 'ollama', auth: 'none', icon: Cpu, title: 'Ollama', description: 'Local models, no key.' }
 ]
+
+/** What the dialog says about each kind, under its title. */
+function kindDescription(kind: ProfileKind): string {
+  switch (kind) {
+    case 'claude-code':
+      return 'Each Claude Code account gets its own configuration folder, so several accounts can work side by side.'
+    case 'codex':
+      return 'Each Codex account gets its own CODEX_HOME folder, so several ChatGPT accounts can work side by side.'
+    case 'antigravity':
+      return 'Antigravity keeps its sign-in in the Windows credential store, once per Windows user, so Atelier allows one Antigravity account.'
+    default:
+      return 'Runs Atelier’s own agent loop: read, write, list files and run commands, plus the MCP tools you allow.'
+  }
+}
 
 const choiceOf = (kind: ProfileKind, auth: AuthMode) =>
   CHOICES.find((c) => c.kind === kind && c.auth === auth) ?? (CHOICES[0] as Choice)
@@ -137,6 +176,7 @@ function ProfileForm({
   close
 }: Omit<ProfileDialogProps, 'open' | 'onOpenChange'> & { close: () => void }) {
   const create = useProfiles((s) => s.create)
+  const profiles = useProfiles((s) => s.profiles)
   const update = useProfiles((s) => s.update)
   const test = useProfiles((s) => s.tests[profile?.id ?? ''])
   const models = test && test !== 'testing' ? test.models : []
@@ -181,9 +221,7 @@ function ProfileForm({
       <DialogHeader>
         <DialogTitle>{editing ? `Edit ${choice.title} account` : 'Add an account'}</DialogTitle>
         <DialogDescription>
-          {kind === 'claude-code'
-            ? 'Each Claude Code account gets its own configuration folder, so several accounts can work side by side.'
-            : 'Runs Atelier’s own agent loop: read, write, list files and run commands, plus the MCP tools you allow.'}
+          {kindDescription(kind)}
         </DialogDescription>
       </DialogHeader>
 
@@ -195,21 +233,31 @@ function ProfileForm({
         }}
       >
         {!editing && (
-          <div className="grid grid-cols-2 gap-2" role="group" aria-label="Provider">
-            {CHOICES.map((c) => {
-              const blocked = distribution && c.auth === 'subscription'
-              return (
-                <AuthOption
-                  key={`${c.kind}:${c.auth}`}
-                  active={c === choice}
-                  disabled={blocked}
-                  icon={c.icon}
-                  title={c.title}
-                  description={blocked ? 'Not available in this build.' : c.description}
-                  onClick={() => setChoice(c)}
-                />
-              )
-            })}
+          <div className="grid max-h-[46vh] gap-3 overflow-y-auto pr-1" role="group" aria-label="Provider">
+            {PROVIDER_FAMILIES.map((family) => (
+              <section key={family.id} className="grid gap-1.5">
+                <h3 className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{family.label}</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  {CHOICES.filter((c) => (family.kinds as readonly ProfileKind[]).includes(c.kind)).map((c) => {
+                    const blocked = distribution && c.auth === 'subscription'
+                    const taken = SINGLE_PROFILE_KINDS.includes(c.kind) && profiles.some((p) => p.kind === c.kind)
+                    return (
+                      <AuthOption
+                        key={`${c.kind}:${c.auth}`}
+                        active={c === choice}
+                        disabled={blocked || taken}
+                        icon={c.icon}
+                        title={c.title}
+                        description={
+                          blocked ? 'Not available in this build.' : taken ? 'You already have this account.' : c.description
+                        }
+                        onClick={() => setChoice(c)}
+                      />
+                    )
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         )}
 
@@ -283,8 +331,8 @@ function ProfileForm({
           hint={
             models.length
               ? undefined
-              : kind === 'claude-code'
-                ? 'Empty uses Claude Code’s default. Test the connection to list models.'
+              : isCliKind(kind)
+                ? 'Empty uses the CLI’s default. Test the connection to list models.'
                 : 'Empty picks the provider’s first chat model. Test the connection to list them.'
           }
         >

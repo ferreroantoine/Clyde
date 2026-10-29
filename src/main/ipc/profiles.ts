@@ -44,6 +44,7 @@ export function registerProfileHandlers({ profiles, ptys, claudeCodePath, query,
       const api = { kind: profile.kind, apiKey: profiles.apiKey(id), baseUrl: profile.baseUrl }
       return testApiConnection(createAdapter(api, fetch), api)
     }
+    if (profile.kind !== 'claude-code') throw new AppError('not_allowed', 'Testing this account is not available yet.')
     // net.fetch goes through Chromium's network stack, so system proxies apply.
     return testConnection({ query, fetch: (url, init) => net.fetch(url, init) }, target(id))
   })

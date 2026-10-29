@@ -44,7 +44,7 @@ function setup(
   writeFileSync(binary, '')
   const repo = mkdtempSync(join(tmpdir(), 'atelier-repo-'))
   const profiles = new ProfilesService(db, new SecretsService(db, { available: () => false, encrypt: () => Buffer.alloc(0), decrypt: () => '' }), {
-    profilesRoot: join(dir, 'profiles'),
+    dataRoot: join(dir, 'profiles'),
     distribution: false
   })
   const profile = profiles.create({ name: 'Perso', color: '#6366f1', auth: 'subscription', defaultModel: 'sonnet' })

@@ -11,6 +11,8 @@ export interface ToolCall {
   id: string
   name: string
   input: Record<string, unknown>
+  /** Opaque vendor data to send back with the call, e.g. Gemini's `extra_content`. */
+  extra?: Record<string, unknown>
 }
 
 export interface ToolResult {

@@ -155,6 +155,56 @@ describe('OpenAICompatAdapter', () => {
       ]).map((m) => m.value)
     ).toEqual(['gpt-5', 'gpt-4o'])
     expect(filterModels('ollama', [{ id: 'llama3.2' }, { id: 'qwen3' }]).map((m) => m.value)).toEqual(['llama3.2', 'qwen3'])
+    expect(
+      filterModels('gemini', [
+        { id: 'models/gemini-3.8-flash' },
+        { id: 'models/gemini-embedding-001' },
+        { id: 'gemini-3.1-pro-preview' },
+        { id: 'models/gemini-3.8-live' },
+        { id: 'models/imagen-4.0-generate-001' },
+        { id: 'models/gemini-2.5-flash-preview-tts' }
+      ]).map((m) => m.value)
+    ).toEqual(['gemini-3.8-flash', 'gemini-3.1-pro-preview'])
+  })
+
+  it('keeps vendor data on tool calls and sends it back (Gemini thought signatures)', async () => {
+    const signed = [
+      {
+        choices: [
+          {
+            index: 0,
+            delta: {
+              tool_calls: [
+                {
+                  index: 0,
+                  id: 'fc_1',
+                  function: { name: 'list_files', arguments: '{}' },
+                  extra_content: { google: { thought_signature: 'sig==' } }
+                }
+              ]
+            },
+            finish_reason: 'tool_calls'
+          }
+        ]
+      }
+    ]
+    const create = vi.fn(async () => items(signed))
+    const adapter = new OpenAICompatAdapter({ chat: { completions: { create } } } as unknown as OpenAI, 'gemini')
+    const done = (await collect(adapter.stream(request()))).at(-1)
+    const call = { id: 'fc_1', name: 'list_files', input: {}, extra: { google: { thought_signature: 'sig==' } } }
+    expect(done).toMatchObject({ toolCalls: [call] })
+    expect(toOpenAIMessages('sys', [{ role: 'assistant', text: '', toolCalls: [call] }])[1]).toEqual({
+      role: 'assistant',
+      content: null,
+      tool_calls: [
+        {
+          id: 'fc_1',
+          type: 'function',
+          function: { name: 'list_files', arguments: '{}' },
+          extra_content: { google: { thought_signature: 'sig==' } }
+        }
+      ]
+    })
   })
 })
 
