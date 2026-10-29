@@ -22,6 +22,17 @@ export function createMainWindow(): BrowserWindow {
 
   win.once('ready-to-show', () => win.show())
 
+  // The window may use the microphone (dictation) and write to the clipboard; nothing else.
+  win.webContents.session.setPermissionRequestHandler((contents, permission, callback, details) => {
+    if (contents !== win.webContents) return callback(false)
+    if (permission === 'clipboard-sanitized-write') return callback(true)
+    if (permission === 'media') {
+      const types = 'mediaTypes' in details ? (details.mediaTypes ?? []) : []
+      return callback(types.length > 0 && types.every((type) => type === 'audio'))
+    }
+    callback(false)
+  })
+
   // Never open external links inside the app window.
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https://')) void shell.openExternal(url)

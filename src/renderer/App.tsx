@@ -6,7 +6,8 @@ import { Toaster } from '@/layout/Toaster'
 import { useApplyTheme, useResolvedTheme } from '@/lib/theme'
 import { terminals } from '@/lib/terminal/registry'
 import { useTerminals } from '@/stores/terminals'
-import { useShortcuts, type Shortcut } from '@/lib/shortcuts'
+import { useDictationShortcut, useShortcuts, type Shortcut } from '@/lib/shortcuts'
+import { useVoice } from '@/stores/voice'
 import { effectiveBindings } from '@shared/keybindings'
 import { useLayout } from '@/stores/layout'
 import { useSettings } from '@/stores/settings'
@@ -83,6 +84,7 @@ export function App() {
     const offBoard = useBoard.getState().init()
     const offLimits = useLimits.getState().init()
     const offChat = useChat.getState().init()
+    const offVoice = useVoice.getState().init()
     void invoke('app:notices')
       .then((notices) => {
         for (const n of notices) useNotifications.getState().push({ level: 'info', persistent: true, ...describeNotice(n) })
@@ -92,6 +94,7 @@ export function App() {
       offBoard()
       offLimits()
       offChat()
+      offVoice()
       offSounds()
       offMcp()
       offAgents()
@@ -132,6 +135,12 @@ export function App() {
       .map(([id, combo]) => ({ combo, run: actions[id] as () => void }))
   }, [overrides])
   useShortcuts(shortcuts)
+  // Settings › Voice: click-to-toggle or hold-to-talk on the dictation shortcut.
+  const dictationActions = useMemo(() => {
+    const voice = useVoice.getState
+    return { start: () => void voice().start(), stop: () => void voice().stop(), toggle: () => void voice().toggle() }
+  }, [])
+  useDictationShortcut(effectiveBindings(overrides)['voice.toggle'], useSettings((s) => s.settings.voice.mode) === 'hold', dictationActions)
   useGlobalErrorToasts()
 
   return (

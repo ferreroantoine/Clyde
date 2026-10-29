@@ -136,3 +136,12 @@ Je travaille dans un conteneur Linux sans compte Claude Pro/Max, ChatGPT ou Goog
 - « Continuer dans le projet » : session d'agent dans le dossier ouvert, conversation dans le prompt système (40 000 caractères au plus), aucun tour consommé.
 - Vérifié de bout en bout avec un faux serveur compatible OpenAI : streaming, tableau, code, formule, pièces jointes (image envoyée en `image_url`), continuer dans le projet.
 
+### Chantier 6 — fait
+- **Vérifié, à savoir** : les tags `v1.9.x` de whisper.cpp n'ont que les sources ; les binaires officiels sont sur les releases `b<build>` (b5454 = 1.9.5). Il y a `whisper-bin-x64.zip` (CPU, Windows), des builds CUDA (272 et 653 Mo) et `whisper-bin-ubuntu-x64.tar.gz`, mais **aucune version Vulkan officielle pour Windows et aucun binaire macOS**. Atelier télécharge donc la version CPU (SHA-256 épinglés, mesurés ici) ; pour Vulkan/CUDA, Paramètres › Voix accepte le chemin d'un `whisper-cli` compilé à part (le GPU est utilisé automatiquement s'il est compilé dedans, `-ng` sinon) ; sur macOS : `brew install whisper-cpp` (trouvé dans le PATH).
+- `whisper-cli --help` lu sur le binaire réel : `-m`, `-f`, `-l` (`auto` possible), `-nt`, `-np`, `-ng`, `-t`. Transcription testée sur `jfk.wav` avec le modèle tiny.
+- Modèles : `ggml-*.bin` de huggingface.co/ggerganov/whisper.cpp, taille et SHA-256 relevés sur Hugging Face, vérifiés après téléchargement. Extraction par le `tar` du système (bsdtar sous Windows 10+ lit les .zip).
+- Capture : Web Audio (PCM) rééchantillonné en WAV 16 kHz mono ; `ScriptProcessorNode` (déprécié mais sans fichier de worklet à servir sous la CSP). Permission micro : seul l'audio est accordé à la fenêtre ; sur macOS, `askForMediaAccess`.
+- API : OpenAI `audio.transcriptions` (`gpt-4o-mini-transcribe`, types du SDK) ; Gemini par son endpoint compatible OpenAI avec `input_audio` (doc ai.google.dev/gemini-api/docs/openai). La doc OpenAI n'était pas accessible d'ici (403) : vérifié sur les types du SDK `openai` 7.45.
+- Nettoyage des hésitations : règles simples (mot entier, lettres étirables, virgules d'encadrement, majuscule transmise), testées ; « ben » retiré de la liste par défaut (prénom). Reformulation optionnelle par un modèle léger (Ollama par défaut).
+- Vérifié dans l'app avec un faux micro Chromium alimenté par `jfk.wav` : téléchargement du binaire et du modèle depuis Paramètres, dictée dans le chat, texte inséré au curseur sans envoi.
+

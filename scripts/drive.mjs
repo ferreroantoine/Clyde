@@ -15,7 +15,8 @@ mkdirSync(outDir, { recursive: true })
 
 const app = await electron.launch({
   executablePath: require('electron'),
-  args: [root],
+  // DRIVE_ARGS: extra Chromium switches, e.g. a fake microphone for dictation tests.
+  args: [...(process.env.DRIVE_ARGS ? process.env.DRIVE_ARGS.split(' ') : []), root],
   timeout: 30_000
 })
 const logs = []

@@ -32,6 +32,20 @@ describe('SettingsService', () => {
     expect(settings.cli.codexPath).toBe('')
   })
 
+  it('gives a document saved before the Voice section its defaults, keeping the rest', () => {
+    const repo = new MemorySettingsRepository()
+    repo.save(DOCUMENT_KEY, { schemaVersion: SETTINGS_VERSION, appearance: { theme: 'dark' } })
+    const settings = new SettingsService(repo).getAll()
+    expect(settings.appearance.theme).toBe('dark')
+    expect(settings.voice).toMatchObject({ engine: 'local', model: 'base', language: 'fr', mode: 'toggle', removeHesitations: true, rewrite: false })
+    expect(settings.voice.hesitations).toContain('euh')
+    // A bad list is replaced, the other voice fields stay.
+    repo.save(DOCUMENT_KEY, { schemaVersion: SETTINGS_VERSION, voice: { hesitations: 'euh', model: 'small' } })
+    const next = new SettingsService(repo).getAll().voice
+    expect(next.model).toBe('small')
+    expect(next.hesitations).toContain('hum')
+  })
+
   it('migrates the version 1 flat keys and removes them', () => {
     const repo = new MemorySettingsRepository()
     repo.save('theme', 'dark')

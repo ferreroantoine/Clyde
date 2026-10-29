@@ -1,7 +1,7 @@
 import { SessionLimitLine } from '@/features/limits/LimitGauge'
 import { intlLocale, t, tn } from '@shared/i18n'
 import { useLimits } from '@/stores/limits'
-import { useEffect, useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react'
 import {
   Bot,
@@ -38,6 +38,7 @@ import { useLayout } from '@/stores/layout'
 import { profileById, useProfiles } from '@/stores/profiles'
 import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/utils'
+import { MicButton } from '@/components/MicButton'
 import { Appear } from '@/components/Appear'
 import { enter, spring, swap } from '@/lib/motion'
 import { Skeleton } from '@/components/Skeleton'
@@ -201,6 +202,7 @@ function NewTaskDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
   const creating = useBoard((s) => !!s.busy['new-task'])
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const descriptionRef = useRef<HTMLTextAreaElement>(null)
   const [agentId, setAgentId] = useState('')
   const chosen = agentId || agents[0]?.id || ''
 
@@ -228,14 +230,16 @@ function NewTaskDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
             <span className="text-xs font-medium">{t('Title')}</span>
             <Input autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('Add a dark mode toggle')} maxLength={120} />
           </label>
-          <label className="grid gap-1.5">
+          <label className="relative grid gap-1.5">
             <span className="text-xs font-medium">{t('What should the agent do?')}</span>
+            <MicButton inputRef={descriptionRef} setValue={setDescription} size="xs" className="absolute right-1.5 bottom-1.5" />
             <textarea
+              ref={descriptionRef}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               aria-label={t('Task description')}
               placeholder={t('The agent receives this as its first message.')}
-              className="min-h-28 w-full resize-y rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="min-h-28 w-full resize-y rounded-md border bg-transparent py-2 pr-10 pl-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </label>
           <label className="grid gap-1.5">
