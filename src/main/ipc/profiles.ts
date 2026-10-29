@@ -9,23 +9,39 @@ import { testConnection, type QueryFn } from '../agents/claude-code/provider'
 import { createAdapter, testApiConnection } from '../agents/api/clients'
 import { buildCodexEnv, probeCodex, testCodexConnection } from '../agents/codex/runtime'
 import { spawnCli } from '../agents/cli/process'
-import { resolveCodexBinary } from '../agents/cli/resolve'
+import { resolveAntigravityBinary, resolveCodexBinary } from '../agents/cli/resolve'
+import { spawnPty } from '../agents/cli/pty-process'
+import { buildAgyEnv, runAgy, testAntigravityConnection } from '../agents/antigravity/runtime'
 
 export interface ProfileHandlerDeps {
   profiles: ProfilesService
   ptys: PtyService
   claudeCodePath: () => string
   codexPath: () => string
+  antigravityPath: () => string
   query: () => Promise<QueryFn>
   clientApp: string
   fetch: typeof globalThis.fetch
 }
 
-export function registerProfileHandlers({ profiles, ptys, claudeCodePath, codexPath, query, clientApp, fetch }: ProfileHandlerDeps): void {
+export function registerProfileHandlers({
+  profiles,
+  ptys,
+  claudeCodePath,
+  codexPath,
+  antigravityPath,
+  query,
+  clientApp,
+  fetch
+}: ProfileHandlerDeps): void {
   const clientVersion = clientApp.split('/')[1] ?? '0.0.0'
   const codexTarget = (id: string) => {
     const home = profiles.configDir(id)
     return { binary: resolveCodexBinary(codexPath()), env: buildCodexEnv(process.env, home), cwd: home }
+  }
+  const agyTarget = (id: string) => {
+    const home = profiles.configDir(id)
+    return { binary: resolveAntigravityBinary(antigravityPath()), env: buildAgyEnv(process.env, home), cwd: home }
   }
   const target = (id: string) => {
     const profile = profiles.requireUsable(id)
@@ -57,7 +73,10 @@ export function registerProfileHandlers({ profiles, ptys, claudeCodePath, codexP
       const t = codexTarget(id)
       return testCodexConnection(() => probeCodex(spawnCli, { ...t, clientVersion }))
     }
-    if (profile.kind !== 'claude-code') throw new AppError('not_allowed', 'Testing this account is not available yet.')
+    if (profile.kind === 'antigravity') {
+      const t = agyTarget(id)
+      return testAntigravityConnection((args) => runAgy(spawnPty, t, args))
+    }
     // net.fetch goes through Chromium's network stack, so system proxies apply.
     return testConnection({ query, fetch: (url, init) => net.fetch(url, init) }, target(id))
   })
@@ -72,6 +91,11 @@ export function registerProfileHandlers({ profiles, ptys, claudeCodePath, codexP
         rows,
         command: { file: t.binary, args: ['login'], env: t.env, title: `Sign in: ${profile.name}` }
       })
+    }
+    if (profile.kind === 'antigravity') {
+      // Antigravity signs in on its first interactive start.
+      const t = agyTarget(id)
+      return ptys.create({ cwd: t.cwd, cols, rows, command: { file: t.binary, args: [], env: t.env, title: `Sign in: ${profile.name}` } })
     }
     const t = target(id)
     if (t.profile.kind !== 'claude-code' || t.profile.auth !== 'subscription') {
