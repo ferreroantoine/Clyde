@@ -20,7 +20,7 @@ export interface ApiSessionDeps {
   toEngine: (call: ToolCall) => ToolRequest
   decide: (tool: ToolRequest) => PermissionDecision
   ask: (question: ApprovalQuestion, signal: AbortSignal) => Promise<ApprovalOutcome>
-  execute: (call: ToolCall, signal: AbortSignal) => Promise<ToolOutput>
+  execute: (call: ToolCall, signal: AbortSignal, onOutput: (chunk: string) => void) => Promise<ToolOutput>
   describeError: (err: unknown) => string
 }
 
@@ -186,7 +186,9 @@ export class ApiSession {
       if (signal.aborted) throw Object.assign(new Error('Interrupted'), { name: 'AbortError' })
       if (outcome.behavior === 'deny') return { content: `The user denied this call: ${outcome.message}`, isError: true }
     }
-    const output = await this.deps.execute(call, signal)
+    const output = await this.deps.execute(call, signal, (chunk) =>
+      this.deps.emit({ type: 'tool_output', toolUseId: call.id, chunk })
+    )
     if (signal.aborted) throw Object.assign(new Error('Interrupted'), { name: 'AbortError' })
     return output
   }

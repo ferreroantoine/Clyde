@@ -33,7 +33,20 @@ export const INVOKE_CHANNELS = [
   'mcp:delete',
   'mcp:reconnect',
   'mcp:importPreview',
-  'mcp:import'
+  'mcp:import',
+  'agents:list',
+  'agents:create',
+  'agents:update',
+  'agents:delete',
+  'tasks:list',
+  'tasks:create',
+  'tasks:start',
+  'tasks:requestChanges',
+  'tasks:changes',
+  'tasks:fileDiff',
+  'tasks:merge',
+  'tasks:abandon',
+  'tasks:delete'
 ] as const
 
 export const EVENT_CHANNELS = [
@@ -44,7 +57,9 @@ export const EVENT_CHANNELS = [
   'profiles:changed',
   'agent:session',
   'agent:event',
-  'mcp:changed'
+  'mcp:changed',
+  'agents:changed',
+  'tasks:changed'
 ] as const
 
 export type InvokeChannel = (typeof INVOKE_CHANNELS)[number]

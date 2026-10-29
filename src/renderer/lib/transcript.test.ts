@@ -10,6 +10,8 @@ const info: AgentSessionInfo = {
   permissionLevel: 'validate-all',
   cwd: 'C:\\repo',
   mcpTools: [],
+  agentId: null,
+  taskId: null,
   status: 'idle',
   createdAt: 0
 }

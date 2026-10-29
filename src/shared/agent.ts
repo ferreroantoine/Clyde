@@ -28,6 +28,9 @@ export const agentStartSchema = z.object({
   cwd: z.string().max(4096).optional(),
   /** Added to the default system prompt. */
   systemPrompt: z.string().max(20_000).default(''),
+  /** The saved agent and the board task this session works for, if any. */
+  agentId: z.uuid().optional(),
+  taskId: z.uuid().optional(),
   /** MCP tools this agent may use, as `mcp__<server>__<tool>`. Nothing else from MCP is visible to it. */
   mcpTools: z
     .array(z.string().regex(/^mcp__[a-z0-9_-]+__.+$/).max(300))
@@ -56,6 +59,8 @@ export interface AgentSessionInfo {
   permissionLevel: PermissionLevel
   cwd: string
   mcpTools: string[]
+  agentId: string | null
+  taskId: string | null
   status: AgentStatus
   createdAt: number
 }
@@ -79,6 +84,8 @@ export type AgentEvent =
   | { type: 'text'; key: string; text: string }
   | ({ type: 'tool_call' } & ToolCallInfo)
   | { type: 'tool_result'; toolUseId: string; content: string; isError: boolean }
+  /** Live output of a command, while it runs (API agents; Claude Code reports output at the end). */
+  | { type: 'tool_output'; toolUseId: string; chunk: string }
   | {
       type: 'approval_request'
       requestId: string

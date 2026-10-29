@@ -20,6 +20,10 @@ import { createAdapter } from './agents/api/clients'
 import { McpStore } from './mcp/store'
 import { McpHub } from './mcp/hub'
 import { registerMcpHandlers } from './ipc/mcp'
+import { registerTaskHandlers } from './ipc/tasks'
+import { AgentDefinitionsService } from './services/agent-definitions'
+import { WorktreeService } from './services/worktrees'
+import { TaskService } from './agents/tasks'
 import { loadQuery, type QueryFn } from './agents/claude-code/provider'
 import { DISTRIBUTION } from './build-flags'
 
@@ -50,6 +54,13 @@ function openAppDatabase(): Db | null {
     )
     return null
   }
+}
+
+/** %LOCALAPPDATA%\\Atelier\\worktrees on Windows (not roaming), the app data folder elsewhere. */
+function worktreesRoot(): string {
+  const local = process.env['LOCALAPPDATA']
+  if (process.platform === 'win32' && local && !userDataOverride) return join(local, 'Atelier', 'worktrees')
+  return join(app.getPath('userData'), 'worktrees')
 }
 
 function memoryDatabase(): Db {
@@ -113,8 +124,14 @@ if (!app.requestSingleInstanceLock()) {
       claudeCodePath,
       workspaceRoot: () => workspace.current()?.root ?? null,
       query,
-      onEvent: (envelope) => broadcast('agent:event', envelope),
-      onSession: (info) => broadcast('agent:session', info),
+      onEvent: (envelope) => {
+        broadcast('agent:event', envelope)
+        tasks.onAgentEvent(envelope)
+      },
+      onSession: (info) => {
+        broadcast('agent:session', info)
+        tasks.onSession(info)
+      },
       clientApp,
       log: createLogger('agents')
     })
@@ -122,6 +139,17 @@ if (!app.requestSingleInstanceLock()) {
     registerAgentHandlers(agents)
     registerMcpHandlers(mcp)
     mcp.start()
+
+    const definitions = new AgentDefinitionsService(profileDb, (list) => broadcast('agents:changed', list))
+    const tasks: TaskService = new TaskService(profileDb, {
+      worktrees: new WorktreeService(worktreesRoot()),
+      agents: definitions,
+      sessions: agents,
+      workspaceRoot: () => workspace.current()?.root ?? null,
+      onChanged: (list) => broadcast('tasks:changed', list)
+    })
+    tasks.recover()
+    registerTaskHandlers(definitions, tasks)
 
     app.on('will-quit', () => {
       agents.stopAll()
