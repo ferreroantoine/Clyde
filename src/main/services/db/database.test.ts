@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3'
 import { describe, expect, it, vi } from 'vitest'
 import { migrate } from './database'
+import { migrations } from './migrations'
 import { SqliteSettingsRepository } from './settings-repo'
 import { SettingsService } from '../settings'
 
@@ -11,9 +12,10 @@ const memoryDb = () => new Database(':memory:')
 describe('migrate', () => {
   it('applies migrations once and records the version', () => {
     const db = memoryDb()
-    expect(migrate(db)).toBe(1)
-    expect(migrate(db)).toBe(1)
-    expect(db.pragma('user_version', { simple: true })).toBe(1)
+    const latest = Math.max(...migrations.map((m) => m.version))
+    expect(migrate(db)).toBe(latest)
+    expect(migrate(db)).toBe(latest)
+    expect(db.pragma('user_version', { simple: true })).toBe(latest)
   })
 
   it('applies only pending migrations, in order', () => {

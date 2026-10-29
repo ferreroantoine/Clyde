@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Input } from '@/components/ui/input'
 import { useSettings } from '@/stores/settings'
 import { cn } from '@/lib/utils'
+import { PricesSection } from './PricesSection'
 import type { Settings } from '@shared/settings'
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
@@ -76,7 +77,16 @@ export function SettingsPage() {
               onBlur={(e) => void update('terminalShell', e.target.value.trim())}
             />
           </Row>
+          <Row label="Claude Code executable" hint="Leave empty to use the one bundled with Atelier.">
+            <Input
+              className="h-8 w-64 font-mono text-xs"
+              placeholder="bundled"
+              defaultValue={settings.claudeCodePath}
+              onBlur={(e) => void update('claudeCodePath', e.target.value.trim())}
+            />
+          </Row>
         </section>
+        <PricesSection />
       </div>
     </div>
   )

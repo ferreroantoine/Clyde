@@ -1,6 +1,29 @@
 import { z } from 'zod'
 import type { EventChannel, InvokeChannel } from './channels'
 import type { Settings } from '../settings'
+import { profileCreateSchema, profileIdSchema, profileUpdateSchema, type ConnectionResult, type Profile } from '../profiles'
+import {
+  agentDefinitionInputSchema,
+  agentDefinitionUpdateSchema,
+  agentIdSchema,
+  taskIdSchema,
+  taskInputSchema,
+  type AgentDefinition,
+  type MergeResult,
+  type Task,
+  type TaskChange,
+  type TaskFileDiff
+} from '../tasks'
+import { priceInputSchema, type PriceRow } from '../pricing'
+import type { Dashboard, SessionTranscript } from '../metrics'
+import { mcpIdSchema, mcpServerInputSchema, mcpServerUpdateSchema, type McpImportPreview, type McpServer } from '../mcp'
+import {
+  agentStartSchema,
+  approvalAnswerSchema,
+  sessionIdSchema,
+  type AgentEventEnvelope,
+  type AgentSessionInfo
+} from '../agent'
 import type {
   AppInfo,
   DirEntry,
@@ -35,7 +58,45 @@ export const requestSchemas = {
   'pty:resize': z.object({ id: ptyId, ...dims }),
   'pty:kill': z.object({ id: ptyId }),
   'settings:getAll': z.undefined(),
-  'settings:set': z.object({ key: z.string().min(1).max(128), value: z.unknown() })
+  'settings:set': z.object({ key: z.string().min(1).max(128), value: z.unknown() }),
+  'profiles:list': z.undefined(),
+  'profiles:create': profileCreateSchema,
+  'profiles:update': profileUpdateSchema,
+  'profiles:delete': z.object({ id: profileIdSchema }),
+  'profiles:test': z.object({ id: profileIdSchema }),
+  'profiles:login': z.object({ id: profileIdSchema, ...dims }),
+  'agent:list': z.undefined(),
+  'agent:start': agentStartSchema,
+  'agent:send': z.object({ sessionId: sessionIdSchema, text: z.string().trim().min(1).max(100_000) }),
+  'agent:interrupt': z.object({ sessionId: sessionIdSchema }),
+  'agent:stop': z.object({ sessionId: sessionIdSchema }),
+  'agent:approve': approvalAnswerSchema,
+  'mcp:list': z.undefined(),
+  'mcp:create': mcpServerInputSchema,
+  'mcp:update': mcpServerUpdateSchema,
+  'mcp:delete': z.object({ id: mcpIdSchema }),
+  'mcp:reconnect': z.object({ id: mcpIdSchema }),
+  'mcp:importPreview': z.undefined(),
+  'mcp:import': z.object({ path: z.string().min(1).max(4096), names: z.array(z.string().max(200)).max(200) }),
+  'agents:list': z.undefined(),
+  'agents:create': agentDefinitionInputSchema,
+  'agents:update': agentDefinitionUpdateSchema,
+  'agents:delete': z.object({ id: agentIdSchema }),
+  'tasks:list': z.undefined(),
+  'tasks:create': taskInputSchema,
+  'tasks:start': z.object({ id: taskIdSchema }),
+  'tasks:requestChanges': z.object({ id: taskIdSchema, comments: z.string().trim().min(1).max(50_000) }),
+  'tasks:changes': z.object({ id: taskIdSchema }),
+  'tasks:fileDiff': z.object({ id: taskIdSchema, path: z.string().min(1).max(4096) }),
+  'tasks:merge': z.object({ id: taskIdSchema }),
+  'tasks:abandon': z.object({ id: taskIdSchema }),
+  'tasks:delete': z.object({ id: taskIdSchema }),
+  'metrics:dashboard': z.object({ range: z.enum(['24h', '7d', '30d']).default('7d') }),
+  'metrics:transcript': z.object({ sessionId: z.string().min(1).max(64) }),
+  'pricing:list': z.undefined(),
+  'pricing:save': priceInputSchema.extend({ id: z.string().min(1).max(64).optional() }),
+  'pricing:delete': z.object({ id: z.string().min(1).max(64) }),
+  'files:list': z.undefined()
 } satisfies Record<InvokeChannel, z.ZodType>
 
 export interface InvokeResponses {
@@ -53,6 +114,44 @@ export interface InvokeResponses {
   'pty:kill': null
   'settings:getAll': Settings
   'settings:set': Settings
+  'profiles:list': Profile[]
+  'profiles:create': Profile
+  'profiles:update': Profile
+  'profiles:delete': null
+  'profiles:test': ConnectionResult
+  'profiles:login': PtyInfo
+  'agent:list': AgentSessionInfo[]
+  'agent:start': AgentSessionInfo
+  'agent:send': null
+  'agent:interrupt': null
+  'agent:stop': null
+  'agent:approve': null
+  'mcp:list': McpServer[]
+  'mcp:create': McpServer[]
+  'mcp:update': McpServer[]
+  'mcp:delete': null
+  'mcp:reconnect': null
+  'mcp:importPreview': McpImportPreview | null
+  'mcp:import': McpServer[]
+  'agents:list': AgentDefinition[]
+  'agents:create': AgentDefinition
+  'agents:update': AgentDefinition
+  'agents:delete': null
+  'tasks:list': Task[]
+  'tasks:create': Task
+  'tasks:start': Task
+  'tasks:requestChanges': Task
+  'tasks:changes': TaskChange[]
+  'tasks:fileDiff': TaskFileDiff
+  'tasks:merge': MergeResult
+  'tasks:abandon': Task
+  'tasks:delete': null
+  'metrics:dashboard': Dashboard
+  'metrics:transcript': SessionTranscript
+  'pricing:list': PriceRow[]
+  'pricing:save': PriceRow[]
+  'pricing:delete': PriceRow[]
+  'files:list': { files: string[]; truncated: boolean }
 }
 
 export interface EventPayloads {
@@ -60,6 +159,12 @@ export interface EventPayloads {
   'fs:changed': FsChange[]
   'pty:data': { id: string; data: string }
   'pty:exit': { id: string; exitCode: number }
+  'profiles:changed': Profile[]
+  'agent:session': AgentSessionInfo
+  'agent:event': AgentEventEnvelope
+  'mcp:changed': McpServer[]
+  'agents:changed': AgentDefinition[]
+  'tasks:changed': Task[]
 }
 
 export type InvokeRequest<C extends InvokeChannel> = z.input<(typeof requestSchemas)[C]>

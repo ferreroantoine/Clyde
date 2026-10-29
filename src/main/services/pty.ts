@@ -32,10 +32,24 @@ export function defaultShell(): string {
   return (detectedShell = 'powershell.exe')
 }
 
+/** True on Windows when PowerShell 7 (pwsh) is installed. */
+export function hasPwsh(): boolean {
+  return process.platform === 'win32' && /pwsh(\.exe)?$/i.test(defaultShell())
+}
+
 export function windowsBuild(): number | null {
   if (process.platform !== 'win32') return null
   const build = Number(release().split('.')[2])
   return Number.isFinite(build) ? build : null
+}
+
+/** A program to run instead of the user's shell, e.g. Claude Code's login for one profile. */
+export interface PtyCommand {
+  file: string
+  args: string[]
+  /** Replaces the inherited environment entirely. */
+  env: Record<string, string>
+  title: string
 }
 
 interface Session {
@@ -54,18 +68,19 @@ export class PtyService {
     private readonly shellSetting: () => string
   ) {}
 
-  create(opts: { cwd: string | undefined; cols: number; rows: number }): PtyInfo {
-    const shell = this.shellSetting().trim() || defaultShell()
+  create(opts: { cwd: string | undefined; cols: number; rows: number; command?: PtyCommand }): PtyInfo {
+    const shell = opts.command?.file ?? (this.shellSetting().trim() || defaultShell())
     const cwd = opts.cwd && existsSync(opts.cwd) ? opts.cwd : homedir()
     const id = `pty-${this.nextId++}`
+    const env = opts.command?.env ?? (process.env as Record<string, string>)
     let pty: nodePty.IPty
     try {
-      pty = nodePty.spawn(shell, [], {
+      pty = nodePty.spawn(shell, opts.command?.args ?? [], {
         name: 'xterm-256color',
         cols: opts.cols,
         rows: opts.rows,
         cwd,
-        env: { ...process.env, TERM_PROGRAM: 'Atelier' } as Record<string, string>
+        env: { ...env, TERM_PROGRAM: 'Atelier' }
       })
     } catch (err) {
       throw new AppError('pty_error', `Could not start ${shell}: ${(err as Error).message}`)
@@ -82,8 +97,9 @@ export class PtyService {
       this.sessions.delete(id)
       this.events.onExit(id, exitCode)
     })
-    log.info(`started ${id}: ${shell} in ${cwd}`)
-    return { id, shell, cwd, title: basename(shell).replace(/\.exe$/i, ''), windowsBuild: windowsBuild() }
+    log.info(`started ${id}: ${opts.command?.title ?? shell} in ${cwd}`)
+    const title = opts.command?.title ?? basename(shell).replace(/\.exe$/i, '')
+    return { id, shell, cwd, title, windowsBuild: windowsBuild() }
   }
 
   private flush(id: string): void {
