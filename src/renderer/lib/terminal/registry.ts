@@ -62,6 +62,8 @@ function themeFor(theme: ResolvedTheme): ITheme {
 export interface TerminalHandlers {
   onInput: (data: string) => void
   onResize: (cols: number, rows: number) => void
+  /** First keystroke or paste. Unlike onInput, it ignores the replies xterm sends to shell queries. */
+  onFirstUse?: () => void
 }
 
 interface Entry {
@@ -96,6 +98,13 @@ export const terminals = {
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.onData(handlers.onInput)
+    let used = false
+    const markUsed = () => {
+      if (used) return
+      used = true
+      handlers.onFirstUse?.()
+    }
+    term.onKey(markUsed)
     term.onResize(({ cols, rows }) => handlers.onResize(cols, rows))
     // Windows Terminal conventions: Ctrl+C copies when there is a selection, Ctrl+V pastes.
     term.attachCustomKeyEventHandler((e) => {
@@ -107,7 +116,11 @@ export const terminals = {
         return false
       }
       if (key === 'v' && !opts.readOnly) {
-        void navigator.clipboard.readText().then((text) => text && term.paste(text))
+        void navigator.clipboard.readText().then((text) => {
+          if (!text) return
+          markUsed()
+          term.paste(text)
+        })
         return false
       }
       return true
