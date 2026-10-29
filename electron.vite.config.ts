@@ -7,7 +7,8 @@ const shared = resolve(__dirname, 'src/shared')
 
 export default defineConfig({
   main: {
-    resolve: { alias: { '@shared': shared } }
+    resolve: { alias: { '@shared': shared } },
+    define: { __ATELIER_DISTRIBUTION__: JSON.stringify(process.env['ATELIER_DISTRIBUTION'] === '1') }
   },
   preload: {
     resolve: { alias: { '@shared': shared } },

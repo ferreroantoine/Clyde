@@ -1,5 +1,6 @@
 import { app } from 'electron'
 import { handle } from './router'
+import { DISTRIBUTION } from '../build-flags'
 import type { SettingsService } from '../services/settings'
 
 export function registerAppHandlers(settings: SettingsService): void {
@@ -9,7 +10,8 @@ export function registerAppHandlers(settings: SettingsService): void {
     electron: process.versions.electron,
     node: process.versions.node,
     platform: process.platform,
-    userData: app.getPath('userData')
+    userData: app.getPath('userData'),
+    distribution: DISTRIBUTION
   }))
   handle('settings:getAll', () => settings.getAll())
   handle('settings:set', ({ key, value }) => settings.set(key, value))

@@ -44,3 +44,23 @@ describe('ripgrepArgs', () => {
     )
   })
 })
+
+describe('listFiles', () => {
+  it('lists files with / separators, skipping .git and ignored files', async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { listFiles } = await import('./search')
+    const root = mkdtempSync(join(tmpdir(), 'atelier-files-'))
+    mkdirSync(join(root, 'src'))
+    mkdirSync(join(root, '.git'))
+    writeFileSync(join(root, '.git', 'HEAD'), 'x')
+    writeFileSync(join(root, 'src', 'a.ts'), '')
+    writeFileSync(join(root, '.gitignore'), 'build/\n')
+    mkdirSync(join(root, 'build'))
+    writeFileSync(join(root, 'build', 'out.js'), '')
+    writeFileSync(join(root, 'b.md'), '')
+    expect(await listFiles(root)).toEqual({ files: ['.gitignore', 'b.md', 'src/a.ts'], truncated: false })
+    expect((await listFiles(root, 1)).truncated).toBe(true)
+  })
+})

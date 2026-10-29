@@ -10,6 +10,14 @@ import { useLayout } from '@/stores/layout'
 import { useSettings } from '@/stores/settings'
 import { useWorkspace } from '@/stores/workspace'
 import { useEditor } from '@/stores/editor'
+import { useProfiles } from '@/stores/profiles'
+import { useAgents } from '@/stores/agents'
+import { useMcp } from '@/stores/mcp'
+import { useBoard } from '@/stores/board'
+import { usePalette } from '@/stores/palette'
+import { CommandPalette } from '@/features/palette/CommandPalette'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { useGlobalErrorToasts } from '@/lib/errors'
 
 export function App() {
   const theme = useSettings((s) => s.settings.theme)
@@ -27,10 +35,18 @@ export function App() {
         else off = unsubscribe
       })
     const offTerminals = useTerminals.getState().init()
+    const offProfiles = useProfiles.getState().init()
+    const offAgents = useAgents.getState().init()
+    const offMcp = useMcp.getState().init()
+    const offBoard = useBoard.getState().init()
     return () => {
+      offBoard()
+      offMcp()
+      offAgents()
       disposed = true
       off?.()
       offTerminals()
+      offProfiles()
     }
   }, [])
 
@@ -50,14 +66,21 @@ export function App() {
       { combo: 'ctrl+shift+f', run: () => layout().showSidebarTab('search') },
       { combo: 'ctrl+,', run: () => layout().showCenter('settings') },
       { combo: 'ctrl+s', run: () => void useEditor.getState().save() },
-      { combo: 'ctrl+o', run: () => void useWorkspace.getState().pick() }
+      { combo: 'ctrl+o', run: () => void useWorkspace.getState().pick() },
+      { combo: 'ctrl+k', run: () => usePalette.getState().show('all') },
+      { combo: 'ctrl+shift+p', run: () => usePalette.getState().show('all') },
+      { combo: 'ctrl+p', run: () => usePalette.getState().show('files') }
     ]
   }, [])
   useShortcuts(shortcuts)
+  useGlobalErrorToasts()
 
   return (
     <TooltipProvider delayDuration={400}>
-      <Shell />
+      <ErrorBoundary scope="Atelier">
+        <Shell />
+      </ErrorBoundary>
+      <CommandPalette />
       <Toaster />
     </TooltipProvider>
   )

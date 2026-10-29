@@ -6,6 +6,8 @@ export const settingsSchema = z.object({
   terminalFontSize: z.number().int().min(9).max(32).default(13),
   /** Empty means auto-detect (pwsh, then Windows PowerShell). */
   terminalShell: z.string().max(4096).default(''),
+  /** Empty means the Claude Code binary bundled with the Agent SDK. */
+  claudeCodePath: z.string().max(4096).default(''),
   recentWorkspaces: z.array(z.string().max(4096)).max(20).default([])
 })
 

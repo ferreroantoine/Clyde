@@ -1,0 +1,290 @@
+import type {
+  CanUseTool,
+  HookCallback,
+  McpServerConfig,
+  Options,
+  Query,
+  SDKUserMessage,
+  query as sdkQuery
+} from '@anthropic-ai/claude-agent-sdk'
+import type { AgentEvent } from '@shared/agent'
+import type { ConnectionResult, ModelOption } from '@shared/profiles'
+import type { PermissionDecision, ToolRequest } from '../../permissions/engine'
+import type { ApprovalOutcome, ApprovalQuestion } from '../../permissions/broker'
+import { MessageTranslator } from './translate'
+import { authStatus as runAuthStatus, type AuthStatus } from './runtime'
+
+export type QueryFn = typeof sdkQuery
+
+/** The SDK is ESM-only and large, so main loads it on first use. */
+export async function loadQuery(): Promise<QueryFn> {
+  return (await import('@anthropic-ai/claude-agent-sdk')).query
+}
+
+/** Approvals can wait for the user far longer than the 600 s default hook timeout. */
+const APPROVAL_TIMEOUT_S = 24 * 60 * 60
+
+/** Tools whose answers need UI Atelier does not have yet. */
+const DISALLOWED_TOOLS = ['AskUserQuestion']
+
+/** A prompt stream that never sends anything, for control requests only. */
+async function* idlePrompt(signal: AbortSignal): AsyncGenerator<SDKUserMessage> {
+  await new Promise<void>((resolve) => signal.addEventListener('abort', () => resolve(), { once: true }))
+  yield* []
+}
+
+export interface ProbeTarget {
+  binary: string
+  env: Record<string, string>
+  cwd: string
+}
+
+/** Model list and account info straight from Claude Code. Starts the CLI but sends no prompt. */
+export async function probeClaudeCode(query: QueryFn, target: ProbeTarget, timeoutMs = 60_000) {
+  const abort = new AbortController()
+  const q = query({
+    prompt: idlePrompt(abort.signal),
+    options: {
+      cwd: target.cwd,
+      env: target.env,
+      pathToClaudeCodeExecutable: target.binary,
+      settingSources: [],
+      abortController: abort
+    }
+  })
+  const timer = setTimeout(() => abort.abort(), timeoutMs)
+  try {
+    const [models, account] = await Promise.all([q.supportedModels(), q.accountInfo()])
+    return {
+      models: models.map((m): ModelOption => ({ value: m.value, displayName: m.displayName, description: m.description })),
+      account
+    }
+  } finally {
+    clearTimeout(timer)
+    q.close()
+    abort.abort()
+  }
+}
+
+export type FetchFn = (url: string, init: { headers: Record<string, string> }) => Promise<{ status: number }>
+
+/** Checks a key against the Anthropic API (models endpoint, no tokens used). */
+export async function checkApiKey(fetchFn: FetchFn, apiKey: string): Promise<{ ok: boolean; detail: string | null }> {
+  let status: number
+  try {
+    ;({ status } = await fetchFn('https://api.anthropic.com/v1/models?limit=1', {
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }
+    }))
+  } catch (err) {
+    return { ok: false, detail: `Could not reach the Anthropic API: ${(err as Error).message}` }
+  }
+  if (status === 200) return { ok: true, detail: null }
+  if (status === 401) return { ok: false, detail: 'The API key was rejected (401).' }
+  if (status === 403) return { ok: false, detail: 'The API key is not allowed to use the API (403).' }
+  return { ok: false, detail: `The Anthropic API answered ${status}.` }
+}
+
+export interface ConnectionDeps {
+  query: () => Promise<QueryFn>
+  fetch: FetchFn
+  authStatus?: (binary: string, env: Record<string, string>) => Promise<AuthStatus>
+}
+
+/** "Test connection" for a Claude Code profile: sign-in state, key validity and available models. */
+export async function testConnection(
+  deps: ConnectionDeps,
+  target: ProbeTarget & { apiKey: string | null }
+): Promise<ConnectionResult> {
+  const result: ConnectionResult = {
+    ok: false,
+    status: 'Not signed in',
+    detail: null,
+    email: null,
+    organization: null,
+    subscriptionType: null,
+    models: [],
+    checkedAt: Date.now()
+  }
+  const auth = await (deps.authStatus ?? runAuthStatus)(target.binary, target.env)
+  result.email = auth.email
+  result.organization = auth.orgName
+  result.subscriptionType = auth.subscriptionType
+  if (!auth.loggedIn) {
+    result.detail = target.apiKey
+      ? 'Claude Code did not accept the stored key.'
+      : 'Open the sign-in terminal and log in with the account this profile should use.'
+    return result
+  }
+  if (target.apiKey) {
+    const key = await checkApiKey(deps.fetch, target.apiKey)
+    if (!key.ok) {
+      result.status = 'Key rejected'
+      result.detail = key.detail
+      return result
+    }
+  }
+  try {
+    const probe = await probeClaudeCode(await deps.query(), target)
+    result.models = probe.models
+    result.email ??= probe.account.email ?? null
+    result.organization ??= probe.account.organization ?? null
+    result.subscriptionType ??= probe.account.subscriptionType ?? null
+  } catch (err) {
+    result.status = 'Signed in'
+    result.detail = `Claude Code started but did not list its models: ${(err as Error).message}`
+    return result
+  }
+  result.ok = true
+  result.status = 'Signed in'
+  return result
+}
+
+export interface SessionConfig extends ProbeTarget {
+  model: string
+  /** Appended to Claude Code's system prompt. */
+  appendSystemPrompt?: string
+  mcpServers?: Record<string, McpServerConfig>
+  /** Extra tools to hide, e.g. MCP tools outside the agent's allow-list. */
+  disallowedTools?: string[]
+}
+
+export interface SessionDeps {
+  query: QueryFn
+  emit: (event: AgentEvent) => void
+  decide: (tool: ToolRequest) => PermissionDecision
+  ask: (question: ApprovalQuestion, signal: AbortSignal) => Promise<ApprovalOutcome>
+  log?: (line: string) => void
+}
+
+/**
+ * One Claude Code conversation in streaming-input mode. Every tool call goes through the
+ * PreToolUse hook, which applies the permission engine and waits for the user on "ask".
+ * Hooks run before settings allow rules, so a profile's own settings cannot skip that check.
+ */
+export class ClaudeCodeSession {
+  private readonly queue: SDKUserMessage[] = []
+  private wake: (() => void) | null = null
+  private closed = false
+  private readonly abort = new AbortController()
+  private readonly translator = new MessageTranslator()
+  /** Tool calls the user approved in the hook; Claude Code may still route them to canUseTool. */
+  private readonly approved = new Set<string>()
+  private q: Query | null = null
+
+  constructor(
+    private readonly cfg: SessionConfig,
+    private readonly deps: SessionDeps
+  ) {}
+
+  /** Starts the Claude Code process and forwards its messages until the session ends. */
+  start(): Promise<void> {
+    this.q = this.deps.query({ prompt: this.input(), options: this.options() })
+    return this.pump(this.q)
+  }
+
+  send(text: string): void {
+    if (this.closed) return
+    this.queue.push({ type: 'user', message: { role: 'user', content: text }, parent_tool_use_id: null })
+    this.wake?.()
+  }
+
+  async interrupt(): Promise<void> {
+    await this.q?.interrupt()
+  }
+
+  stop(): void {
+    if (this.closed) return
+    this.closed = true
+    this.wake?.()
+    this.q?.close()
+    this.abort.abort()
+  }
+
+  private async *input(): AsyncGenerator<SDKUserMessage> {
+    while (!this.closed) {
+      const next = this.queue.shift()
+      if (next) {
+        yield next
+        continue
+      }
+      await new Promise<void>((resolve) => (this.wake = resolve))
+      this.wake = null
+    }
+  }
+
+  private options(): Options {
+    const preToolUse: HookCallback = async (input, _toolUseId, { signal }) => {
+      if (input.hook_event_name !== 'PreToolUse') return {}
+      const tool = { name: input.tool_name, input: (input.tool_input ?? {}) as Record<string, unknown> }
+      const verdict = this.deps.decide(tool)
+      let outcome: ApprovalOutcome
+      if (verdict.decision === 'allow') outcome = { behavior: 'allow' }
+      else if (verdict.decision === 'deny') outcome = { behavior: 'deny', message: verdict.reason }
+      else {
+        outcome = await this.deps.ask(
+          { toolUseId: input.tool_use_id, toolName: tool.name, input: tool.input, reason: verdict.reason },
+          signal
+        )
+        if (outcome.behavior === 'allow') this.approved.add(input.tool_use_id)
+      }
+      return {
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: outcome.behavior,
+          permissionDecisionReason: outcome.behavior === 'allow' ? 'Allowed by Atelier' : outcome.message
+        }
+      }
+    }
+
+    // Reached only for calls that settings "ask" rules or Claude Code's own checks still hold back.
+    const canUseTool: CanUseTool = async (toolName, input, opts) => {
+      if (this.approved.has(opts.toolUseID)) return { behavior: 'allow', updatedInput: input }
+      const outcome = await this.deps.ask(
+        {
+          toolUseId: opts.toolUseID,
+          toolName,
+          input,
+          reason: opts.title ?? opts.decisionReason ?? 'Claude Code asks for approval'
+        },
+        opts.signal
+      )
+      return outcome.behavior === 'allow' ? { behavior: 'allow', updatedInput: input } : outcome
+    }
+
+    return {
+      cwd: this.cfg.cwd,
+      env: this.cfg.env,
+      pathToClaudeCodeExecutable: this.cfg.binary,
+      ...(this.cfg.model ? { model: this.cfg.model } : {}),
+      systemPrompt: {
+        type: 'preset',
+        preset: 'claude_code',
+        snapshot: true,
+        ...(this.cfg.appendSystemPrompt ? { append: this.cfg.appendSystemPrompt } : {})
+      },
+      settingSources: ['user', 'project', 'local'],
+      permissionMode: 'default',
+      includePartialMessages: true,
+      disallowedTools: [...DISALLOWED_TOOLS, ...(this.cfg.disallowedTools ?? [])],
+      ...(this.cfg.mcpServers && Object.keys(this.cfg.mcpServers).length ? { mcpServers: this.cfg.mcpServers } : {}),
+      hooks: { PreToolUse: [{ hooks: [preToolUse], timeout: APPROVAL_TIMEOUT_S }] },
+      canUseTool,
+      abortController: this.abort,
+      stderr: (data) => this.deps.log?.(data.trimEnd())
+    }
+  }
+
+  private async pump(q: Query): Promise<void> {
+    try {
+      for await (const message of q) {
+        for (const event of this.translator.translate(message)) this.deps.emit(event)
+      }
+    } catch (err) {
+      if (!this.closed) this.deps.emit({ type: 'error', message: (err as Error).message })
+      throw err
+    } finally {
+      this.closed = true
+      this.wake?.()
+    }
+  }
+}

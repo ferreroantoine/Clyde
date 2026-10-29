@@ -1,7 +1,10 @@
 import { spawn } from 'node:child_process'
-import { rgPath } from '@vscode/ripgrep'
+import { rgPath as bundledRgPath } from '@vscode/ripgrep'
 import { AppError } from '@shared/errors'
 import type { SearchMatch, SearchResult } from '@shared/types'
+import { unpackedPath } from './unpacked'
+
+const rgPath = unpackedPath(bundledRgPath)
 
 export interface SearchOptions {
   query: string
@@ -96,6 +99,36 @@ export function searchText(root: string, opts: SearchOptions): Promise<SearchRes
       // 0 = matches, 1 = no match, null = killed after hitting the limit.
       if (code === 0 || code === 1 || truncated) resolve({ matches, truncated })
       else reject(new AppError('search_error', stderr.trim().split('\n')[0] || `ripgrep exited with ${code}`))
+    })
+  })
+}
+
+const MAX_FILES = 20_000
+
+/** Workspace files for "Go to file", as `/`-separated relative paths. Respects .gitignore like rg does. */
+export function listFiles(root: string, max = MAX_FILES): Promise<{ files: string[]; truncated: boolean }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(rgPath, ['--files', '--hidden', '--glob', '!.git', '--no-messages'], { cwd: root, windowsHide: true })
+    const files: string[] = []
+    let rest = ''
+    let truncated = false
+    child.stdout.setEncoding('utf8')
+    child.stdout.on('data', (chunk: string) => {
+      const lines = (rest + chunk).split(/\r?\n/)
+      rest = lines.pop() ?? ''
+      for (const line of lines) {
+        if (files.length >= max) {
+          truncated = true
+          child.kill()
+          return
+        }
+        if (line) files.push(line.replace(/\\/g, '/'))
+      }
+    })
+    child.on('error', (err) => reject(new AppError('search_error', `Could not list files: ${err.message}`)))
+    child.on('close', () => {
+      if (rest && files.length < max) files.push(rest.replace(/\\/g, '/'))
+      resolve({ files: files.sort(), truncated })
     })
   })
 }

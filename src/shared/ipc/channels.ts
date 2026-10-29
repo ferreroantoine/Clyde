@@ -14,10 +14,59 @@ export const INVOKE_CHANNELS = [
   'pty:resize',
   'pty:kill',
   'settings:getAll',
-  'settings:set'
+  'settings:set',
+  'profiles:list',
+  'profiles:create',
+  'profiles:update',
+  'profiles:delete',
+  'profiles:test',
+  'profiles:login',
+  'agent:list',
+  'agent:start',
+  'agent:send',
+  'agent:interrupt',
+  'agent:stop',
+  'agent:approve',
+  'mcp:list',
+  'mcp:create',
+  'mcp:update',
+  'mcp:delete',
+  'mcp:reconnect',
+  'mcp:importPreview',
+  'mcp:import',
+  'agents:list',
+  'agents:create',
+  'agents:update',
+  'agents:delete',
+  'tasks:list',
+  'tasks:create',
+  'tasks:start',
+  'tasks:requestChanges',
+  'tasks:changes',
+  'tasks:fileDiff',
+  'tasks:merge',
+  'tasks:abandon',
+  'tasks:delete',
+  'metrics:dashboard',
+  'metrics:transcript',
+  'pricing:list',
+  'pricing:save',
+  'pricing:delete',
+  'files:list'
 ] as const
 
-export const EVENT_CHANNELS = ['workspace:changed', 'fs:changed', 'pty:data', 'pty:exit'] as const
+export const EVENT_CHANNELS = [
+  'workspace:changed',
+  'fs:changed',
+  'pty:data',
+  'pty:exit',
+  'profiles:changed',
+  'agent:session',
+  'agent:event',
+  'mcp:changed',
+  'agents:changed',
+  'tasks:changed'
+] as const
 
 export type InvokeChannel = (typeof INVOKE_CHANNELS)[number]
 export type EventChannel = (typeof EVENT_CHANNELS)[number]
