@@ -9,7 +9,7 @@ module.exports = tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.strict,
   {
-    files: ['src/main/**/*.ts', 'src/preload/**/*.ts', '*.config.ts'],
+    files: ['src/main/**/*.ts', 'src/preload/**/*.ts', '*.config.ts', 'scripts/**/*.mjs'],
     languageOptions: { globals: globals.node }
   },
   {
