@@ -17,7 +17,16 @@ export interface ProfileRuntime {
  * inherited keys and tokens, base URLs, Bedrock/Vertex switches, another CLAUDE_CONFIG_DIR,
  * and the markers a parent Claude Code session sets.
  */
-const INHERITED_AUTH = /^(ANTHROPIC_|CLAUDE_|CLAUDECODE$)/
+const INHERITED_AUTH = /^(ANTHROPIC_|CLAUDE_|CLAUDECODE$|OPENAI_|MISTRAL_)/
+
+/** The app's environment without any provider account: what agent processes and their commands get. */
+export function withoutAccountVars(base: NodeJS.ProcessEnv): Record<string, string> {
+  const env: Record<string, string> = {}
+  for (const [key, value] of Object.entries(base)) {
+    if (value !== undefined && !INHERITED_AUTH.test(key)) env[key] = value
+  }
+  return env
+}
 
 /**
  * Environment for a Claude Code process. The SDK replaces the child environment with this
@@ -28,10 +37,7 @@ export function buildProfileEnv(
   runtime: Pick<ProfileRuntime, 'configDir' | 'apiKey'>,
   clientApp: string
 ): Record<string, string> {
-  const env: Record<string, string> = {}
-  for (const [key, value] of Object.entries(base)) {
-    if (value !== undefined && !INHERITED_AUTH.test(key)) env[key] = value
-  }
+  const env = withoutAccountVars(base)
   env['CLAUDE_CONFIG_DIR'] = runtime.configDir
   env['CLAUDE_AGENT_SDK_CLIENT_APP'] = clientApp
   if (runtime.apiKey) env['ANTHROPIC_API_KEY'] = runtime.apiKey

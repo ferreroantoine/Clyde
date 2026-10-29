@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { profileIdSchema } from './profiles'
+import { profileIdSchema, type ProfileKind } from './profiles'
 
 /**
  * Per-agent permission levels from the spec. Reads inside the working directory are always allowed.
@@ -25,7 +25,14 @@ export const agentStartSchema = z.object({
   model: z.string().trim().max(200).default(''),
   permissionLevel: z.enum(PERMISSION_LEVELS).default('validate-all'),
   /** Defaults to the open workspace. */
-  cwd: z.string().max(4096).optional()
+  cwd: z.string().max(4096).optional(),
+  /** Added to the default system prompt. */
+  systemPrompt: z.string().max(20_000).default(''),
+  /** MCP tools this agent may use, as `mcp__<server>__<tool>`. Nothing else from MCP is visible to it. */
+  mcpTools: z
+    .array(z.string().regex(/^mcp__[a-z0-9_-]+__.+$/).max(300))
+    .max(500)
+    .default([])
 })
 export type AgentStart = z.input<typeof agentStartSchema>
 
@@ -44,9 +51,11 @@ export type AgentStatus = 'starting' | 'idle' | 'running' | 'awaiting-approval' 
 export interface AgentSessionInfo {
   id: string
   profileId: string
+  kind: ProfileKind
   model: string
   permissionLevel: PermissionLevel
   cwd: string
+  mcpTools: string[]
   status: AgentStatus
   createdAt: number
 }
@@ -86,7 +95,8 @@ export type AgentEvent =
       /** e.g. success, error_during_execution, error_max_turns. */
       subtype: string
       errors: string[]
-      costUsd: number
+      /** Claude Code reports the cost; null for API providers until pricing arrives. */
+      costUsd: number | null
       inputTokens: number
       outputTokens: number
       durationMs: number

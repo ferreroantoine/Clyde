@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { EventChannel, InvokeChannel } from './channels'
 import type { Settings } from '../settings'
 import { profileCreateSchema, profileIdSchema, profileUpdateSchema, type ConnectionResult, type Profile } from '../profiles'
+import { mcpIdSchema, mcpServerInputSchema, mcpServerUpdateSchema, type McpImportPreview, type McpServer } from '../mcp'
 import {
   agentStartSchema,
   approvalAnswerSchema,
@@ -55,7 +56,14 @@ export const requestSchemas = {
   'agent:send': z.object({ sessionId: sessionIdSchema, text: z.string().trim().min(1).max(100_000) }),
   'agent:interrupt': z.object({ sessionId: sessionIdSchema }),
   'agent:stop': z.object({ sessionId: sessionIdSchema }),
-  'agent:approve': approvalAnswerSchema
+  'agent:approve': approvalAnswerSchema,
+  'mcp:list': z.undefined(),
+  'mcp:create': mcpServerInputSchema,
+  'mcp:update': mcpServerUpdateSchema,
+  'mcp:delete': z.object({ id: mcpIdSchema }),
+  'mcp:reconnect': z.object({ id: mcpIdSchema }),
+  'mcp:importPreview': z.undefined(),
+  'mcp:import': z.object({ path: z.string().min(1).max(4096), names: z.array(z.string().max(200)).max(200) })
 } satisfies Record<InvokeChannel, z.ZodType>
 
 export interface InvokeResponses {
@@ -85,6 +93,13 @@ export interface InvokeResponses {
   'agent:interrupt': null
   'agent:stop': null
   'agent:approve': null
+  'mcp:list': McpServer[]
+  'mcp:create': McpServer[]
+  'mcp:update': McpServer[]
+  'mcp:delete': null
+  'mcp:reconnect': null
+  'mcp:importPreview': McpImportPreview | null
+  'mcp:import': McpServer[]
 }
 
 export interface EventPayloads {
@@ -95,6 +110,7 @@ export interface EventPayloads {
   'profiles:changed': Profile[]
   'agent:session': AgentSessionInfo
   'agent:event': AgentEventEnvelope
+  'mcp:changed': McpServer[]
 }
 
 export type InvokeRequest<C extends InvokeChannel> = z.input<(typeof requestSchemas)[C]>

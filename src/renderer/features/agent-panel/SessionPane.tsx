@@ -55,8 +55,8 @@ function Item({ item, cwd, ended }: { item: TranscriptItem; cwd: string; ended: 
           {item.isError && <CircleAlert className="size-3 text-destructive" />}
           {item.isError ? item.errors[0] ?? `Turn ended: ${item.subtype.replace(/_/g, ' ')}` : 'Done'}
           <span>
-            · {(item.durationMs / 1000).toFixed(1)}s · {tokens(item.inputTokens)} in / {tokens(item.outputTokens)} out ·{' '}
-            {usd(item.costUsd)}
+            · {(item.durationMs / 1000).toFixed(1)}s · {tokens(item.inputTokens)} in / {tokens(item.outputTokens)} out
+            {item.costUsd !== null && ` · ${usd(item.costUsd)}`}
           </span>
         </p>
       )

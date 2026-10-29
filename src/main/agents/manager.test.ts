@@ -7,14 +7,36 @@ import type { AgentEventEnvelope, AgentSessionInfo } from '@shared/agent'
 import { migrate } from '../services/db/database'
 import { SecretsService } from '../services/secrets'
 import { ProfilesService } from '../services/profiles'
-import { AgentManager, MAX_ACTIVE_SESSIONS } from './manager'
+import { AgentManager, MAX_ACTIVE_SESSIONS, type AgentManagerDeps } from './manager'
 import { fakeQuery, sdk, type FakeContext } from './claude-code/fake-query'
+import type { ChatAdapter, ChatRequest } from './api/chat'
 
 vi.mock('electron', () => ({ app: { getPath: () => { throw new Error('no electron in tests') } }, safeStorage: {} }))
 
 const log = { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 
-function setup(script: (ctx: FakeContext) => AsyncGenerator<never>, { workspace = true } = {}) {
+/** Stands in for the MCP hub: one connected server, `docs`, with `search` and `delete`. */
+function fakeMcp() {
+  const tool = (name: string) => ({
+    name: `mcp__docs__${name}`,
+    qualifiedName: `mcp__docs__${name}`,
+    description: name,
+    inputSchema: { type: 'object' }
+  })
+  return {
+    toolSpecs: vi.fn((allowed: ReadonlySet<string>) => [tool('search'), tool('delete')].filter((t) => allowed.has(t.qualifiedName))),
+    callTool: vi.fn(async (name: string) => ({ content: `ran ${name}`, isError: false })),
+    claudeCodeConfig: vi.fn((allowed: ReadonlySet<string>) => ({
+      servers: allowed.size ? { docs: { type: 'stdio' as const, command: 'docs-mcp', args: [], env: {} } } : {},
+      disallowed: allowed.size ? ['mcp__docs__delete'] : []
+    }))
+  }
+}
+
+function setup(
+  script: (ctx: FakeContext) => AsyncGenerator<never>,
+  { workspace = true, adapter }: { workspace?: boolean; adapter?: ChatAdapter } = {}
+) {
   const db = new Database(':memory:')
   migrate(db)
   const dir = mkdtempSync(join(tmpdir(), 'atelier-agents-'))
@@ -29,8 +51,16 @@ function setup(script: (ctx: FakeContext) => AsyncGenerator<never>, { workspace 
   const events: AgentEventEnvelope[] = []
   const sessions: AgentSessionInfo[] = []
   const { query, calls } = fakeQuery(script as never)
+  const mcp = fakeMcp()
   const manager = new AgentManager({
     profiles,
+    mcp: mcp as unknown as AgentManagerDeps['mcp'],
+    createAdapter: () => {
+      if (!adapter) throw new Error('no adapter in this test')
+      return adapter
+    },
+    hasPwsh: () => false,
+    platform: 'linux',
     claudeCodePath: () => binary,
     workspaceRoot: () => (workspace ? repo : null),
     query: async () => query,
@@ -46,7 +76,7 @@ function setup(script: (ctx: FakeContext) => AsyncGenerator<never>, { workspace 
       .filter((s) => s.id === id)
       .map((s) => s.status)
       .filter((status, i, all) => status !== all[i - 1])
-  return { manager, profile, profiles, events, calls, statuses, repo }
+  return { manager, profile, profiles, events, calls, statuses, repo, mcp }
 }
 
 async function* idle(ctx: FakeContext) {
@@ -101,5 +131,58 @@ describe('AgentManager', () => {
     await expect(manager.start({ profileId: profile.id })).rejects.toThrow(/already running/)
     manager.stop(manager.list()[0]?.id ?? '')
     await expect(manager.start({ profileId: profile.id })).resolves.toMatchObject({ status: 'idle' })
+  })
+
+  it('gives Claude Code only the MCP servers and tools the agent may use', async () => {
+    const { manager, profile, calls } = setup(idle as never)
+    await manager.start({ profileId: profile.id, mcpTools: ['mcp__docs__search'], systemPrompt: 'Be brief.' })
+    expect(calls[0]).toMatchObject({
+      mcpServers: { docs: { type: 'stdio', command: 'docs-mcp' } },
+      disallowedTools: ['AskUserQuestion', 'mcp__docs__delete'],
+      systemPrompt: { type: 'preset', preset: 'claude_code', append: 'Be brief.' }
+    })
+    await manager.start({ profileId: profile.id })
+    expect(calls[1]).not.toHaveProperty('mcpServers')
+  })
+
+  it('runs API accounts in the in-house loop with their allowed MCP tools', async () => {
+    const requests: ChatRequest[] = []
+    const replies = [
+      { toolCalls: [{ id: 'c1', name: 'mcp__docs__search', input: { q: 'x' } }, { id: 'c2', name: 'mcp__docs__delete', input: {} }] },
+      { toolCalls: [] }
+    ]
+    const adapter: ChatAdapter = {
+      async *stream(req) {
+        requests.push(structuredClone({ ...req, signal: undefined }) as unknown as ChatRequest)
+        const reply = replies.shift() ?? { toolCalls: [] }
+        yield { type: 'done', text: 'ok', toolCalls: reply.toolCalls, stopReason: 'end', usage: { inputTokens: 1, outputTokens: 1 } }
+      },
+      listModels: async () => [{ value: 'qwen3', displayName: 'qwen3', description: '' }]
+    }
+    const { manager, profiles, events, mcp } = setup(idle as never, { adapter })
+    const ollama = profiles.create({ kind: 'ollama', name: 'Local', color: '#64748b', auth: 'none' })
+    const info = await manager.start({ profileId: ollama.id, mcpTools: ['mcp__docs__search'], permissionLevel: 'autonomous' })
+    expect(info).toMatchObject({ kind: 'ollama', model: 'qwen3', mcpTools: ['mcp__docs__search'] })
+
+    manager.send(info.id, 'search the docs')
+    await vi.waitFor(() => expect(events.some((e) => e.event.type === 'turn_end')).toBe(true))
+    expect(requests[0]?.tools.map((t) => t.name)).toEqual([
+      'read_file',
+      'write_file',
+      'edit_file',
+      'list_files',
+      'run_command',
+      'mcp__docs__search'
+    ])
+    expect(requests[0]?.system).toContain('Linux')
+    // The allowed tool ran through the hub; the other one was refused without reaching it.
+    expect(mcp.callTool).toHaveBeenCalledTimes(1)
+    expect(mcp.callTool).toHaveBeenCalledWith('mcp__docs__search', { q: 'x' }, expect.any(AbortSignal))
+    const results = events.flatMap((e) => (e.event.type === 'tool_result' ? [e.event] : []))
+    expect(results).toEqual([
+      { type: 'tool_result', toolUseId: 'c1', content: 'ran mcp__docs__search', isError: false },
+      { type: 'tool_result', toolUseId: 'c2', content: expect.stringMatching(/not in this agent's MCP tools/), isError: true }
+    ])
+    manager.stop(info.id)
   })
 })

@@ -5,9 +5,11 @@ import { applyEvent, describeTool, emptyView, toolState, type SessionView, type 
 const info: AgentSessionInfo = {
   id: 'as-1',
   profileId: 'p1',
+  kind: 'claude-code',
   model: '',
   permissionLevel: 'validate-all',
   cwd: 'C:\\repo',
+  mcpTools: [],
   status: 'idle',
   createdAt: 0
 }

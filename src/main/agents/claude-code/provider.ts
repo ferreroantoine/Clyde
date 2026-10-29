@@ -1,6 +1,7 @@
 import type {
   CanUseTool,
   HookCallback,
+  McpServerConfig,
   Options,
   Query,
   SDKUserMessage,
@@ -140,6 +141,11 @@ export async function testConnection(
 
 export interface SessionConfig extends ProbeTarget {
   model: string
+  /** Appended to Claude Code's system prompt. */
+  appendSystemPrompt?: string
+  mcpServers?: Record<string, McpServerConfig>
+  /** Extra tools to hide, e.g. MCP tools outside the agent's allow-list. */
+  disallowedTools?: string[]
 }
 
 export interface SessionDeps {
@@ -250,11 +256,17 @@ export class ClaudeCodeSession {
       env: this.cfg.env,
       pathToClaudeCodeExecutable: this.cfg.binary,
       ...(this.cfg.model ? { model: this.cfg.model } : {}),
-      systemPrompt: { type: 'preset', preset: 'claude_code', snapshot: true },
+      systemPrompt: {
+        type: 'preset',
+        preset: 'claude_code',
+        snapshot: true,
+        ...(this.cfg.appendSystemPrompt ? { append: this.cfg.appendSystemPrompt } : {})
+      },
       settingSources: ['user', 'project', 'local'],
       permissionMode: 'default',
       includePartialMessages: true,
-      disallowedTools: DISALLOWED_TOOLS,
+      disallowedTools: [...DISALLOWED_TOOLS, ...(this.cfg.disallowedTools ?? [])],
+      ...(this.cfg.mcpServers && Object.keys(this.cfg.mcpServers).length ? { mcpServers: this.cfg.mcpServers } : {}),
       hooks: { PreToolUse: [{ hooks: [preToolUse], timeout: APPROVAL_TIMEOUT_S }] },
       canUseTool,
       abortController: this.abort,
