@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { t, tk } from '@shared/i18n'
-import { ChevronRight, FolderGit2, KeyRound, Play, Plug } from 'lucide-react'
+import { ChevronRight, FolderGit2, KeyRound, Play, Plug, TriangleAlert } from 'lucide-react'
 import { ANTIGRAVITY_LEVEL_HINTS, PERMISSION_LEVELS, PERMISSION_LEVEL_LABELS, type PermissionLevel } from '@shared/agent'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,7 @@ import { useSettings } from '@/stores/settings'
 import { useProfiles } from '@/stores/profiles'
 import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/utils'
+import { estimateTokens, TOOL_COUNT_WARNING, TOOL_TOKENS_WARNING } from '@shared/mcp-catalog'
 import { PROFILE_KIND_LABELS } from '@shared/profiles'
 
 export const LEVEL_HINTS: Record<PermissionLevel, string> = {
@@ -36,8 +37,20 @@ export function McpPicker({ value, onChange }: { value: Set<string>; onChange: (
     }
     onChange(next)
   }
+  // What the chosen tools cost in context on every request (chantier 8 measures the rest).
+  const chosen = servers.flatMap((s) => s.tools).filter((tool) => value.has(tool.qualifiedName))
+  const tokens = estimateTokens(chosen.reduce((n, tool) => n + tool.chars, 0))
+  const heavy = tokens > TOOL_TOKENS_WARNING || chosen.length > TOOL_COUNT_WARNING
   return (
     <div className="space-y-1.5">
+      {chosen.length > 0 && (
+        <p className={cn('flex items-start gap-1 text-[11px]', heavy ? 'text-warning' : 'text-muted-foreground')} role={heavy ? 'alert' : undefined}>
+          {heavy && <TriangleAlert className="mt-px size-3 shrink-0" />}
+          {heavy
+            ? t('{count} tools, about {tokens} tokens of definitions sent with every request. Keep only what this agent needs.', { count: chosen.length, tokens })
+            : t('{count} tools, about {tokens} tokens of definitions per request.', { count: chosen.length, tokens })}
+        </p>
+      )}
       {servers.map((server) => {
         const names = server.tools.map((t) => t.qualifiedName)
         const count = names.filter((n) => value.has(n)).length

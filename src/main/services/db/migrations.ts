@@ -357,5 +357,27 @@ export const migrations: Migration[] = [
         PRIMARY KEY (conversation_id, session_id)
       );
     `
+  },
+  {
+    version: 12,
+    name: 'mcp catalog',
+    sql: `
+      -- Which catalog preset a server came from; built-in presets live in code.
+      ALTER TABLE mcp_servers ADD COLUMN preset_id TEXT;
+      -- Presets the user saved from their own servers. Secrets are not kept: only the names of
+      -- the environment variables and headers, asked again at install.
+      CREATE TABLE mcp_presets (
+        id          TEXT PRIMARY KEY,
+        title       TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        name        TEXT NOT NULL,
+        transport   TEXT NOT NULL,
+        command     TEXT NOT NULL DEFAULT '',
+        args_json   TEXT NOT NULL DEFAULT '[]',
+        url         TEXT NOT NULL DEFAULT '',
+        params_json TEXT NOT NULL DEFAULT '[]',
+        created_at  INTEGER NOT NULL
+      );
+    `
   }
 ]

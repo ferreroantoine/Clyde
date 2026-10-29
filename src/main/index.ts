@@ -142,7 +142,8 @@ if (!app.requestSingleInstanceLock()) {
         limitsSetup.syncProfiles(list)
       }
     })
-    const mcp = new McpHub(new McpStore(profileDb, safeStorageCipher), {
+    const mcpStore = new McpStore(profileDb, safeStorageCipher)
+    const mcp = new McpHub(mcpStore, {
       onChanged: (list) => broadcast('mcp:changed', list),
       log: createLogger('mcp')
     })
@@ -189,7 +190,11 @@ if (!app.requestSingleInstanceLock()) {
     })
     registerProfileHandlers({ profiles, ptys, claudeCodePath, codexPath, antigravityPath, cli, query, clientApp, fetch })
     registerAgentHandlers(agents)
-    registerMcpHandlers(mcp)
+    registerMcpHandlers(mcp, {
+      list: () => mcpStore.presets(),
+      save: (serverId, title, description) => mcpStore.savePreset(serverId, title, description),
+      remove: (id) => mcpStore.deletePreset(id)
+    })
     mcp.start()
 
     const definitions = new AgentDefinitionsService(profileDb, (list) => broadcast('agents:changed', list))

@@ -46,6 +46,8 @@ export interface McpTool {
   /** `mcp__<server slug>__<tool>`, the name Claude Code uses and the one allow-lists store. */
   qualifiedName: string
   description: string
+  /** Size of its definition (name, description, input schema) in JSON characters: its context cost. */
+  chars: number
 }
 
 export interface McpServer {
@@ -60,6 +62,8 @@ export interface McpServer {
   envKeys: string[]
   headerKeys: string[]
   enabled: boolean
+  /** The catalog preset it came from, if any. */
+  presetId: string | null
   status: McpStatus
   error: string | null
   tools: McpTool[]

@@ -145,3 +145,15 @@ Je travaille dans un conteneur Linux sans compte Claude Pro/Max, ChatGPT ou Goog
 - Nettoyage des hésitations : règles simples (mot entier, lettres étirables, virgules d'encadrement, majuscule transmise), testées ; « ben » retiré de la liste par défaut (prénom). Reformulation optionnelle par un modèle léger (Ollama par défaut).
 - Vérifié dans l'app avec un faux micro Chromium alimenté par `jfk.wav` : téléchargement du binaire et du modèle depuis Paramètres, dictée dans le chat, texte inséré au curseur sans envoi.
 
+### Chantier 7 — fait
+- Vérifié (registres npm/PyPI, `--help` et `tools/list` réels) :
+  - Filesystem : `npx -y @modelcontextprotocol/server-filesystem <dossier>` (2.1.0). Déclare `node >= 24` mais tourne sur Node 22 (testé).
+  - Git : `uvx mcp-server-git --repository <dossier>` (PyPI 2026.10.28) ; Fetch : `uvx mcp-server-fetch` (idem).
+  - GitHub : `@modelcontextprotocol/server-github` est **déprécié** sur npm ; remplacé par le serveur officiel `github/github-mcp-server`, en version hébergée `https://api.githubcopilot.com/mcp/` avec `Authorization: Bearer <PAT>` (la version locale demande Docker ou une compilation Go).
+  - Playwright : `npx -y @playwright/mcp@latest` (Microsoft, 25 outils) ; Context7 : `npx -y @upstash/context7-mcp` (clé optionnelle `CONTEXT7_API_KEY`).
+  - Docker : **pas de serveur officiel de gestion des conteneurs** (Docker publie une passerelle MCP, pas ce serveur) ; ajouté le serveur communautaire maintenu `uvx mcp-server-docker` (ckreiling, 0.3.0, août 2026), signalé comme tel sur la carte.
+  - **SQLite non ajouté** : `mcp-server-sqlite` archivé, dernière version avril 2025.
+- Coût en contexte = taille JSON de `{name, description, inputSchema}` par outil ÷ 4, mesuré sur les serveurs réels pour les cartes, recalculé sur les outils connectés ensuite. Avertissement au-delà de 15 000 tokens ou 40 outils pour un agent.
+- Les CLI (Claude Code, Codex, Antigravity) lancent `npx`/`uvx` via `cmd /c` sous Windows (fichiers .cmd) ; le client d'Atelier passe aussi les variables de proxy/certificats aux serveurs stdio (sans elles, `npx` ne télécharge rien derrière un proxy — trouvé en testant ici).
+- Migration SQL 12 : `mcp_servers.preset_id`, `mcp_presets` (presets de l'utilisateur, sans valeurs secrètes).
+

@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { t, tk, tn } from '@shared/i18n'
+import { t, tk } from '@shared/i18n'
 import {
+  BookmarkPlus,
   ChevronRight,
   CircleAlert,
   FileInput,
@@ -31,6 +32,7 @@ import { cn } from '@/lib/utils'
 import { Appear } from '@/components/Appear'
 import { SkeletonCards } from '@/components/Skeleton'
 import { McpServerDialog } from './McpServerDialog'
+import { ContextCost, McpCatalog } from './McpCatalog'
 
 const STATUS = {
   connected: { label: tk('Connected'), dot: 'bg-success' },
@@ -42,6 +44,7 @@ const STATUS = {
 function ServerCard({ server, onEdit, onDelete }: { server: McpServer; onEdit: () => void; onDelete: () => void }) {
   const update = useMcp((s) => s.update)
   const reconnect = useMcp((s) => s.reconnect)
+  const savePreset = useMcp((s) => s.savePreset)
   const [open, setOpen] = useState(false)
   const status = STATUS[server.status]
   const Icon = server.transport === 'stdio' ? SquareTerminal : Globe
@@ -57,7 +60,12 @@ function ServerCard({ server, onEdit, onDelete }: { server: McpServer; onEdit: (
             <span className="flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground">
               <span className={cn('size-1.5 rounded-full', status.dot)} />
               {t(status.label)}
-              {server.status === 'connected' && ` · ${tn('{count} tool', '{count} tools', server.tools.length)}`}
+              {server.status === 'connected' && (
+                <>
+                  {' · '}
+                  <ContextCost tools={server.tools.length} chars={server.tools.reduce((n, x) => n + x.chars, 0)} />
+                </>
+              )}
             </span>
           </div>
           <p className="truncate font-mono text-[11px] text-muted-foreground" title={summary}>
@@ -83,6 +91,9 @@ function ServerCard({ server, onEdit, onDelete }: { server: McpServer; onEdit: (
               <RefreshCw /> {' '}{t('Reconnect')}</DropdownMenuItem>
             <DropdownMenuItem onSelect={onEdit}>
               <Pencil /> {' '}{t('Edit')}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void savePreset(server.id, server.name, '')}>
+              <BookmarkPlus /> {t('Save as a preset')}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onSelect={onDelete}>
               <Trash2 /> {' '}{t('Delete')}</DropdownMenuItem>
@@ -240,6 +251,10 @@ export function McpPage({ embedded = false }: { embedded?: boolean } = {}) {
             ))}
           </div>
         )}
+      </div>
+
+      <div className={embedded ? undefined : 'mx-auto max-w-4xl px-8 pb-10'}>
+        <McpCatalog />
       </div>
 
       <McpServerDialog

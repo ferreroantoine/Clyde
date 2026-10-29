@@ -38,6 +38,7 @@ function install() {
         envKeys: input.transport === 'stdio' ? Object.keys(input.env ?? {}) : [],
         headerKeys: input.transport === 'http' ? Object.keys(input.headers ?? {}) : [],
         enabled: input.enabled ?? true,
+        presetId: null,
         status: 'disabled',
         error: null,
         tools: []
