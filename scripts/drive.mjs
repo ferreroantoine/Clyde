@@ -19,8 +19,9 @@ const app = await electron.launch({
   timeout: 30_000
 })
 const logs = []
+let page = null
 try {
-  const page = await app.firstWindow()
+  page = await app.firstWindow()
   page.on('console', (m) => logs.push(`[console.${m.type()}] ${m.text()}`))
   page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`))
   await page.waitForSelector('#root > *', { timeout: 15_000 })
@@ -45,6 +46,14 @@ try {
     }
     await page.waitForTimeout(250)
   }
+} catch (err) {
+  console.log('step failed:', err.message.split('\n')[0])
+  if (page) {
+    const file = join(outDir, 'error.png')
+    await page.screenshot({ path: file })
+    console.log('screenshot:', file)
+  }
+  process.exitCode = 1
 } finally {
   for (const line of logs) console.log(line)
   await app.close()

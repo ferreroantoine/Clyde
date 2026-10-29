@@ -3,10 +3,13 @@ import { IconButton } from '@/components/IconButton'
 import { useLayout } from '@/stores/layout'
 import { useSettings } from '@/stores/settings'
 import { useWorkspace } from '@/stores/workspace'
+import { useEditor } from '@/stores/editor'
 import { useResolvedTheme } from '@/lib/theme'
 
 export function StatusBar() {
   const workspace = useWorkspace((s) => s.info)
+  const cursor = useEditor((s) => s.cursor)
+  const language = useEditor((s) => s.tabs.find((t) => t.path === s.active)?.language)
   const theme = useResolvedTheme((s) => s.theme)
   const updateSetting = useSettings((s) => s.update)
   const layout = useLayout()
@@ -24,6 +27,12 @@ export function StatusBar() {
         </span>
       </div>
       <div className="flex items-center gap-0.5">
+        {cursor && (
+          <span className="mr-2 tabular-nums">
+            Ln {cursor.line}, Col {cursor.column}
+          </span>
+        )}
+        {language && <span className="mr-3">{language}</span>}
         <IconButton
           icon={PanelLeft}
           label="Toggle sidebar"

@@ -45,6 +45,8 @@ export interface SearchMatch {
   line: number
   column: number
   preview: string
+  /** Index of the match inside `preview` (the preview may be cropped). */
+  previewStart: number
   matchLength: number
 }
 
