@@ -61,7 +61,7 @@ export const useLayout = create<LayoutState>()(
       clearIntent: () => set({ intent: null })
     }),
     {
-      name: 'atelier.layout',
+      name: 'clyde.layout',
       partialize: ({ center, sidebarTab, sidebarOpen, agentPanelOpen, terminalOpen }) => ({
         center,
         sidebarTab,

@@ -89,7 +89,7 @@ function ServerForm({ server, close }: { server?: McpServer; close: () => void }
       <DialogHeader>
         <DialogTitle>{editing ? `Edit ${server.name}` : 'Add an MCP server'}</DialogTitle>
         <DialogDescription>
-          Atelier connects to the server and lists its tools. Each agent only sees the tools you allow when you start it.
+          Clyde connects to the server and lists its tools. Each agent only sees the tools you allow when you start it.
         </DialogDescription>
       </DialogHeader>
       <form
@@ -103,7 +103,7 @@ function ServerForm({ server, close }: { server?: McpServer; close: () => void }
           <div className="grid grid-cols-2 gap-2" role="group" aria-label="Transport">
             {(
               [
-                ['stdio', SquareTerminal, 'Local command', 'Atelier starts the server (stdio).'],
+                ['stdio', SquareTerminal, 'Local command', 'Clyde starts the server (stdio).'],
                 ['http', Globe, 'Remote URL', 'Streamable HTTP, or SSE for older servers.']
               ] as const
             ).map(([value, Icon, title, description]) => (

@@ -42,7 +42,7 @@ export function DiffView({ diff }: { diff: TaskFileDiff }) {
   }, [fontSize])
 
   useEffect(() => {
-    monaco.editor.setTheme(theme === 'dark' ? 'atelier-dark' : 'atelier-light')
+    monaco.editor.setTheme(theme === 'dark' ? 'clyde-dark' : 'clyde-light')
   }, [theme])
 
   useEffect(() => {

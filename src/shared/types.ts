@@ -8,7 +8,7 @@ export interface AppInfo {
   node: string
   platform: string
   userData: string
-  /** Distribution builds (ATELIER_DISTRIBUTION=1) disable Claude subscription profiles. */
+  /** Distribution builds (CLYDE_DISTRIBUTION=1) disable Claude subscription profiles. */
   distribution: boolean
 }
 

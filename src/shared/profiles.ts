@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 /**
  * `claude-code` drives Claude Code through the Agent SDK. The others are API providers that
- * run Atelier's own agent loop.
+ * run Clyde's own agent loop.
  */
 export const PROFILE_KINDS = ['claude-code', 'anthropic', 'openai', 'mistral', 'ollama'] as const
 export type ProfileKind = (typeof PROFILE_KINDS)[number]

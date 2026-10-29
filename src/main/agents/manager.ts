@@ -43,7 +43,7 @@ export interface AgentManagerDeps {
   log: Logger
 }
 
-/** What the manager drives: a Claude Code session or Atelier's own loop. */
+/** What the manager drives: a Claude Code session or Clyde's own loop. */
 interface AgentSession {
   start(): Promise<void>
   send(text: string): void
@@ -63,7 +63,7 @@ const ENDED: AgentStatus[] = ['stopped', 'error']
 export function apiSystemPrompt(cwd: string, platform: NodeJS.Platform, extra: string): string {
   const os = platform === 'win32' ? 'Windows (commands run in PowerShell)' : platform === 'darwin' ? 'macOS' : 'Linux'
   return [
-    `You are a coding agent working inside Atelier, in the folder ${cwd} on ${os}.`,
+    `You are a coding agent working inside Clyde, in the folder ${cwd} on ${os}.`,
     'Use the tools to read and change files and to run commands. Paths are relative to that folder.',
     'Read a file before editing it, and prefer edit_file for small changes. Keep replies short and say what you changed.',
     'Some tool calls wait for the user to approve them. When one is denied, follow the user’s message instead of retrying.',

@@ -61,7 +61,7 @@ const CHOICES: Choice[] = [
     auth: 'api-key',
     icon: Sparkles,
     title: 'Anthropic API',
-    description: 'Claude models in Atelier’s own agent loop.',
+    description: 'Claude models in Clyde’s own agent loop.',
     keyPlaceholder: 'sk-ant-…'
   },
   { kind: 'openai', auth: 'api-key', icon: Bot, title: 'OpenAI', description: 'GPT models.', keyPlaceholder: 'sk-…' },
@@ -184,7 +184,7 @@ function ProfileForm({
         <DialogDescription>
           {kind === 'claude-code'
             ? 'Each Claude Code account gets its own configuration folder, so several accounts can work side by side.'
-            : 'Runs Atelier’s own agent loop: read, write, list files and run commands, plus the MCP tools you allow.'}
+            : 'Runs Clyde’s own agent loop: read, write, list files and run commands, plus the MCP tools you allow.'}
         </DialogDescription>
       </DialogHeader>
 
@@ -268,7 +268,7 @@ function ProfileForm({
         )}
 
         {kind === 'ollama' && (
-          <Field label="Server URL" hint="Where Ollama listens. Atelier talks to its OpenAI-compatible /v1 API.">
+          <Field label="Server URL" hint="Where Ollama listens. Clyde talks to its OpenAI-compatible /v1 API.">
             <Input
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}

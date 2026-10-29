@@ -1,4 +1,4 @@
-# Projet : « Atelier » — IDE desktop centré sur les agents IA, multi-comptes et multi-fournisseurs
+# Projet : « Clyde » — IDE desktop centré sur les agents IA, multi-comptes et multi-fournisseurs
 
 > Cahier des charges d'origine, tel que fourni par l'auteur du projet. Le plan d'implémentation validé est dans [PLAN.md](PLAN.md).
 

@@ -59,7 +59,7 @@ export function contentText(content: unknown): string {
 /** The SDK client over stdio, or streamable HTTP with an SSE fallback for older servers. */
 export const connectWithSdk: ConnectFn = async (server) => {
   const open = async (transport: Transport) => {
-    const client = new Client({ name: 'atelier', version: '0.1.0' })
+    const client = new Client({ name: 'clyde', version: '0.1.0' })
     await client.connect(transport, { timeout: CONNECT_TIMEOUT_MS })
     return client
   }
