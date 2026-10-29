@@ -2,7 +2,10 @@ import { app, BrowserWindow } from 'electron'
 import { createMainWindow } from './window'
 import { createLogger } from './logger'
 import { registerAppHandlers } from './ipc/app'
+import { registerWorkspaceHandlers } from './ipc/workspace'
+import { broadcast } from './ipc/events'
 import { MemorySettingsRepository, SettingsService } from './services/settings'
+import { WorkspaceService } from './services/workspace'
 
 const log = createLogger('main')
 
@@ -25,7 +28,13 @@ if (!app.requestSingleInstanceLock()) {
 
   void app.whenReady().then(() => {
     const settings = new SettingsService(new MemorySettingsRepository())
+    const workspace = new WorkspaceService(settings, {
+      onChanged: (info) => broadcast('workspace:changed', info),
+      onFsChanges: (changes) => broadcast('fs:changed', changes)
+    })
     registerAppHandlers(settings)
+    registerWorkspaceHandlers(workspace)
+    app.on('will-quit', () => void workspace.dispose())
 
     createMainWindow()
     log.info(`started v${app.getVersion()} (electron ${process.versions.electron})`)
