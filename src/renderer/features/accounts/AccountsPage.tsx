@@ -20,6 +20,7 @@ import {
   type LucideIcon
 } from 'lucide-react'
 import { type Profile } from '@shared/profiles'
+import type { CliStatus } from '@shared/cli'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -171,6 +172,40 @@ function ProfileCard({
   )
 }
 
+const CLI_NAMES: Record<CliStatus['kind'], string> = { 'claude-code': 'Claude Code', codex: 'Codex', antigravity: 'Antigravity' }
+
+/** Which coding CLIs Atelier found, with their versions. */
+function CliLine() {
+  const [status, setStatus] = useState<CliStatus[] | null>(null)
+  const [checking, setChecking] = useState(true)
+  const fetchStatus = useCallback((refresh: boolean) => {
+    invoke('cli:status', { refresh })
+      .then(setStatus)
+      .catch(() => setStatus([]))
+      .finally(() => setChecking(false))
+  }, [])
+  const load = (refresh: boolean) => {
+    setChecking(true)
+    fetchStatus(refresh)
+  }
+  useEffect(() => fetchStatus(false), [fetchStatus])
+  return (
+    <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground" aria-label="Coding CLIs">
+      {(status ?? []).map((c) => (
+        <span key={c.kind} className="flex items-center gap-1.5" title={c.detail ?? c.path ?? undefined}>
+          {c.installed ? <CircleCheck className="size-3.5 text-success" /> : <CircleAlert className="size-3.5 text-warning" />}
+          <span className="font-medium text-foreground">{CLI_NAMES[c.kind]}</span>
+          {c.installed ? (c.version ?? 'version unknown') : 'not found'}
+          {c.bundled && ' · bundled'}
+        </span>
+      ))}
+      <Button size="xs" variant="ghost" disabled={checking} onClick={() => load(true)} aria-label="Check CLIs again">
+        <RefreshCw className={checking ? 'animate-spin' : undefined} /> {status ? 'Check again' : 'Checking CLIs…'}
+      </Button>
+    </div>
+  )
+}
+
 export function AccountsPage() {
   const profiles = useProfiles((s) => s.profiles)
   const loaded = useProfiles((s) => s.loaded)
@@ -207,6 +242,7 @@ export function AccountsPage() {
             <Plus /> Add account
           </Button>
         </div>
+        <CliLine />
 
         {loaded && profiles.length === 0 ? (
           <div className="mt-10 rounded-xl border border-dashed py-14">

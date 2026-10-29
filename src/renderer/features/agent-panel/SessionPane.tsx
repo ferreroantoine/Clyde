@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ArrowUp, CircleAlert, Gauge, Square } from 'lucide-react'
 import { PERMISSION_LEVEL_LABELS, type AgentStatus } from '@shared/agent'
+import { kindLabel } from '@shared/profiles'
 import { Button } from '@/components/ui/button'
 import { ProfileBadge } from '@/components/ProfileBadge'
 import type { SessionView, TranscriptItem } from '@/lib/transcript'
@@ -190,7 +191,7 @@ export function SessionPane({ view }: { view: SessionView }) {
       >
         {view.items.length === 0 && (
           <p className="pt-6 text-center text-xs text-muted-foreground">
-            {view.info.status === 'starting' ? 'Starting Claude Code…' : 'Ask something to start.'}
+            {view.info.status === 'starting' ? `Starting ${kindLabel(view.info.kind)}…` : 'Ask something to start.'}
           </p>
         )}
         {view.items.map((item) => (

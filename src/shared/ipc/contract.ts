@@ -17,6 +17,7 @@ import {
 import { priceInputSchema, type PriceRow } from '../pricing'
 import type { Dashboard, SessionTranscript } from '../metrics'
 import type { AppNotice } from '../notices'
+import type { CliStatus } from '../cli'
 import { mcpIdSchema, mcpServerInputSchema, mcpServerUpdateSchema, type McpImportPreview, type McpServer } from '../mcp'
 import {
   agentStartSchema,
@@ -67,6 +68,7 @@ export const requestSchemas = {
   'profiles:delete': z.object({ id: profileIdSchema }),
   'profiles:test': z.object({ id: profileIdSchema }),
   'profiles:login': z.object({ id: profileIdSchema, ...dims }),
+  'cli:status': z.object({ refresh: z.boolean().default(false) }),
   'agent:list': z.undefined(),
   'agent:start': agentStartSchema,
   'agent:send': z.object({ sessionId: sessionIdSchema, text: z.string().trim().min(1).max(100_000) }),
@@ -123,6 +125,7 @@ export interface InvokeResponses {
   'profiles:delete': null
   'profiles:test': ConnectionResult
   'profiles:login': PtyInfo
+  'cli:status': CliStatus[]
   'agent:list': AgentSessionInfo[]
   'agent:start': AgentSessionInfo
   'agent:send': null

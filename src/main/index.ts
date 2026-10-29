@@ -9,6 +9,7 @@ import { registerWorkspaceHandlers } from './ipc/workspace'
 import { broadcast } from './ipc/events'
 import { MemorySettingsRepository, SettingsService } from './services/settings'
 import { NoticesService } from './services/notices'
+import { CliDetectService } from './services/cli-detect'
 import { WorkspaceService } from './services/workspace'
 import { hasPwsh, PtyService } from './services/pty'
 import { registerTerminalHandlers } from './ipc/terminal'
@@ -108,6 +109,10 @@ if (!app.requestSingleInstanceLock()) {
     const claudeCodePath = () => settings.getAll().cli.claudeCodePath
     const codexPath = () => settings.getAll().cli.codexPath
     const antigravityPath = () => settings.getAll().cli.antigravityPath
+    const cli = new CliDetectService({
+      paths: () => ({ 'claude-code': claudeCodePath(), codex: codexPath(), antigravity: antigravityPath() })
+    })
+    void cli.status().catch((err) => log.warn('could not detect the coding CLIs', err))
     // Without the app database, profiles live in memory for this session, like settings.
     const profileDb = db ?? memoryDatabase()
     const profiles = new ProfilesService(profileDb, new SecretsService(profileDb, safeStorageCipher), {
@@ -129,6 +134,7 @@ if (!app.requestSingleInstanceLock()) {
       claudeCodePath,
       codexPath,
       antigravityPath,
+      cliVersion: (kind) => cli.versionOf(kind),
       workspaceRoot: () => workspace.current()?.root ?? null,
       query,
       onEvent: (envelope) => {
@@ -144,7 +150,7 @@ if (!app.requestSingleInstanceLock()) {
       clientApp,
       log: createLogger('agents')
     })
-    registerProfileHandlers({ profiles, ptys, claudeCodePath, codexPath, antigravityPath, query, clientApp, fetch })
+    registerProfileHandlers({ profiles, ptys, claudeCodePath, codexPath, antigravityPath, cli, query, clientApp, fetch })
     registerAgentHandlers(agents)
     registerMcpHandlers(mcp)
     mcp.start()

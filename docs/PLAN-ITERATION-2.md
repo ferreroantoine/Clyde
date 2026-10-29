@@ -1,6 +1,7 @@
-# Itération 2 — plan (en attente de validation)
+# Itération 2 — plan (validé le 29/10/2026)
 
-> Demande : `iteration-2.md` (8 chantiers). Rien n'est codé tant que ce plan n'est pas validé.
+> Demande : `iteration-2.md` (8 chantiers). Validé tel quel, avec mes recommandations pour les questions ouvertes.
+> Avancement : chantier 2 (fournisseurs) fait. Écarts constatés en route : voir « Journal » en fin de fichier.
 > Base : `dev` @ fa29b55, schéma SQLite v6, 16,8 k lignes.
 
 ## 0. Faits vérifiés (oct. 2026) et écarts avec la demande
@@ -90,3 +91,13 @@ Attribution par session (seul / concurrent au prorata / reset de fenêtre / donn
 
 ## 5. Limites de l'environnement
 Je travaille dans un conteneur Linux sans compte Claude Pro/Max, ChatGPT ou Google. Je peux installer `codex` pour lire `--help` et générer le schéma app-server, mais pas me connecter. Tout ce qui demande un vrai compte (status line en headless, `usage_*`, limites Codex, `agy`) sera couvert par des tests sur flux enregistrés et un bouton « Diagnostic limites » dans Paramètres › Usage, que tu lances sur Windows et qui me dit quelles sources répondent.
+
+## Journal
+
+### Chantier 2 — fait
+- Numérotation : les paramètres v2 migrent dans `SettingsService` (pas de migration SQL) ; la migration SQL 7 retire Mistral (+ table `app_notices`), la 8 ajoute les prix OpenAI/Gemini. Les numéros de la section 2 se décalent d'autant.
+- Mistral : agents enregistrés liés supprimés avec le compte (message unique au démarrage).
+- Codex : piloté via `codex app-server` (vérifié sur Codex CLI 0.165.0 : bindings `generate-ts` + exécution réelle sans compte). Approbations commandes / fichiers / permissions passées au moteur de permissions d'Atelier.
+- Antigravity : `agy -p` en pty, un processus par message, `--conversation` pour enchaîner. **Non vérifié avec `agy --help`** (installation refusée dans mon conteneur) : flags tirés de la doc officielle. Identifiants dans le trousseau Windows → un seul compte Antigravity. Pas d'approbation possible en headless → niveaux traduits en règles (`permissions` dans le `settings.json` du HOME du profil).
+- Gemini API : endpoint OpenAI-compatible ; `extra_content` des appels d'outils (signatures de pensée Gemini 3) conservé et renvoyé.
+- Coût : Codex et Antigravity comptés à 0 $ (abonnement) en attendant le chantier 1.

@@ -17,6 +17,16 @@ export const PERMISSION_LEVEL_LABELS: Record<PermissionLevel, string> = {
   autonomous: 'Autonomous in its folder'
 }
 
+/**
+ * What each level means for Antigravity, which cannot ask for approval in headless mode:
+ * anything that would need it is refused instead.
+ */
+export const ANTIGRAVITY_LEVEL_HINTS: Record<PermissionLevel, string> = {
+  'validate-all': 'Antigravity cannot ask: it only reads.',
+  'files-auto': 'Edits files in its folder; commands are refused (it cannot ask).',
+  autonomous: 'Edits and runs commands in its folder; git push is refused.'
+}
+
 export const sessionIdSchema = z.string().regex(/^as-[a-z0-9-]{1,40}$/)
 
 export const agentStartSchema = z.object({

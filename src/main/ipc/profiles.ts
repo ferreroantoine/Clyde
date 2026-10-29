@@ -12,6 +12,7 @@ import { spawnCli } from '../agents/cli/process'
 import { resolveAntigravityBinary, resolveCodexBinary } from '../agents/cli/resolve'
 import { spawnPty } from '../agents/cli/pty-process'
 import { buildAgyEnv, runAgy, testAntigravityConnection } from '../agents/antigravity/runtime'
+import type { CliDetectService } from '../services/cli-detect'
 
 export interface ProfileHandlerDeps {
   profiles: ProfilesService
@@ -19,6 +20,7 @@ export interface ProfileHandlerDeps {
   claudeCodePath: () => string
   codexPath: () => string
   antigravityPath: () => string
+  cli: CliDetectService
   query: () => Promise<QueryFn>
   clientApp: string
   fetch: typeof globalThis.fetch
@@ -30,6 +32,7 @@ export function registerProfileHandlers({
   claudeCodePath,
   codexPath,
   antigravityPath,
+  cli,
   query,
   clientApp,
   fetch
@@ -57,6 +60,7 @@ export function registerProfileHandlers({
   }
 
   handle('profiles:list', () => profiles.list())
+  handle('cli:status', ({ refresh }) => cli.status(refresh))
   handle('profiles:create', (input) => profiles.create(input))
   handle('profiles:update', (input) => profiles.update(input))
   handle('profiles:delete', ({ id }) => {

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { PERMISSION_LEVELS, PERMISSION_LEVEL_LABELS, type PermissionLevel } from '@shared/agent'
+import { PERMISSION_LEVELS, PERMISSION_LEVEL_LABELS, type PermissionLevel, ANTIGRAVITY_LEVEL_HINTS } from '@shared/agent'
 import type { AgentDefinition } from '@shared/tasks'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -101,7 +101,9 @@ function AgentForm({ agent, close }: { agent?: AgentDefinition; close: () => voi
                 <input type="radio" name="agent-level" checked={level === l} onChange={() => setLevel(l)} className="mt-0.5 accent-[var(--primary)]" />
                 <span>
                   <span className="block font-medium">{PERMISSION_LEVEL_LABELS[l]}</span>
-                  <span className="block text-[11px] text-muted-foreground">{LEVEL_HINTS[l]}</span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    {profiles.find((p) => p.id === profileId)?.kind === 'antigravity' ? ANTIGRAVITY_LEVEL_HINTS[l] : LEVEL_HINTS[l]}
+                  </span>
                 </span>
               </label>
             ))}
