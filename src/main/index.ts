@@ -31,10 +31,10 @@ import { DISTRIBUTION } from './build-flags'
 
 const log = createLogger('main')
 
-app.setName('Atelier')
-app.setAppUserModelId('dev.atelier.app')
+app.setName('Clyde')
+app.setAppUserModelId('dev.clyde.app')
 // Lets scripts and tests run against a throwaway profile.
-const userDataOverride = process.env['ATELIER_USER_DATA']
+const userDataOverride = process.env['CLYDE_USER_DATA']
 if (userDataOverride) app.setPath('userData', userDataOverride)
 
 let queryFn: Promise<QueryFn> | null = null
@@ -42,7 +42,7 @@ const query = () => (queryFn ??= loadQuery())
 
 /** Opens and migrates the app database; on failure the app still starts, with settings kept in memory. */
 function openAppDatabase(): Db | null {
-  const file = join(app.getPath('userData'), 'atelier.db')
+  const file = join(app.getPath('userData'), 'clyde.db')
   try {
     const db = openDatabase(file)
     const version = migrate(db)
@@ -51,17 +51,17 @@ function openAppDatabase(): Db | null {
   } catch (err) {
     log.error('could not open the database', err)
     dialog.showErrorBox(
-      'Atelier could not open its database',
+      'Clyde could not open its database',
       `${(err as Error).message}\n\nFile: ${file}\n\nSettings will not be saved during this session.`
     )
     return null
   }
 }
 
-/** %LOCALAPPDATA%\\Atelier\\worktrees on Windows (not roaming), the app data folder elsewhere. */
+/** %LOCALAPPDATA%\\Clyde\\worktrees on Windows (not roaming), the app data folder elsewhere. */
 function worktreesRoot(): string {
   const local = process.env['LOCALAPPDATA']
-  if (process.platform === 'win32' && local && !userDataOverride) return join(local, 'Atelier', 'worktrees')
+  if (process.platform === 'win32' && local && !userDataOverride) return join(local, 'Clyde', 'worktrees')
   return join(app.getPath('userData'), 'worktrees')
 }
 
@@ -103,7 +103,7 @@ if (!app.requestSingleInstanceLock()) {
     registerWorkspaceHandlers(workspace)
     registerTerminalHandlers(ptys, workspace)
 
-    const clientApp = `atelier/${app.getVersion()}`
+    const clientApp = `clyde/${app.getVersion()}`
     const claudeCodePath = () => settings.getAll().claudeCodePath
     // Without the app database, profiles live in memory for this session, like settings.
     const profileDb = db ?? memoryDatabase()

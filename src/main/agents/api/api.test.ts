@@ -194,7 +194,7 @@ describe('testApiConnection', () => {
 
 describe('base tools', () => {
   const setup = () => {
-    const cwd = mkdtempSync(join(tmpdir(), 'atelier-tools-'))
+    const cwd = mkdtempSync(join(tmpdir(), 'clyde-tools-'))
     mkdirSync(join(cwd, 'src'))
     mkdirSync(join(cwd, 'node_modules', 'x'), { recursive: true })
     writeFileSync(join(cwd, 'src', 'a.ts'), 'one\ntwo\nthree\n')

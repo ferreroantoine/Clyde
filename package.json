@@ -1,6 +1,6 @@
 {
-  "name": "atelier",
-  "productName": "Atelier",
+  "name": "clyde",
+  "productName": "Clyde",
   "version": "0.1.0",
   "description": "Agent-centric desktop IDE, multi-account and multi-provider",
   "private": true,
@@ -72,5 +72,5 @@
     "vitest": "^5.0.5",
     "zustand": "^5.0.16"
   },
-  "author": "Atelier"
+  "author": "Clyde"
 }

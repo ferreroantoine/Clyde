@@ -77,7 +77,7 @@ export function App() {
 
   return (
     <TooltipProvider delayDuration={400}>
-      <ErrorBoundary scope="Atelier">
+      <ErrorBoundary scope="Clyde">
         <Shell />
       </ErrorBoundary>
       <CommandPalette />

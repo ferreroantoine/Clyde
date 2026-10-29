@@ -193,7 +193,7 @@ export function AccountsPage() {
           <div>
             <h1 className="text-lg font-semibold tracking-tight">Accounts</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Each account has its own color and label, shown wherever it works. Atelier never switches accounts on its own.
+              Each account has its own color and label, shown wherever it works. Clyde never switches accounts on its own.
             </p>
           </div>
           <Button size="sm" onClick={() => setEditing('new')}>
@@ -252,7 +252,7 @@ export function AccountsPage() {
           <DialogHeader>
             <DialogTitle>Delete {deleting?.name}?</DialogTitle>
             <DialogDescription>
-              This removes the account from Atelier, its stored key, and its Claude Code folder, including the sign-in.
+              This removes the account from Clyde, its stored key, and its Claude Code folder, including the sign-in.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

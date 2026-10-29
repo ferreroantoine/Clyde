@@ -22,7 +22,7 @@ function setup({ cipher = fakeCipher(), distribution = false } = {}) {
   const db = new Database(':memory:')
   db.pragma('foreign_keys = ON')
   migrate(db)
-  const root = mkdtempSync(join(tmpdir(), 'atelier-profiles-'))
+  const root = mkdtempSync(join(tmpdir(), 'clyde-profiles-'))
   const onChanged = vi.fn()
   const secrets = new SecretsService(db, cipher)
   const profiles = new ProfilesService(db, secrets, { profilesRoot: root, distribution, onChanged })

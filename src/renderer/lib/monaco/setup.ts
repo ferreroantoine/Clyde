@@ -38,7 +38,7 @@ for (const defaults of [monaco.typescript.typescriptDefaults, monaco.typescript.
   })
 }
 
-monaco.editor.defineTheme('atelier-light', {
+monaco.editor.defineTheme('clyde-light', {
   base: 'vs',
   inherit: true,
   rules: [],
@@ -54,7 +54,7 @@ monaco.editor.defineTheme('atelier-light', {
   }
 })
 
-monaco.editor.defineTheme('atelier-dark', {
+monaco.editor.defineTheme('clyde-dark', {
   base: 'vs-dark',
   inherit: true,
   rules: [],

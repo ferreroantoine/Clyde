@@ -39,10 +39,10 @@ function setup(
 ) {
   const db = new Database(':memory:')
   migrate(db)
-  const dir = mkdtempSync(join(tmpdir(), 'atelier-agents-'))
+  const dir = mkdtempSync(join(tmpdir(), 'clyde-agents-'))
   const binary = join(dir, 'claude')
   writeFileSync(binary, '')
-  const repo = mkdtempSync(join(tmpdir(), 'atelier-repo-'))
+  const repo = mkdtempSync(join(tmpdir(), 'clyde-repo-'))
   const profiles = new ProfilesService(db, new SecretsService(db, { available: () => false, encrypt: () => Buffer.alloc(0), decrypt: () => '' }), {
     profilesRoot: join(dir, 'profiles'),
     distribution: false
@@ -66,7 +66,7 @@ function setup(
     query: async () => query,
     onEvent: (e) => events.push(e),
     onSession: (s) => sessions.push(s),
-    clientApp: 'atelier/test',
+    clientApp: 'clyde/test',
     baseEnv: { PATH: '/usr/bin', ANTHROPIC_API_KEY: 'sk-ant-inherited' },
     log
   })
@@ -92,7 +92,7 @@ describe('AgentManager', () => {
     expect(calls[0]?.env).toEqual({
       PATH: '/usr/bin',
       CLAUDE_CONFIG_DIR: profiles.configDir(profile.id),
-      CLAUDE_AGENT_SDK_CLIENT_APP: 'atelier/test'
+      CLAUDE_AGENT_SDK_CLIENT_APP: 'clyde/test'
     })
 
     manager.send(info.id, 'hello')

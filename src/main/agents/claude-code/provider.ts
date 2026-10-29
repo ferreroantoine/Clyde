@@ -24,7 +24,7 @@ export async function loadQuery(): Promise<QueryFn> {
 /** Approvals can wait for the user far longer than the 600 s default hook timeout. */
 const APPROVAL_TIMEOUT_S = 24 * 60 * 60
 
-/** Tools whose answers need UI Atelier does not have yet. */
+/** Tools whose answers need UI Clyde does not have yet. */
 const DISALLOWED_TOOLS = ['AskUserQuestion']
 
 /** A prompt stream that never sends anything, for control requests only. */
@@ -231,7 +231,7 @@ export class ClaudeCodeSession {
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: outcome.behavior,
-          permissionDecisionReason: outcome.behavior === 'allow' ? 'Allowed by Atelier' : outcome.message
+          permissionDecisionReason: outcome.behavior === 'allow' ? 'Allowed by Clyde' : outcome.message
         }
       }
     }

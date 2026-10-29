@@ -1,7 +1,7 @@
 # Packaging. Build the Windows installer on Windows: npm installs the Claude Code binary for
 # the machine it runs on, and the installer must ship the Windows one.
-appId: dev.atelier.app
-productName: Atelier
+appId: dev.clyde.app
+productName: Clyde
 copyright: Copyright © 2026
 directories:
   output: release
@@ -30,7 +30,7 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
-  shortcutName: Atelier
+  shortcutName: Clyde
 mac:
   target: dmg
   category: public.app-category.developer-tools
