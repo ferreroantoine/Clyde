@@ -85,6 +85,22 @@ export function SettingsPage() {
               onBlur={(e) => void update('cli.claudeCodePath', e.target.value.trim())}
             />
           </Row>
+          <Row label="Codex executable" hint="Leave empty to use codex from PATH (npm install -g @openai/codex).">
+            <Input
+              className="h-8 w-64 font-mono text-xs"
+              placeholder="from PATH"
+              defaultValue={settings.cli.codexPath}
+              onBlur={(e) => void update('cli.codexPath', e.target.value.trim())}
+            />
+          </Row>
+          <Row label="Antigravity executable" hint="Leave empty to use agy from PATH or ~/.local/bin.">
+            <Input
+              className="h-8 w-64 font-mono text-xs"
+              placeholder="from PATH"
+              defaultValue={settings.cli.antigravityPath}
+              onBlur={(e) => void update('cli.antigravityPath', e.target.value.trim())}
+            />
+          </Row>
         </section>
         <PricesSection />
       </div>

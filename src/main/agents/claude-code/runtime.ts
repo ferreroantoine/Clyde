@@ -14,11 +14,13 @@ export interface ProfileRuntime {
 }
 
 /**
- * Variables that would make Claude Code use another account or backend than the profile's:
- * inherited keys and tokens, base URLs, Bedrock/Vertex switches, another CLAUDE_CONFIG_DIR,
- * and the markers a parent Claude Code session sets.
+ * Variables that would make a CLI or a command use another account or backend than the
+ * profile's: inherited keys and tokens, base URLs, Bedrock/Vertex switches, another
+ * CLAUDE_CONFIG_DIR or CODEX_HOME, Google credentials, and the markers a parent Claude Code
+ * session sets.
  */
-const INHERITED_AUTH = /^(ANTHROPIC_|CLAUDE_|CLAUDECODE$|OPENAI_|MISTRAL_)/
+const INHERITED_AUTH =
+  /^(ANTHROPIC_|CLAUDE_|CLAUDECODE$|OPENAI_|MISTRAL_|CODEX_|GEMINI_|AGY_|GOOGLE_API_KEY$|GOOGLE_APPLICATION_CREDENTIALS$|GOOGLE_CLOUD_|GOOGLE_GEMINI_)/
 
 /** The app's environment without any provider account: what agent processes and their commands get. */
 export function withoutAccountVars(base: NodeJS.ProcessEnv): Record<string, string> {

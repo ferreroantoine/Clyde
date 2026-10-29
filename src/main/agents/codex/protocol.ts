@@ -1,0 +1,183 @@
+/**
+ * The part of the `codex app-server` v2 protocol Atelier uses, copied by hand from the
+ * bindings `codex app-server generate-ts` produces (Codex CLI 0.165.0). Fields Atelier does
+ * not read are left out; unknown fields and item types are ignored at runtime.
+ */
+
+export interface InitializeResponse {
+  userAgent: string
+  codexHome: string
+  platformFamily: string
+  platformOs: string
+}
+
+export type AskForApproval = 'untrusted' | 'on-request' | 'never'
+export type SandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access'
+
+export interface ThreadStartParams {
+  model?: string | null
+  cwd?: string | null
+  approvalPolicy?: AskForApproval | null
+  sandbox?: SandboxMode | null
+  config?: Record<string, unknown> | null
+  developerInstructions?: string | null
+  ephemeral?: boolean | null
+}
+
+export interface ThreadStartResponse {
+  thread: { id: string }
+  model: string
+  cwd: string
+}
+
+export interface UserTextInput {
+  type: 'text'
+  text: string
+  text_elements: never[]
+}
+
+export interface TurnStartResponse {
+  turn: Turn
+}
+
+export type TurnStatus = 'completed' | 'interrupted' | 'failed' | 'inProgress'
+
+export interface TurnError {
+  message: string
+  codexErrorInfo: unknown
+  additionalDetails: string | null
+}
+
+export interface Turn {
+  id: string
+  status: TurnStatus
+  error: TurnError | null
+  durationMs: number | null
+}
+
+export interface FileUpdateChange {
+  path: string
+  kind: { type: 'add' } | { type: 'delete' } | { type: 'update'; move_path: string | null }
+  diff: string
+}
+
+export type ThreadItem =
+  | { type: 'userMessage'; id: string }
+  | { type: 'agentMessage'; id: string; text: string }
+  | { type: 'reasoning'; id: string }
+  | { type: 'plan'; id: string; text: string }
+  | {
+      type: 'commandExecution'
+      id: string
+      command: string
+      cwd: string
+      status: 'inProgress' | 'completed' | 'failed' | 'declined'
+      aggregatedOutput: string | null
+      exitCode: number | null
+    }
+  | { type: 'fileChange'; id: string; changes: FileUpdateChange[]; status: 'inProgress' | 'completed' | 'failed' | 'declined' }
+  | {
+      type: 'mcpToolCall'
+      id: string
+      server: string
+      tool: string
+      status: 'inProgress' | 'completed' | 'failed'
+      arguments: unknown
+      result: { content: unknown[] } | null
+      error: { message: string } | null
+    }
+  | { type: 'webSearch'; id: string; query: string }
+  | { type: 'contextCompaction'; id: string }
+  | { type: string; id: string }
+
+export interface TokenUsageBreakdown {
+  totalTokens: number
+  inputTokens: number
+  cachedInputTokens: number
+  cacheWriteInputTokens: number
+  outputTokens: number
+  reasoningOutputTokens: number
+}
+
+export interface ThreadTokenUsage {
+  total: TokenUsageBreakdown
+  last: TokenUsageBreakdown
+  modelContextWindow: number | null
+}
+
+export interface RateLimitWindow {
+  usedPercent: number
+  windowDurationMins: number | null
+  /** Unix seconds. */
+  resetsAt: number | null
+}
+
+export interface RateLimitSnapshot {
+  limitId: string | null
+  limitName: string | null
+  primary: RateLimitWindow | null
+  secondary: RateLimitWindow | null
+  planType: string | null
+}
+
+export interface GetAccountResponse {
+  account: { type: 'chatgpt'; email: string | null; planType: string } | { type: string } | null
+  requiresOpenaiAuth: boolean
+}
+
+export interface Model {
+  id: string
+  model: string
+  displayName: string
+  description: string
+  hidden: boolean
+  isDefault: boolean
+}
+
+export interface ModelListResponse {
+  data: Model[]
+  nextCursor: string | null
+}
+
+/** Server notifications Atelier reads. */
+export interface Notifications {
+  'item/started': { item: ThreadItem; threadId: string; turnId: string }
+  'item/completed': { item: ThreadItem; threadId: string; turnId: string }
+  'item/agentMessage/delta': { threadId: string; turnId: string; itemId: string; delta: string }
+  'item/commandExecution/outputDelta': { threadId: string; turnId: string; itemId: string; delta: string }
+  'turn/started': { threadId: string; turn: Turn }
+  'turn/completed': { threadId: string; turn: Turn }
+  'thread/tokenUsage/updated': { threadId: string; turnId: string; tokenUsage: ThreadTokenUsage }
+  'account/rateLimits/updated': { rateLimits: RateLimitSnapshot }
+  error: { error: TurnError; willRetry: boolean; threadId: string; turnId: string }
+  warning: { threadId?: string; message: string }
+  configWarning: { summary: string; details: string | null }
+}
+
+export type CommandApprovalDecision = 'accept' | 'acceptForSession' | 'decline' | 'cancel'
+
+export interface CommandApprovalParams {
+  threadId: string
+  turnId: string
+  itemId: string
+  reason?: string | null
+  command?: string | null
+  cwd?: string | null
+}
+
+export interface FileChangeApprovalParams {
+  threadId: string
+  turnId: string
+  itemId: string
+  reason?: string | null
+  grantRoot?: string | null
+}
+
+export interface PermissionsApprovalParams {
+  threadId: string
+  turnId: string
+  itemId: string
+  cwd: string
+  reason: string | null
+  permissions: { network: unknown; fileSystem: unknown }
+}

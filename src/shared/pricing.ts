@@ -44,7 +44,8 @@ export function estimateCost(
   inputTokens: number,
   outputTokens: number
 ): number | null {
-  if (kind === 'ollama') return 0
+  // Local models are free; Codex and Antigravity run on a subscription, which has no per-turn price.
+  if (kind === 'ollama' || kind === 'codex' || kind === 'antigravity') return 0
   const price = findPrice(rows, kind, model)
   if (!price) return null
   return (inputTokens * price.inputPerMTok + outputTokens * price.outputPerMTok) / 1_000_000

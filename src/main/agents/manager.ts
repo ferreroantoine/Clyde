@@ -22,14 +22,24 @@ import { describeApiError, type ApiTarget } from './api/clients'
 import { ApiSession } from './api/loop'
 import { BASE_TOOLS, BaseToolExecutor, defaultShell, toEngineRequest } from './api/tools'
 import type { Logger } from '../logger'
+import { CodexSession } from './codex/session'
+import { buildCodexEnv, codexMcpServers } from './codex/runtime'
+import { spawnCli, type SpawnCli } from './cli/process'
+import { resolveCodexBinary } from './cli/resolve'
 
 /** Default cap on agents running at once (plan: "agent CPU guard"). */
 export const MAX_ACTIVE_SESSIONS = 4
 
 export interface AgentManagerDeps {
   profiles: ProfilesService
-  mcp: Pick<McpHub, 'toolSpecs' | 'callTool' | 'claudeCodeConfig'>
+  mcp: Pick<McpHub, 'toolSpecs' | 'callTool' | 'claudeCodeConfig' | 'agentServers'>
   claudeCodePath: () => string
+  /** Codex executable from Settings; empty means the one on PATH. */
+  codexPath?: () => string
+  /** Finds the Codex executable; swapped in tests. */
+  resolveCodex?: (override: string) => string
+  /** Starts CLIs with piped stdio (Codex). */
+  spawnCli?: SpawnCli
   workspaceRoot: () => string | null
   query: () => Promise<QueryFn>
   createAdapter: (target: ApiTarget) => ChatAdapter
@@ -127,12 +137,16 @@ export class AgentManager {
       ask: (question: Parameters<ApprovalBroker['ask']>[1], signal: AbortSignal) => this.broker.ask(id, question, signal)
     }
 
-    if (profile.kind === 'codex' || profile.kind === 'antigravity') {
+    let session: AgentSession
+    if (isApiKind(profile.kind)) {
+      session = await this.apiSession(profile, apiKey, info, req.systemPrompt, allowed, platform, common)
+    } else if (profile.kind === 'claude-code') {
+      session = await this.claudeCodeSession(profile, apiKey, info, req.systemPrompt, allowed, common)
+    } else if (profile.kind === 'codex') {
+      session = this.codexSession(profile, info, req.systemPrompt, allowed, platform, common)
+    } else {
       throw new AppError('not_allowed', `${profile.name} cannot run agents yet.`)
     }
-    const session: AgentSession = isApiKind(profile.kind)
-      ? await this.apiSession(profile, apiKey, info, req.systemPrompt, allowed, platform, common)
-      : await this.claudeCodeSession(profile, apiKey, info, req.systemPrompt, allowed, common)
 
     const entry: Entry = { info, session, seq: 0 }
     this.sessions.set(id, entry)
@@ -177,6 +191,32 @@ export class AgentManager {
         disallowedTools: mcp.disallowed
       },
       { ...common, query, log: (line) => log.debug(`[${info.id}] ${line}`) }
+    )
+  }
+
+  private codexSession(
+    profile: Profile,
+    info: AgentSessionInfo,
+    systemPrompt: string,
+    allowed: ReadonlySet<string>,
+    platform: NodeJS.Platform,
+    common: Pick<ConstructorParameters<typeof CodexSession>[1], 'emit' | 'decide' | 'ask'>
+  ): AgentSession {
+    const binary = (this.deps.resolveCodex ?? resolveCodexBinary)(this.deps.codexPath?.() ?? '')
+    const log = this.deps.log
+    return new CodexSession(
+      {
+        binary,
+        env: buildCodexEnv(this.deps.baseEnv ?? process.env, this.deps.profiles.configDir(profile.id)),
+        cwd: info.cwd,
+        model: info.model,
+        permissionLevel: info.permissionLevel,
+        platform,
+        instructions: systemPrompt,
+        mcpServers: codexMcpServers(this.deps.mcp.agentServers(allowed)),
+        clientVersion: this.deps.clientApp.split('/')[1] ?? '0.0.0'
+      },
+      { ...common, spawn: this.deps.spawnCli ?? spawnCli, log: (line) => log.debug(`[${info.id}] ${line}`) }
     )
   }
 

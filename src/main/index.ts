@@ -106,6 +106,7 @@ if (!app.requestSingleInstanceLock()) {
 
     const clientApp = `atelier/${app.getVersion()}`
     const claudeCodePath = () => settings.getAll().cli.claudeCodePath
+    const codexPath = () => settings.getAll().cli.codexPath
     // Without the app database, profiles live in memory for this session, like settings.
     const profileDb = db ?? memoryDatabase()
     const profiles = new ProfilesService(profileDb, new SecretsService(profileDb, safeStorageCipher), {
@@ -125,6 +126,7 @@ if (!app.requestSingleInstanceLock()) {
       createAdapter: (target) => createAdapter(target, fetch),
       hasPwsh,
       claudeCodePath,
+      codexPath,
       workspaceRoot: () => workspace.current()?.root ?? null,
       query,
       onEvent: (envelope) => {
@@ -140,7 +142,7 @@ if (!app.requestSingleInstanceLock()) {
       clientApp,
       log: createLogger('agents')
     })
-    registerProfileHandlers({ profiles, ptys, claudeCodePath, query, clientApp, fetch })
+    registerProfileHandlers({ profiles, ptys, claudeCodePath, codexPath, query, clientApp, fetch })
     registerAgentHandlers(agents)
     registerMcpHandlers(mcp)
     mcp.start()

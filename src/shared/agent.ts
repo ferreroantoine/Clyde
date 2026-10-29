@@ -76,7 +76,7 @@ export interface ToolCallInfo {
 /** Everything the agent panel renders, pushed from main as `agent:event`. */
 export type AgentEvent =
   | { type: 'status'; status: AgentStatus }
-  | { type: 'init'; model: string; claudeCodeVersion: string; cwd: string; tools: string[] }
+  | { type: 'init'; model: string; /** Version of the CLI behind the session; empty for API agents. */ cliVersion: string; cwd: string; tools: string[] }
   | { type: 'user'; id: string; text: string }
   /** Streaming text; `key` identifies one text block of one assistant message. */
   | { type: 'text_delta'; key: string; text: string }

@@ -18,7 +18,12 @@ describe('buildProfileEnv', () => {
         CLAUDE_CODE_OAUTH_TOKEN: 'tok',
         CLAUDE_CONFIG_DIR: '/home/me/.claude',
         CLAUDECODE: '1',
-        CLAUDE_CODE_USE_BEDROCK: '1'
+        CLAUDE_CODE_USE_BEDROCK: '1',
+        CODEX_HOME: '/home/me/.codex',
+        GEMINI_API_KEY: 'AIza-other',
+        GOOGLE_APPLICATION_CREDENTIALS: '/home/me/adc.json',
+        AGY_ADC_AUTH: 'true',
+        GOOGLE_CHROME_BIN: '/usr/bin/chrome'
       },
       { configDir: '/data/claude-profiles/p1', apiKey: null },
       'atelier/0.1.0'
@@ -26,6 +31,7 @@ describe('buildProfileEnv', () => {
     expect(env).toEqual({
       PATH: '/usr/bin',
       HOME: '/home/me',
+      GOOGLE_CHROME_BIN: '/usr/bin/chrome',
       CLAUDE_CONFIG_DIR: '/data/claude-profiles/p1',
       CLAUDE_AGENT_SDK_CLIENT_APP: 'atelier/0.1.0'
     })
@@ -79,7 +85,7 @@ describe('MessageTranslator', () => {
     ].flatMap((m) => t.translate(m))
 
     expect(events).toEqual([
-      { type: 'init', model: 'claude-sonnet-5', claudeCodeVersion: '2.1.312', cwd: '/repo', tools: ['Bash', 'Read'] },
+      { type: 'init', model: 'claude-sonnet-5', cliVersion: '2.1.312', cwd: '/repo', tools: ['Bash', 'Read'] },
       { type: 'text_delta', key: 'm1:0', text: 'Hel' },
       { type: 'text_delta', key: 'm1:0', text: 'lo' },
       { type: 'text_delta', key: 'm1:1', text: 'Done' },
