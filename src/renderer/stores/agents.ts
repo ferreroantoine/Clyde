@@ -3,6 +3,9 @@ import type { AgentSessionInfo, AgentStart, ApprovalDecision } from '@shared/age
 import { invoke, on } from '@/lib/ipc'
 import { applyEvent, emptyView, type SessionView } from '@/lib/transcript'
 import { notify } from './notifications'
+import { AgentTerminalFeed } from '@/lib/agent-terminal'
+import { useTerminals } from './terminals'
+import { profileById, useProfiles } from './profiles'
 
 interface AgentsState {
   sessions: Record<string, SessionView>
@@ -24,6 +27,13 @@ interface AgentsState {
 export const ENDED_STATUSES = new Set(['stopped', 'error'])
 
 export const useAgents = create<AgentsState>()((set, get) => {
+  // Each agent's shell commands also show in a read-only terminal tab named after its account.
+  const terminalFeed = new AgentTerminalFeed((sessionId, data) => {
+    const info = get().sessions[sessionId]?.info
+    const profile = profileById(useProfiles.getState().profiles, info?.profileId)
+    useTerminals.getState().agentWrite(sessionId, `Agent · ${profile?.name ?? 'agent'}`, info?.cwd ?? '', data)
+  })
+
   const upsertSession = (info: AgentSessionInfo) => {
     const { sessions, order } = get()
     const current = sessions[info.id]
@@ -46,6 +56,7 @@ export const useAgents = create<AgentsState>()((set, get) => {
           const view = get().sessions[envelope.sessionId]
           if (!view) return
           set({ sessions: { ...get().sessions, [envelope.sessionId]: applyEvent(view, envelope) } })
+          terminalFeed.feed(envelope)
         })
       ]
       invoke('agent:list')

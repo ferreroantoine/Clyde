@@ -13,14 +13,14 @@ import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/utils'
 import { PROFILE_KIND_LABELS } from '@shared/profiles'
 
-const LEVEL_HINTS: Record<PermissionLevel, string> = {
+export const LEVEL_HINTS: Record<PermissionLevel, string> = {
   'validate-all': 'Every file change and command asks first.',
   'files-auto': 'Edits inside the folder run; commands ask.',
   autonomous: 'Runs freely inside the folder. No git push.'
 }
 
 /** Connected servers with checkboxes per server and per tool. Nothing is ticked by default. */
-function McpPicker({ value, onChange }: { value: Set<string>; onChange: (next: Set<string>) => void }) {
+export function McpPicker({ value, onChange }: { value: Set<string>; onChange: (next: Set<string>) => void }) {
   const servers = useMcp((s) => s.servers).filter((s) => s.status === 'connected' && s.tools.length > 0)
   const [open, setOpen] = useState<Set<string>>(new Set())
   if (servers.length === 0) {

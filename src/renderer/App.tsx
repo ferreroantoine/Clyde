@@ -13,6 +13,7 @@ import { useEditor } from '@/stores/editor'
 import { useProfiles } from '@/stores/profiles'
 import { useAgents } from '@/stores/agents'
 import { useMcp } from '@/stores/mcp'
+import { useBoard } from '@/stores/board'
 
 export function App() {
   const theme = useSettings((s) => s.settings.theme)
@@ -33,7 +34,9 @@ export function App() {
     const offProfiles = useProfiles.getState().init()
     const offAgents = useAgents.getState().init()
     const offMcp = useMcp.getState().init()
+    const offBoard = useBoard.getState().init()
     return () => {
+      offBoard()
       offMcp()
       offAgents()
       disposed = true

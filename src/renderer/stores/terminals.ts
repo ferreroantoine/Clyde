@@ -24,6 +24,8 @@ interface TerminalsState {
   close: (id: string) => Promise<void>
   activate: (id: string) => void
   workspaceChanged: (root: string) => Promise<void>
+  /** Writes to an agent's read-only terminal, creating its tab on first use. */
+  agentWrite: (sessionId: string, title: string, cwd: string, data: string) => void
 }
 
 export const useTerminals = create<TerminalsState>()((set, get) => ({
@@ -70,13 +72,23 @@ export const useTerminals = create<TerminalsState>()((set, get) => ({
     const index = tabs.findIndex((t) => t.id === id)
     const tab = tabs[index]
     if (!tab) return
-    if (tab.exitCode === null) await invoke('pty:kill', { id }).catch(() => undefined)
+    if (tab.kind === 'shell' && tab.exitCode === null) await invoke('pty:kill', { id }).catch(() => undefined)
     terminals.dispose(id)
     const rest = tabs.filter((t) => t.id !== id)
     set({ tabs: rest, active: active === id ? ((rest[index] ?? rest[index - 1])?.id ?? null) : active })
   },
 
   activate: (id) => set({ active: id }),
+
+  agentWrite: (sessionId, title, cwd, data) => {
+    const id = `agent-${sessionId}`
+    if (!get().tabs.some((t) => t.id === id)) {
+      terminals.create(id, { readOnly: true, windowsBuild: null }, { onInput: () => undefined, onResize: () => undefined })
+      const tab: TerminalTab = { id, title, cwd, kind: 'agent', exitCode: null, used: true }
+      set({ tabs: [...get().tabs, tab] })
+    }
+    terminals.write(id, data)
+  },
 
   /**
    * Shells nobody has typed in yet are replaced by one in the new workspace, so the terminal
