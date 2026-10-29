@@ -25,12 +25,17 @@ win:
     - target: nsis
       arch: [x64]
   icon: resources/icon.png
+# One click, per user: no admin rights, no questions, shortcuts on the desktop and in the Start
+# menu, and Clyde starts when the install ends. Data in %APPDATA%\Clyde survives uninstalls.
 nsis:
-  oneClick: false
+  oneClick: true
   perMachine: false
-  allowToChangeInstallationDirectory: true
-  createDesktopShortcut: true
+  runAfterFinish: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
   shortcutName: Clyde
+  artifactName: Clyde-Setup-${version}.exe
+  deleteAppDataOnUninstall: false
 mac:
   target: dmg
   category: public.app-category.developer-tools
