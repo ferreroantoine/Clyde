@@ -7,9 +7,9 @@ import { AppError } from '@shared/errors'
 import type { MergeResult, TaskChange, TaskFileDiff } from '@shared/tasks'
 
 const MAX_DIFF_BYTES = 1024 * 1024
-const BRANCH_PREFIX = 'atelier/'
+const BRANCH_PREFIX = 'clyde/'
 /** Used only when the repository has no git identity configured. */
-const FALLBACK_IDENTITY = ['-c', 'user.name=Atelier', '-c', 'user.email=atelier@localhost']
+const FALLBACK_IDENTITY = ['-c', 'user.name=Clyde', '-c', 'user.email=clyde@localhost']
 
 export interface WorktreeRef {
   repoRoot: string
@@ -62,7 +62,7 @@ export function parseNameStatus(out: string): TaskChange[] {
 }
 
 /**
- * Git worktrees for tasks: one branch `atelier/<slug>` and one folder per task, outside the
+ * Git worktrees for tasks: one branch `clyde/<slug>` and one folder per task, outside the
  * repository so watchers and tooling never see them.
  */
 export class WorktreeService {

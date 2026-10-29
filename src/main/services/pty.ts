@@ -80,7 +80,7 @@ export class PtyService {
         cols: opts.cols,
         rows: opts.rows,
         cwd,
-        env: { ...env, TERM_PROGRAM: 'Atelier' }
+        env: { ...env, TERM_PROGRAM: 'Clyde' }
       })
     } catch (err) {
       throw new AppError('pty_error', `Could not start ${shell}: ${(err as Error).message}`)

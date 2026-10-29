@@ -213,6 +213,9 @@ export class MetricsService {
     )
     const profiles: ProfileUsage[] = this.deps.profiles().map((p) => {
       const u = byProfile.get(p.id)
+      // Local models cost nothing: their cost is exact and never "unpriced".
+      const local = p.kind === 'ollama'
+      const unpriced = local ? 0 : (u?.unpriced ?? 0)
       const limit = latestLimit.get(p.id) as
         | { status: string; utilization: number | null; resets_at: number | null; limit_type: string | null; at: number }
         | undefined
@@ -226,8 +229,8 @@ export class MetricsService {
         inputTokens: u?.input ?? 0,
         outputTokens: u?.output ?? 0,
         costUsd: u?.cost ?? 0,
-        costEstimated: (u?.estimated ?? 0) === 1 || (u?.unpriced ?? 0) > 0,
-        unpricedTurns: u?.unpriced ?? 0,
+        costEstimated: !local && ((u?.estimated ?? 0) === 1 || unpriced > 0),
+        unpricedTurns: unpriced,
         rateLimit: limit
           ? {
               status: limit.status as 'allowed' | 'allowed_warning' | 'rejected',

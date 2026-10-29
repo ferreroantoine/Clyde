@@ -31,6 +31,13 @@ function Highlight({ text, query }: { text: string; query: string }) {
   )
 }
 
+/** Keeps the ranking but shows each group once, where its best match ranks. */
+function groupByBestMatch(commands: Command[]): Command[] {
+  const groups = new Map<Command['group'], Command[]>()
+  for (const command of commands) groups.set(command.group, [...(groups.get(command.group) ?? []), command])
+  return [...groups.values()].flat()
+}
+
 /** Ctrl+K: every action and, below them, the workspace files. Ctrl+P opens it on files only. */
 export function CommandPalette() {
   const open = usePalette((s) => s.open)
@@ -67,7 +74,7 @@ function PaletteBody({ mode, close }: { mode: 'all' | 'files'; close: () => void
   }, [root])
 
   const entries = useMemo<Entry[]>(() => {
-    const cmds = fuzzyFilter(commands, query, (c) => c.title, 40).map((command): Entry => ({ kind: 'command', command }))
+    const cmds = groupByBestMatch(fuzzyFilter(commands, query, (c) => c.title, 40)).map((command): Entry => ({ kind: 'command', command }))
     // Files show once the user types (or in files mode), so the command list stays short.
     const showFiles = mode === 'files' || query.trim().length > 0
     const fileEntries = showFiles ? fuzzyFilter(files, query, (p) => p, 30).map((path): Entry => ({ kind: 'file', path })) : []

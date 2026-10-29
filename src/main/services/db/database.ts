@@ -17,7 +17,7 @@ export function migrate(db: Db, migrations: Migration[] = defaultMigrations): nu
   const pending = [...migrations].sort((a, b) => a.version - b.version).filter((m) => m.version > current)
   const latest = migrations.reduce((max, m) => Math.max(max, m.version), 0)
   if (current > latest) {
-    throw new Error(`Database version ${current} is newer than this build (${latest}). Update Atelier.`)
+    throw new Error(`Database version ${current} is newer than this build (${latest}). Update Clyde.`)
   }
   for (const m of pending) {
     db.transaction(() => {

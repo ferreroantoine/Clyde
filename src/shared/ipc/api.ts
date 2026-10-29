@@ -2,8 +2,8 @@ import type { EventChannel, InvokeChannel } from './channels'
 import type { EventPayloads, InvokeArgs, InvokeResponses } from './contract'
 import type { IpcResult } from '../types'
 
-/** Shape of `window.atelier`, the only bridge between renderer and main. */
-export interface AtelierApi {
+/** Shape of `window.clyde`, the only bridge between renderer and main. */
+export interface ClydeApi {
   platform: string
   invoke<C extends InvokeChannel>(
     channel: C,

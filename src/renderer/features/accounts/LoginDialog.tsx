@@ -18,7 +18,7 @@ import { useProfiles } from '@/stores/profiles'
 
 /**
  * Runs `claude auth login` for one profile in an embedded terminal. Claude Code handles the
- * whole flow and writes the credentials into the profile's own folder; Atelier only relays keystrokes.
+ * whole flow and writes the credentials into the profile's own folder; Clyde only relays keystrokes.
  */
 export function LoginDialog({ profile, onClose }: { profile: Profile | null; onClose: () => void }) {
   const test = useProfiles((s) => s.test)
@@ -82,7 +82,7 @@ function LoginSession({ profile, onFailed, onDone }: { profile: Profile; onFaile
         <DialogTitle>Sign in: {profile.name}</DialogTitle>
         <DialogDescription className="flex items-start gap-1.5">
           <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
-          Claude Code’s own login runs below and opens your browser. Atelier never sees your credentials; they stay in
+          Claude Code’s own login runs below and opens your browser. Clyde never sees your credentials; they stay in
           this account’s folder.
         </DialogDescription>
       </DialogHeader>
