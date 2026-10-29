@@ -14,6 +14,8 @@ import {
   type TaskChange,
   type TaskFileDiff
 } from '../tasks'
+import { priceInputSchema, type PriceRow } from '../pricing'
+import type { Dashboard, SessionTranscript } from '../metrics'
 import { mcpIdSchema, mcpServerInputSchema, mcpServerUpdateSchema, type McpImportPreview, type McpServer } from '../mcp'
 import {
   agentStartSchema,
@@ -88,7 +90,13 @@ export const requestSchemas = {
   'tasks:fileDiff': z.object({ id: taskIdSchema, path: z.string().min(1).max(4096) }),
   'tasks:merge': z.object({ id: taskIdSchema }),
   'tasks:abandon': z.object({ id: taskIdSchema }),
-  'tasks:delete': z.object({ id: taskIdSchema })
+  'tasks:delete': z.object({ id: taskIdSchema }),
+  'metrics:dashboard': z.object({ range: z.enum(['24h', '7d', '30d']).default('7d') }),
+  'metrics:transcript': z.object({ sessionId: z.string().min(1).max(64) }),
+  'pricing:list': z.undefined(),
+  'pricing:save': priceInputSchema.extend({ id: z.string().min(1).max(64).optional() }),
+  'pricing:delete': z.object({ id: z.string().min(1).max(64) }),
+  'files:list': z.undefined()
 } satisfies Record<InvokeChannel, z.ZodType>
 
 export interface InvokeResponses {
@@ -138,6 +146,12 @@ export interface InvokeResponses {
   'tasks:merge': MergeResult
   'tasks:abandon': Task
   'tasks:delete': null
+  'metrics:dashboard': Dashboard
+  'metrics:transcript': SessionTranscript
+  'pricing:list': PriceRow[]
+  'pricing:save': PriceRow[]
+  'pricing:delete': PriceRow[]
+  'files:list': { files: string[]; truncated: boolean }
 }
 
 export interface EventPayloads {

@@ -21,6 +21,8 @@ import { McpStore } from './mcp/store'
 import { McpHub } from './mcp/hub'
 import { registerMcpHandlers } from './ipc/mcp'
 import { registerTaskHandlers } from './ipc/tasks'
+import { registerMetricsHandlers } from './ipc/metrics'
+import { MetricsService } from './metrics/metrics'
 import { AgentDefinitionsService } from './services/agent-definitions'
 import { WorktreeService } from './services/worktrees'
 import { TaskService } from './agents/tasks'
@@ -126,10 +128,12 @@ if (!app.requestSingleInstanceLock()) {
       query,
       onEvent: (envelope) => {
         broadcast('agent:event', envelope)
+        metrics.onEvent(envelope)
         tasks.onAgentEvent(envelope)
       },
       onSession: (info) => {
         broadcast('agent:session', info)
+        metrics.onSession(info)
         tasks.onSession(info)
       },
       clientApp,
@@ -150,6 +154,13 @@ if (!app.requestSingleInstanceLock()) {
     })
     tasks.recover()
     registerTaskHandlers(definitions, tasks)
+
+    const metrics: MetricsService = new MetricsService(profileDb, {
+      profiles: () => profiles.list(),
+      activeSessions: () => agents.list()
+    })
+    metrics.recover()
+    registerMetricsHandlers(metrics)
 
     app.on('will-quit', () => {
       agents.stopAll()

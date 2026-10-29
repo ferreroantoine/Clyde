@@ -46,7 +46,13 @@ export const INVOKE_CHANNELS = [
   'tasks:fileDiff',
   'tasks:merge',
   'tasks:abandon',
-  'tasks:delete'
+  'tasks:delete',
+  'metrics:dashboard',
+  'metrics:transcript',
+  'pricing:list',
+  'pricing:save',
+  'pricing:delete',
+  'files:list'
 ] as const
 
 export const EVENT_CHANNELS = [

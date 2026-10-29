@@ -2,7 +2,7 @@ import { BrowserWindow, dialog } from 'electron'
 import { handle } from './router'
 import type { WorkspaceService } from '../services/workspace'
 import { listDir, readText, writeText } from '../services/files'
-import { searchText } from '../services/search'
+import { listFiles, searchText } from '../services/search'
 
 export function registerWorkspaceHandlers(workspace: WorkspaceService): void {
   handle('workspace:current', () => workspace.current())
@@ -20,4 +20,5 @@ export function registerWorkspaceHandlers(workspace: WorkspaceService): void {
   handle('fs:read', ({ path }) => readText(workspace.requireRoot(), path))
   handle('fs:write', ({ path, content }) => writeText(workspace.requireRoot(), path, content))
   handle('search:text', (opts) => searchText(workspace.requireRoot(), opts))
+  handle('files:list', () => listFiles(workspace.requireRoot()))
 }

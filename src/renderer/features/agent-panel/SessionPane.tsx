@@ -34,10 +34,11 @@ export function StatusDot({ status }: { status: AgentStatus }) {
   )
 }
 
-const usd = (n: number) => (n < 0.01 && n > 0 ? '<$0.01' : `$${n.toFixed(2)}`)
-const tokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
+export const usd = (n: number) => (n < 0.01 && n > 0 ? '<$0.01' : `$${n.toFixed(2)}`)
+export const tokens = (n: number) =>
+  n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
 
-function Item({ item, cwd, ended }: { item: TranscriptItem; cwd: string; ended: boolean }) {
+export function Item({ item, cwd, ended }: { item: TranscriptItem; cwd: string; ended: boolean }) {
   switch (item.kind) {
     case 'user':
       return (
@@ -70,7 +71,7 @@ function Item({ item, cwd, ended }: { item: TranscriptItem; cwd: string; ended: 
   }
 }
 
-function itemKey(item: TranscriptItem): string {
+export function itemKey(item: TranscriptItem): string {
   switch (item.kind) {
     case 'user':
     case 'turn':

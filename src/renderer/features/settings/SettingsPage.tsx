@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Input } from '@/components/ui/input'
 import { useSettings } from '@/stores/settings'
 import { cn } from '@/lib/utils'
+import { PricesSection } from './PricesSection'
 import type { Settings } from '@shared/settings'
 
 function Row({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
@@ -85,6 +86,7 @@ export function SettingsPage() {
             />
           </Row>
         </section>
+        <PricesSection />
       </div>
     </div>
   )
