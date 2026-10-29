@@ -24,6 +24,8 @@ win:
   target:
     - target: nsis
       arch: [x64]
+    - target: portable
+      arch: [x64]
   icon: resources/icon.png
 # One click, per user: no admin rights, no questions, shortcuts on the desktop and in the Start
 # menu, and Clyde starts when the install ends. Data in %APPDATA%\Clyde survives uninstalls.
@@ -36,6 +38,11 @@ nsis:
   shortcutName: Clyde
   artifactName: Clyde-Setup-${version}.exe
   deleteAppDataOnUninstall: false
+# A single exe that runs without installing: it unpacks itself to a temporary folder at each
+# start, and keeps its data in Clyde-data next to the exe (see src/main/index.ts).
+portable:
+  artifactName: Clyde-${version}-portable.exe
+  splashImage: resources/portable-splash.bmp
 mac:
   target: dmg
   category: public.app-category.developer-tools
