@@ -32,6 +32,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { ProfileDot } from '@/components/ProfileBadge'
 import { invoke } from '@/lib/ipc'
 import { useProfiles } from '@/stores/profiles'
+import { useLayout } from '@/stores/layout'
 import { ProfileDialog } from './ProfileDialog'
 import { LoginDialog } from './LoginDialog'
 
@@ -170,6 +171,8 @@ export function AccountsPage() {
   const test = useProfiles((s) => s.test)
   const [distribution, setDistribution] = useState(false)
   const [editing, setEditing] = useState<Profile | 'new' | null>(null)
+  const intent = useLayout((s) => s.intent)
+  const clearIntent = useLayout((s) => s.clearIntent)
   const [loginFor, setLoginFor] = useState<Profile | null>(null)
   const [deleting, setDeleting] = useState<Profile | null>(null)
   const closeLogin = useCallback(() => setLoginFor(null), [])
@@ -233,8 +236,12 @@ export function AccountsPage() {
       </div>
 
       <ProfileDialog
-        open={editing !== null}
-        onOpenChange={(open) => !open && setEditing(null)}
+        open={editing !== null || intent === 'new-account'}
+        onOpenChange={(open) => {
+          if (open) return
+          setEditing(null)
+          if (intent === 'new-account') clearIntent()
+        }}
         {...(editing && editing !== 'new' ? { profile: editing } : {})}
         distribution={distribution}
         onCreated={onCreated}

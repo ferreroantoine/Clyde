@@ -228,7 +228,10 @@ function Board() {
   const tasks = useBoard((s) => s.tasks)
   const agents = useBoard((s) => s.agents)
   const workspace = useWorkspace((s) => s.info)
-  const [creating, setCreating] = useState(false)
+  const [creatingLocal, setCreating] = useState(false)
+  const intent = useLayout((s) => s.intent)
+  const clearIntent = useLayout((s) => s.clearIntent)
+  const creating = creatingLocal || intent === 'new-task'
   const columns: Record<TaskStatus, Task[]> = { todo: [], in_progress: [], review: [], done: [] }
   for (const t of tasks) columns[t.status].push(t)
 
@@ -261,7 +264,13 @@ function Board() {
           </section>
         ))}
       </div>
-      <NewTaskDialog open={creating} onOpenChange={setCreating} />
+      <NewTaskDialog
+        open={creating}
+        onOpenChange={(open) => {
+          setCreating(open)
+          if (!open && intent === 'new-task') clearIntent()
+        }}
+      />
     </div>
   )
 }
@@ -329,6 +338,8 @@ function AgentCard({ agent, onEdit }: { agent: AgentDefinition; onEdit: () => vo
 function AgentsList() {
   const agents = useBoard((s) => s.agents)
   const [editing, setEditing] = useState<AgentDefinition | 'new' | null>(null)
+  const intent = useLayout((s) => s.intent)
+  const clearIntent = useLayout((s) => s.clearIntent)
   return (
     <div className="h-full overflow-y-auto px-6 py-5">
       <div className="mb-4 flex items-center justify-between">
@@ -349,8 +360,12 @@ function AgentsList() {
         </div>
       )}
       <AgentDialog
-        open={editing !== null}
-        onOpenChange={(o) => !o && setEditing(null)}
+        open={editing !== null || intent === 'new-agent'}
+        onOpenChange={(o) => {
+          if (o) return
+          setEditing(null)
+          if (intent === 'new-agent') clearIntent()
+        }}
         {...(editing && editing !== 'new' ? { agent: editing } : {})}
       />
     </div>
@@ -358,7 +373,9 @@ function AgentsList() {
 }
 
 export function AgentsPage() {
-  const [tab, setTab] = useState<'board' | 'agents'>('board')
+  const [chosenTab, setTab] = useState<'board' | 'agents'>('board')
+  const intent = useLayout((s) => s.intent)
+  const tab = intent === 'new-agent' ? 'agents' : intent === 'new-task' ? 'board' : chosenTab
   const review = useBoard((s) => s.review)
   const reviewTask = useBoard((s) => (s.review ? s.tasks.find((t) => t.id === s.review?.taskId) : undefined))
   if (review && reviewTask) return <ReviewView task={reviewTask} />

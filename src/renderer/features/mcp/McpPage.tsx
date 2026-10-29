@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { EmptyState } from '@/components/EmptyState'
 import { useMcp } from '@/stores/mcp'
+import { useLayout } from '@/stores/layout'
 import { cn } from '@/lib/utils'
 import { McpServerDialog } from './McpServerDialog'
 
@@ -195,17 +196,15 @@ export function McpPage() {
   const servers = useMcp((s) => s.servers)
   const loaded = useMcp((s) => s.loaded)
   const remove = useMcp((s) => s.remove)
-  const previewImport = useMcp((s) => s.previewImport)
+  const preview = useMcp((s) => s.preview)
+  const picking = useMcp((s) => s.picking)
+  const startImport = useMcp((s) => s.startImport)
+  const closeImport = useMcp((s) => s.closeImport)
+  const intent = useLayout((s) => s.intent)
+  const clearIntent = useLayout((s) => s.clearIntent)
   const [editing, setEditing] = useState<McpServer | 'new' | null>(null)
   const [deleting, setDeleting] = useState<McpServer | null>(null)
-  const [preview, setPreview] = useState<McpImportPreview | null>(null)
-  const [picking, setPicking] = useState(false)
-
-  const pick = async () => {
-    setPicking(true)
-    setPreview(await previewImport())
-    setPicking(false)
-  }
+  const pick = () => void startImport()
 
   return (
     <div className="h-full overflow-y-auto">
@@ -218,7 +217,7 @@ export function McpPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => void pick()} disabled={picking}>
+            <Button size="sm" variant="outline" onClick={pick} disabled={picking}>
               {picking ? <LoaderCircle className="animate-spin" /> : <FileInput />} Import claude_desktop_config.json
             </Button>
             <Button size="sm" onClick={() => setEditing('new')}>
@@ -245,11 +244,15 @@ export function McpPage() {
       </div>
 
       <McpServerDialog
-        open={editing !== null}
-        onOpenChange={(open) => !open && setEditing(null)}
+        open={editing !== null || intent === 'new-mcp'}
+        onOpenChange={(open) => {
+          if (open) return
+          setEditing(null)
+          if (intent === 'new-mcp') clearIntent()
+        }}
         {...(editing && editing !== 'new' ? { server: editing } : {})}
       />
-      {preview && <ImportDialog key={preview.path} preview={preview} onClose={() => setPreview(null)} />}
+      {preview && <ImportDialog key={preview.path} preview={preview} onClose={closeImport} />}
       <Dialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>

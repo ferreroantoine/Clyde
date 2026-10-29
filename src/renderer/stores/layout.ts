@@ -3,6 +3,15 @@ import { persist } from 'zustand/middleware'
 
 export type CenterView = 'editor' | 'agents' | 'accounts' | 'mcp' | 'supervision' | 'settings'
 export type SidebarTab = 'files' | 'search'
+/** A dialog another part of the UI (the command palette) asked a page to open. */
+export type Intent = 'new-account' | 'new-mcp' | 'new-task' | 'new-agent'
+
+const INTENT_VIEW: Record<Intent, CenterView> = {
+  'new-account': 'accounts',
+  'new-mcp': 'mcp',
+  'new-task': 'agents',
+  'new-agent': 'agents'
+}
 
 interface LayoutState {
   center: CenterView
@@ -20,6 +29,10 @@ interface LayoutState {
   toggleSidebar: () => void
   toggleAgentPanel: () => void
   toggleTerminal: () => void
+  intent: Intent | null
+  /** Shows the page that owns the intent; the page opens its dialog while the intent is set. */
+  request: (intent: Intent) => void
+  clearIntent: () => void
 }
 
 export const useLayout = create<LayoutState>()(
@@ -42,7 +55,10 @@ export const useLayout = create<LayoutState>()(
       setTerminalOpen: (open) => set({ terminalOpen: open }),
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       toggleAgentPanel: () => set((s) => ({ agentPanelOpen: !s.agentPanelOpen })),
-      toggleTerminal: () => set((s) => ({ terminalOpen: !s.terminalOpen }))
+      toggleTerminal: () => set((s) => ({ terminalOpen: !s.terminalOpen })),
+      intent: null,
+      request: (intent) => set({ intent, center: INTENT_VIEW[intent] }),
+      clearIntent: () => set({ intent: null })
     }),
     {
       name: 'atelier.layout',

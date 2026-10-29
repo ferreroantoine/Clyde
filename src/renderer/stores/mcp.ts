@@ -11,14 +11,20 @@ interface McpState {
   update: (input: McpServerUpdate) => Promise<boolean>
   remove: (id: string) => Promise<void>
   reconnect: (id: string) => Promise<void>
-  /** Opens the file picker; null when cancelled. */
-  previewImport: () => Promise<McpImportPreview | null>
+  /** The import being previewed, after the user picked a file. */
+  preview: McpImportPreview | null
+  picking: boolean
+  /** Opens the file picker, then the preview. */
+  startImport: () => Promise<void>
+  closeImport: () => void
   importServers: (path: string, names: string[]) => Promise<boolean>
 }
 
 export const useMcp = create<McpState>()((set) => ({
   servers: [],
   loaded: false,
+  preview: null,
+  picking: false,
 
   init: () => {
     const off = on('mcp:changed', (servers) => set({ servers }))
@@ -59,14 +65,18 @@ export const useMcp = create<McpState>()((set) => ({
     await invoke('mcp:reconnect', { id }).catch((err) => notify.error('Could not reconnect', err))
   },
 
-  previewImport: async () => {
+  startImport: async () => {
+    set({ picking: true })
     try {
-      return await invoke('mcp:importPreview')
+      set({ preview: await invoke('mcp:importPreview') })
     } catch (err) {
       notify.error('Could not read that file', err)
-      return null
+    } finally {
+      set({ picking: false })
     }
   },
+
+  closeImport: () => set({ preview: null }),
 
   importServers: async (path, names) => {
     try {
