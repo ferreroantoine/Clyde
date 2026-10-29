@@ -4,6 +4,7 @@ import { invoke, on } from '@/lib/ipc'
 import { notify } from './notifications'
 import { useExplorer } from './explorer'
 import { useEditor } from './editor'
+import { useTerminals } from './terminals'
 
 interface WorkspaceState {
   info: WorkspaceInfo | null
@@ -17,7 +18,10 @@ function onWorkspaceChanged(info: WorkspaceInfo | null, previous: WorkspaceInfo 
   if (info?.root === previous?.root) return
   useEditor.getState().closeAll()
   useExplorer.getState().reset()
-  if (info) void useExplorer.getState().loadDir('')
+  if (info) {
+    void useExplorer.getState().loadDir('')
+    void useTerminals.getState().workspaceChanged(info.root)
+  }
 }
 
 export const useWorkspace = create<WorkspaceState>()((set, get) => ({
