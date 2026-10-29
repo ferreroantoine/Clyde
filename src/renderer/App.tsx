@@ -11,6 +11,7 @@ import { useSettings } from '@/stores/settings'
 import { useWorkspace } from '@/stores/workspace'
 import { useEditor } from '@/stores/editor'
 import { useProfiles } from '@/stores/profiles'
+import { useAgents } from '@/stores/agents'
 
 export function App() {
   const theme = useSettings((s) => s.settings.theme)
@@ -29,7 +30,9 @@ export function App() {
       })
     const offTerminals = useTerminals.getState().init()
     const offProfiles = useProfiles.getState().init()
+    const offAgents = useAgents.getState().init()
     return () => {
+      offAgents()
       disposed = true
       off?.()
       offTerminals()
