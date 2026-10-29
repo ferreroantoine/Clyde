@@ -9,7 +9,19 @@ export type OpenAICompatKind = 'openai' | 'gemini' | 'ollama'
 export function toOpenAIMessages(system: string, messages: ChatMessage[]): Message[] {
   const out: Message[] = [{ role: 'system', content: system }]
   for (const m of messages) {
-    if (m.role === 'user') out.push({ role: 'user', content: m.text })
+    if (m.role === 'user') {
+      out.push(
+        m.images?.length
+          ? {
+              role: 'user',
+              content: [
+                ...m.images.map((img) => ({ type: 'image_url' as const, image_url: { url: `data:${img.mime};base64,${img.data}` } })),
+                { type: 'text' as const, text: m.text }
+              ]
+            }
+          : { role: 'user', content: m.text }
+      )
+    }
     else if (m.role === 'assistant') {
       out.push({
         role: 'assistant',

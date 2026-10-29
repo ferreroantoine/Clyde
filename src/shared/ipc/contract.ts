@@ -18,6 +18,17 @@ import { priceInputSchema, type PriceRow } from '../pricing'
 import type { Dashboard, SessionTranscript } from '../metrics'
 import type { AppNotice } from '../notices'
 import type { CliStatus } from '../cli'
+import {
+  chatEditSchema,
+  chatSendSchema,
+  conversationCreateSchema,
+  conversationIdSchema,
+  conversationUpdateSchema,
+  type ChatLive,
+  type ChatMessage,
+  type ChatUsage,
+  type Conversation
+} from '../chat'
 import type { DataPaths, ImportSummary } from '../config-export'
 import type { LimitAlert, LimitDiagnostic, LimitHistory, ProfileLimits, SessionLimitUsage } from '../limits'
 import { mcpIdSchema, mcpServerInputSchema, mcpServerUpdateSchema, type McpImportPreview, type McpServer } from '../mcp'
@@ -106,6 +117,20 @@ export const requestSchemas = {
   'tasks:abandon': z.object({ id: taskIdSchema }),
   'tasks:delete': z.object({ id: taskIdSchema }),
   'tasks:reorder': z.object({ id: taskIdSchema, beforeId: taskIdSchema.nullable() }),
+  'chat:list': z.undefined(),
+  'chat:create': conversationCreateSchema,
+  'chat:update': conversationUpdateSchema,
+  'chat:delete': z.object({ id: conversationIdSchema }),
+  'chat:messages': z.object({ id: conversationIdSchema }),
+  'chat:send': chatSendSchema,
+  'chat:edit': chatEditSchema,
+  'chat:regenerate': z.object({ id: conversationIdSchema }),
+  'chat:stop': z.object({ id: conversationIdSchema }),
+  'chat:search': z.object({ query: z.string().max(200) }),
+  'chat:usage': z.object({ id: conversationIdSchema }),
+  'chat:live': z.object({ id: conversationIdSchema }),
+  'chat:continueInProject': z.object({ id: conversationIdSchema }),
+  'chat:attachment': z.object({ id: conversationIdSchema, attachmentId: z.uuid() }),
   'metrics:dashboard': z.object({ range: z.enum(['24h', '7d', '30d']).default('7d') }),
   'metrics:transcript': z.object({ sessionId: z.string().min(1).max(64) }),
   'limits:list': z.undefined(),
@@ -177,6 +202,21 @@ export interface InvokeResponses {
   'tasks:abandon': Task
   'tasks:delete': null
   'tasks:reorder': Task[]
+  'chat:list': Conversation[]
+  'chat:create': Conversation
+  'chat:update': Conversation
+  'chat:delete': null
+  'chat:messages': ChatMessage[]
+  'chat:send': ChatMessage
+  'chat:edit': null
+  'chat:regenerate': null
+  'chat:stop': null
+  'chat:search': string[]
+  'chat:usage': ChatUsage
+  'chat:live': ChatLive
+  'chat:continueInProject': AgentSessionInfo
+  /** An attachment's bytes, base64, for image previews. */
+  'chat:attachment': { mime: string; data: string }
   'metrics:dashboard': Dashboard
   'metrics:transcript': SessionTranscript
   'limits:list': ProfileLimits[]
@@ -201,6 +241,9 @@ export interface EventPayloads {
   'mcp:changed': McpServer[]
   'agents:changed': AgentDefinition[]
   'tasks:changed': Task[]
+  'chat:changed': Conversation[]
+  'chat:message': ChatMessage
+  'chat:live': ChatLive
   'limits:changed': ProfileLimits
   'limits:sessionChanged': { sessionId: string; usage: SessionLimitUsage[] }
   'limits:alert': LimitAlert

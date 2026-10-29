@@ -42,6 +42,12 @@ export const agentStartSchema = z.object({
   /** The saved agent and the board task this session works for, if any. */
   agentId: z.uuid().optional(),
   taskId: z.uuid().optional(),
+  /**
+   * The chat conversation this session answers, if any. A chat session only reads (files in its
+   * own folder, which holds the attachments) and uses the MCP tools it was given; it never
+   * writes files or runs commands, and it never asks for approval.
+   */
+  chatId: z.uuid().optional(),
   /** MCP tools this agent may use, as `mcp__<server>__<tool>`. Nothing else from MCP is visible to it. */
   mcpTools: z
     .array(z.string().regex(/^mcp__[a-z0-9_-]+__.+$/).max(300))
@@ -72,6 +78,7 @@ export interface AgentSessionInfo {
   mcpTools: string[]
   agentId: string | null
   taskId: string | null
+  chatId: string | null
   status: AgentStatus
   createdAt: number
 }

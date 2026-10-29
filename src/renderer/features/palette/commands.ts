@@ -34,6 +34,7 @@ export function buildCommands(): Command[] {
   const sc = (id: string) => (keys[id] ? { shortcut: formatCombo(keys[id] as string) } : {})
 
   const commands: Command[] = [
+    { id: 'go.chat', title: t('Go to Chat'), group: t('Go to'), ...sc('view.chat'), run: () => layout.showCenter('chat') },
     { id: 'go.files', title: t('Go to Explorer'), group: t('Go to'), ...sc('view.explorer'), run: () => layout.showSidebarTab('files') },
     { id: 'go.search', title: t('Search in files'), group: t('Go to'), ...sc('view.search'), run: () => layout.showSidebarTab('search') },
     { id: 'go.file', title: t('Go to file…'), group: t('Go to'), ...sc('file.quickOpen'), run: () => setTimeout(() => usePalette.getState().show('files')) },

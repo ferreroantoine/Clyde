@@ -311,6 +311,7 @@ function Transcript() {
       mcpTools: [],
       agentId: s.agentId,
       taskId: s.taskId,
+      chatId: null,
       status: 'stopped',
       createdAt: s.startedAt
     })

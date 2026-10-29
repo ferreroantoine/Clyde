@@ -12,6 +12,7 @@ const info: AgentSessionInfo = {
   mcpTools: [],
   agentId: null,
   taskId: null,
+  chatId: null,
   status: 'idle',
   createdAt: 0
 }

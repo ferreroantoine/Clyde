@@ -17,6 +17,7 @@ import { useAgents } from '@/stores/agents'
 import { useMcp } from '@/stores/mcp'
 import { useBoard } from '@/stores/board'
 import { useLimits } from '@/stores/limits'
+import { useChat } from '@/stores/chat'
 import { usePalette } from '@/stores/palette'
 import { CommandPalette } from '@/features/palette/CommandPalette'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -57,7 +58,7 @@ export function App() {
         // Settings › General › Start view.
         const view = useSettings.getState().settings.general.startView
         const layout = useLayout.getState()
-        if (view === 'agents' || view === 'supervision') layout.showCenter(view)
+        if (view === 'chat' || view === 'agents' || view === 'supervision') layout.showCenter(view)
         else layout.showCenter('editor')
       })
     // Settings › Notifications › Sounds.
@@ -81,6 +82,7 @@ export function App() {
     const offMcp = useMcp.getState().init()
     const offBoard = useBoard.getState().init()
     const offLimits = useLimits.getState().init()
+    const offChat = useChat.getState().init()
     void invoke('app:notices')
       .then((notices) => {
         for (const n of notices) useNotifications.getState().push({ level: 'info', persistent: true, ...describeNotice(n) })
@@ -89,6 +91,7 @@ export function App() {
     return () => {
       offBoard()
       offLimits()
+      offChat()
       offSounds()
       offMcp()
       offAgents()
@@ -115,7 +118,7 @@ export function App() {
       'file.quickOpen': () => usePalette.getState().show('files'),
       'file.save': () => void useEditor.getState().save(),
       'file.openFolder': () => void useWorkspace.getState().pick(),
-      'view.chat': () => layout().showCenter('editor'),
+      'view.chat': () => layout().showCenter('chat'),
       'view.explorer': () => layout().showSidebarTab('files'),
       'view.search': () => layout().showSidebarTab('search'),
       'view.settings': () => layout().showSettings(),
