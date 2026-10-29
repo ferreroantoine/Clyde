@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Check, KeyRound, UserRound } from 'lucide-react'
-import { PROFILE_COLORS, type ClaudeAuthMode, type Profile } from '@shared/profiles'
+import { PROFILE_COLORS, type AuthMode, type Profile } from '@shared/profiles'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -97,7 +97,7 @@ function ProfileForm({
   const [name, setName] = useState(profile?.name ?? '')
   const [label, setLabel] = useState(profile?.label ?? '')
   const [color, setColor] = useState<string>(() => profile?.color ?? nextColor())
-  const [auth, setAuth] = useState<ClaudeAuthMode>(profile?.auth ?? (distribution ? 'api-key' : 'subscription'))
+  const [auth, setAuth] = useState<AuthMode>(profile?.auth ?? (distribution ? 'api-key' : 'subscription'))
   const [apiKey, setApiKey] = useState('')
   const [defaultModel, setDefaultModel] = useState(profile?.defaultModel ?? '')
   const [saving, setSaving] = useState(false)

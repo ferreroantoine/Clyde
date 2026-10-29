@@ -3,9 +3,12 @@ import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { AppError } from '@shared/errors'
 import {
+  DEFAULT_OLLAMA_URL,
+  KIND_AUTH,
+  PROFILE_KIND_LABELS,
   profileCreateSchema,
   profileUpdateSchema,
-  type ClaudeAuthMode,
+  type AuthMode,
   type Profile,
   type ProfileCreate,
   type ProfileKind,
@@ -25,6 +28,7 @@ interface Row {
   color: string
   auth: string
   default_model: string
+  base_url: string
   created_at: number
   updated_at: number
 }
@@ -44,7 +48,7 @@ export class ProfilesService {
   ) {}
 
   private toProfile(row: Row): Profile {
-    const auth = row.auth as ClaudeAuthMode
+    const auth = row.auth as AuthMode
     return {
       id: row.id,
       kind: row.kind as ProfileKind,
@@ -53,6 +57,7 @@ export class ProfilesService {
       color: row.color,
       auth,
       defaultModel: row.default_model,
+      baseUrl: row.base_url,
       hasApiKey: auth === 'api-key' && this.secrets.has(row.id, API_KEY),
       personalUse: auth === 'subscription',
       usable: !(this.opts.distribution && auth === 'subscription'),
@@ -83,25 +88,29 @@ export class ProfilesService {
 
   create(input: ProfileCreate): Profile {
     const data = profileCreateSchema.parse(input)
+    if (!KIND_AUTH[data.kind].includes(data.auth)) {
+      throw new AppError('invalid_request', `${PROFILE_KIND_LABELS[data.kind]} accounts cannot use ${data.auth} sign-in`)
+    }
     if (data.auth === 'subscription' && this.opts.distribution) {
       throw new AppError('not_allowed', 'Claude subscription profiles are disabled in this build. Use an API key profile.')
     }
     if (data.auth === 'api-key' && !data.apiKey) throw new AppError('invalid_request', 'An API key is required')
-    if (data.auth === 'subscription' && data.apiKey) {
-      throw new AppError('invalid_request', 'Subscription profiles sign in with Claude Code, not with a key')
+    if (data.auth !== 'api-key' && data.apiKey) {
+      throw new AppError('invalid_request', 'This account does not use an API key')
     }
+    const baseUrl = data.kind === 'ollama' ? normalizeUrl(data.baseUrl || DEFAULT_OLLAMA_URL) : ''
     const id = randomUUID()
     const now = Date.now()
     this.db.transaction(() => {
       this.db
         .prepare(
-          `INSERT INTO profiles (id, kind, name, label, color, auth, default_model, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO profiles (id, kind, name, label, color, auth, default_model, base_url, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
-        .run(id, data.kind, data.name, data.label, data.color, data.auth, data.defaultModel, now, now)
+        .run(id, data.kind, data.name, data.label, data.color, data.auth, data.defaultModel, baseUrl, now, now)
       if (data.apiKey) this.secrets.set(id, API_KEY, data.apiKey)
     })()
-    this.configDir(id)
+    if (data.kind === 'claude-code') this.configDir(id)
     this.changed()
     return this.get(id)
   }
@@ -110,16 +119,21 @@ export class ProfilesService {
     const data = profileUpdateSchema.parse(input)
     const current = this.get(data.id)
     if (data.apiKey && current.auth !== 'api-key') {
-      throw new AppError('invalid_request', 'Subscription profiles sign in with Claude Code, not with a key')
+      throw new AppError('invalid_request', 'This account does not use an API key')
     }
+    const baseUrl =
+      current.kind === 'ollama' && data.baseUrl !== undefined ? normalizeUrl(data.baseUrl || DEFAULT_OLLAMA_URL) : current.baseUrl
     this.db.transaction(() => {
       this.db
-        .prepare('UPDATE profiles SET name = ?, label = ?, color = ?, default_model = ?, updated_at = ? WHERE id = ?')
+        .prepare(
+          'UPDATE profiles SET name = ?, label = ?, color = ?, default_model = ?, base_url = ?, updated_at = ? WHERE id = ?'
+        )
         .run(
           data.name ?? current.name,
           data.label ?? current.label,
           data.color ?? current.color,
           data.defaultModel ?? current.defaultModel,
+          baseUrl,
           Date.now(),
           data.id
         )
@@ -140,7 +154,7 @@ export class ProfilesService {
     this.changed()
   }
 
-  /** The profile's own CLAUDE_CONFIG_DIR, created on demand. */
+  /** The profile's own CLAUDE_CONFIG_DIR, created on demand. Only Claude Code profiles use it. */
   configDir(id: string): string {
     const dir = this.dirOf(id)
     mkdirSync(dir, { recursive: true })
@@ -159,4 +173,9 @@ export class ProfilesService {
   private changed(): void {
     this.opts.onChanged?.(this.list())
   }
+}
+
+/** Drops a trailing slash and an `/v1` suffix people paste from OpenAI-style docs. */
+export function normalizeUrl(url: string): string {
+  return url.trim().replace(/\/+$/, '').replace(/\/v1$/i, '')
 }

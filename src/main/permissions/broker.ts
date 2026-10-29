@@ -17,7 +17,7 @@ interface Pending {
   resolve: (outcome: ApprovalOutcome) => void
 }
 
-const SHELL_TOOLS = new Set(['Bash', 'PowerShell', 'Monitor'])
+const SHELL_TOOLS = new Set(['Bash', 'PowerShell', 'Monitor', 'run_command'])
 
 /**
  * What "allow for this session" covers: the exact command for shell tools, the whole tool otherwise.

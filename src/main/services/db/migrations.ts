@@ -44,5 +44,32 @@ export const migrations: Migration[] = [
         PRIMARY KEY (profile_id, name)
       );
     `
+  },
+  {
+    version: 3,
+    name: 'profile base url',
+    sql: `ALTER TABLE profiles ADD COLUMN base_url TEXT NOT NULL DEFAULT '';`
+  },
+  {
+    version: 4,
+    name: 'mcp servers',
+    sql: `
+      CREATE TABLE mcp_servers (
+        id         TEXT PRIMARY KEY,
+        name       TEXT NOT NULL,
+        slug       TEXT NOT NULL UNIQUE,
+        transport  TEXT NOT NULL,
+        command    TEXT NOT NULL DEFAULT '',
+        args_json  TEXT NOT NULL DEFAULT '[]',
+        url        TEXT NOT NULL DEFAULT '',
+        -- safeStorage ciphertext of {"env": {...}, "headers": {...}}; NULL when both are empty.
+        secrets    BLOB,
+        env_keys   TEXT NOT NULL DEFAULT '[]',
+        header_keys TEXT NOT NULL DEFAULT '[]',
+        enabled    INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+    `
   }
 ]

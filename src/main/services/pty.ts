@@ -32,6 +32,11 @@ export function defaultShell(): string {
   return (detectedShell = 'powershell.exe')
 }
 
+/** True on Windows when PowerShell 7 (pwsh) is installed. */
+export function hasPwsh(): boolean {
+  return process.platform === 'win32' && /pwsh(\.exe)?$/i.test(defaultShell())
+}
+
 export function windowsBuild(): number | null {
   if (process.platform !== 'win32') return null
   const build = Number(release().split('.')[2])

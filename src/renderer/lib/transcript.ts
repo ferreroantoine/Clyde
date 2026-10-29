@@ -25,7 +25,7 @@ export type TranscriptItem =
       isError: boolean
       subtype: string
       errors: string[]
-      costUsd: number
+      costUsd: number | null
       inputTokens: number
       outputTokens: number
       durationMs: number
@@ -142,7 +142,7 @@ function reduce(view: SessionView, event: AgentEvent, seq: number): SessionView 
         ...view,
         items: [...items, { kind: 'turn', id: `turn-${seq}`, ...withoutType(event) }],
         totals: {
-          costUsd: view.totals.costUsd + event.costUsd,
+          costUsd: view.totals.costUsd + (event.costUsd ?? 0),
           inputTokens: view.totals.inputTokens + event.inputTokens,
           outputTokens: view.totals.outputTokens + event.outputTokens
         }

@@ -105,3 +105,38 @@ describe('ProfilesService', () => {
     expect(() => dist.requireUsable(p.id)).toThrow(/disabled/)
   })
 })
+
+describe('API provider profiles', () => {
+  it('accepts each kind with its own sign-in', () => {
+    const { profiles } = setup()
+    const openai = profiles.create({ kind: 'openai', name: 'OpenAI', color: '#22c55e', auth: 'api-key', apiKey: 'sk-proj-123' })
+    expect(openai).toMatchObject({ kind: 'openai', auth: 'api-key', hasApiKey: true, personalUse: false, baseUrl: '' })
+    const ollama = profiles.create({ kind: 'ollama', name: 'Local', color: '#64748b', auth: 'none' })
+    expect(ollama).toMatchObject({ baseUrl: 'http://localhost:11434', hasApiKey: false })
+    const remote = profiles.create({
+      kind: 'ollama',
+      name: 'GPU box',
+      color: '#64748b',
+      auth: 'none',
+      baseUrl: 'http://gpu.lan:11434/v1/'
+    })
+    expect(remote.baseUrl).toBe('http://gpu.lan:11434')
+    expect(profiles.update({ id: remote.id, baseUrl: 'https://ollama.example.com/' }).baseUrl).toBe('https://ollama.example.com')
+  })
+
+  it('rejects sign-in modes a kind does not support', () => {
+    const { profiles } = setup()
+    expect(() => profiles.create({ kind: 'mistral', name: 'M', color: '#f97316', auth: 'subscription' })).toThrow(/cannot use/)
+    expect(() => profiles.create({ kind: 'ollama', name: 'O', color: '#f97316', auth: 'api-key', apiKey: 'k' })).toThrow(/cannot use/)
+    expect(() => profiles.create({ kind: 'anthropic', name: 'A', color: '#f97316', auth: 'api-key' })).toThrow(/API key is required/)
+    expect(() =>
+      profiles.create({ kind: 'ollama', name: 'O', color: '#f97316', auth: 'none', baseUrl: 'ftp://x' })
+    ).toThrow()
+  })
+
+  it('creates no Claude Code folder for API accounts', () => {
+    const { profiles, root } = setup()
+    const p = profiles.create({ kind: 'ollama', name: 'Local', color: '#64748b', auth: 'none' })
+    expect(existsSync(join(root, p.id))).toBe(false)
+  })
+})

@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, dialog } from 'electron'
+import { app, BrowserWindow, dialog, net } from 'electron'
 import { openDatabase, migrate, type Db } from './services/db/database'
 import { SqliteSettingsRepository } from './services/db/settings-repo'
 import { createMainWindow } from './window'
@@ -9,13 +9,17 @@ import { registerWorkspaceHandlers } from './ipc/workspace'
 import { broadcast } from './ipc/events'
 import { MemorySettingsRepository, SettingsService } from './services/settings'
 import { WorkspaceService } from './services/workspace'
-import { PtyService } from './services/pty'
+import { hasPwsh, PtyService } from './services/pty'
 import { registerTerminalHandlers } from './ipc/terminal'
 import { registerProfileHandlers } from './ipc/profiles'
 import { registerAgentHandlers } from './ipc/agents'
 import { SecretsService, safeStorageCipher } from './services/secrets'
 import { ProfilesService } from './services/profiles'
 import { AgentManager } from './agents/manager'
+import { createAdapter } from './agents/api/clients'
+import { McpStore } from './mcp/store'
+import { McpHub } from './mcp/hub'
+import { registerMcpHandlers } from './ipc/mcp'
 import { loadQuery, type QueryFn } from './agents/claude-code/provider'
 import { DISTRIBUTION } from './build-flags'
 
@@ -95,8 +99,17 @@ if (!app.requestSingleInstanceLock()) {
       distribution: DISTRIBUTION,
       onChanged: (list) => broadcast('profiles:changed', list)
     })
+    const mcp = new McpHub(new McpStore(profileDb, safeStorageCipher), {
+      onChanged: (list) => broadcast('mcp:changed', list),
+      log: createLogger('mcp')
+    })
+    // net.fetch goes through Chromium's network stack, so system proxies apply to API calls too.
+    const fetch = ((input, init) => net.fetch(input as string, init)) as typeof globalThis.fetch
     const agents = new AgentManager({
       profiles,
+      mcp,
+      createAdapter: (target) => createAdapter(target, fetch),
+      hasPwsh,
       claudeCodePath,
       workspaceRoot: () => workspace.current()?.root ?? null,
       query,
@@ -105,11 +118,14 @@ if (!app.requestSingleInstanceLock()) {
       clientApp,
       log: createLogger('agents')
     })
-    registerProfileHandlers({ profiles, ptys, claudeCodePath, query, clientApp })
+    registerProfileHandlers({ profiles, ptys, claudeCodePath, query, clientApp, fetch })
     registerAgentHandlers(agents)
+    registerMcpHandlers(mcp)
+    mcp.start()
 
     app.on('will-quit', () => {
       agents.stopAll()
+      void mcp.dispose()
       ptys.killAll()
       void workspace.dispose()
       db?.close()
