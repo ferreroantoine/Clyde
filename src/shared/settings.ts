@@ -13,6 +13,7 @@ export const LANGUAGES = ['system', 'en', 'fr'] as const
 export const START_VIEWS = ['chat', 'editor', 'agents', 'supervision'] as const
 export const ACCENTS = ['indigo', 'blue', 'teal', 'green', 'orange', 'rose', 'violet', 'slate'] as const
 export const ANIMATION_LEVELS = ['full', 'reduced', 'off'] as const
+export type AnimationLevel = (typeof ANIMATION_LEVELS)[number]
 const PERMISSION_LEVELS = ['validate-all', 'files-auto', 'autonomous'] as const
 
 const DEFAULT_MONO = "'JetBrains Mono Variable', 'Cascadia Code', Consolas, monospace"

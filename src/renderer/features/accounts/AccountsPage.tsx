@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Appear } from '@/components/Appear'
+import { SkeletonCards } from '@/components/Skeleton'
 import { t } from '@shared/i18n'
 import {
   Bot,
@@ -252,14 +254,11 @@ export function AccountsPage({ embedded = false }: { embedded?: boolean } = {}) 
           </div>
         ) : (
           <div className="mt-8 grid gap-3 sm:grid-cols-2">
+            {!loaded && <SkeletonCards count={2} className="contents space-y-0" />}
             {profiles.map((p) => (
-              <ProfileCard
-                key={p.id}
-                profile={p}
-                onEdit={() => setEditing(p)}
-                onLogin={() => setLoginFor(p)}
-                onDelete={() => setDeleting(p)}
-              />
+              <Appear key={p.id}>
+                <ProfileCard profile={p} onEdit={() => setEditing(p)} onLogin={() => setLoginFor(p)} onDelete={() => setDeleting(p)} />
+              </Appear>
             ))}
           </div>
         )}

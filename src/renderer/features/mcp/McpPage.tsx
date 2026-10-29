@@ -5,7 +5,6 @@ import {
   CircleAlert,
   FileInput,
   Globe,
-  LoaderCircle,
   MoreHorizontal,
   Pencil,
   Plug,
@@ -29,6 +28,8 @@ import { EmptyState } from '@/components/EmptyState'
 import { useMcp } from '@/stores/mcp'
 import { useLayout } from '@/stores/layout'
 import { cn } from '@/lib/utils'
+import { Appear } from '@/components/Appear'
+import { SkeletonCards } from '@/components/Skeleton'
 import { McpServerDialog } from './McpServerDialog'
 
 const STATUS = {
@@ -100,7 +101,7 @@ function ServerCard({ server, onEdit, onDelete }: { server: McpServer; onEdit: (
             type="button"
             onClick={() => setOpen(!open)}
             aria-expanded={open}
-            className="flex w-full items-center gap-1.5 px-4 py-2 text-left text-xs text-muted-foreground hover:bg-accent/40"
+            className="press press-soft flex w-full items-center gap-1.5 px-4 py-2 text-left text-xs text-muted-foreground hover:bg-accent/40"
           >
             <ChevronRight className={cn('size-3 transition-transform', open && 'rotate-90')} />
             {t('Tools')}</button>
@@ -213,8 +214,8 @@ export function McpPage({ embedded = false }: { embedded?: boolean } = {}) {
               {t('Tools for your agents. An agent only sees the tools you tick when you start it.')}</p>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={pick} disabled={picking}>
-              {picking ? <LoaderCircle className="animate-spin" /> : <FileInput />} {t('Import claude_desktop_config.json')}
+            <Button size="sm" variant="outline" onClick={pick} loading={picking}>
+              <FileInput /> {t('Import claude_desktop_config.json')}
             </Button>
             <Button size="sm" onClick={() => setEditing('new')}>
               <Plus /> {' '}{t('Add server')}</Button>
@@ -231,8 +232,11 @@ export function McpPage({ embedded = false }: { embedded?: boolean } = {}) {
           </div>
         ) : (
           <div className="mt-8 space-y-3">
+            {!loaded && <SkeletonCards count={2} />}
             {servers.map((s) => (
-              <ServerCard key={s.id} server={s} onEdit={() => setEditing(s)} onDelete={() => setDeleting(s)} />
+              <Appear key={s.id}>
+                <ServerCard server={s} onEdit={() => setEditing(s)} onDelete={() => setDeleting(s)} />
+              </Appear>
             ))}
           </div>
         )}

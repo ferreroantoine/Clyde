@@ -37,6 +37,9 @@ interface BoardState {
   merge: (id: string) => Promise<MergeResult | null>
   abandon: (id: string) => Promise<void>
   deleteTask: (id: string) => Promise<void>
+  /** Drag and drop inside a column: shown at once, then saved. */
+  reorder: (id: string, beforeId: string | null) => Promise<void>
+  loaded: boolean
   openReview: (taskId: string) => Promise<void>
   selectFile: (path: string) => Promise<void>
   closeReview: () => void
@@ -62,6 +65,7 @@ export const useBoard = create<BoardState>()((set, get) => {
     tasks: [],
     review: null,
     busy: {},
+    loaded: false,
 
     init: () => {
       const offs = [
@@ -85,8 +89,9 @@ export const useBoard = create<BoardState>()((set, get) => {
 
     reloadTasks: async () => {
       try {
-        set({ tasks: await invoke('tasks:list') })
+        set({ tasks: await invoke('tasks:list'), loaded: true })
       } catch (err) {
+        set({ loaded: true })
         notify.error(t('Could not load the board'), err)
       }
     },
@@ -132,6 +137,21 @@ export const useBoard = create<BoardState>()((set, get) => {
 
     deleteTask: async (id) => {
       await act(id, t('Could not delete the task'), () => invoke('tasks:delete', { id }))
+    },
+
+    reorder: async (id, beforeId) => {
+      const before = get().tasks
+      const moving = before.find((x) => x.id === id)
+      if (!moving || id === beforeId) return
+      const rest = before.filter((x) => x.id !== id)
+      const at = beforeId ? rest.findIndex((x) => x.id === beforeId) : -1
+      set({ tasks: at < 0 ? [...rest, moving] : [...rest.slice(0, at), moving, ...rest.slice(at)] })
+      try {
+        set({ tasks: await invoke('tasks:reorder', { id, beforeId }) })
+      } catch (err) {
+        set({ tasks: before })
+        notify.error(t('Could not move the task'), err)
+      }
     },
 
     openReview: async (taskId) => {

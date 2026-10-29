@@ -1,10 +1,11 @@
+import { motion } from 'motion/react'
+import { spring } from '@/lib/motion'
 import { Bot, Files, Gauge, Settings, type LucideIcon } from 'lucide-react'
 import { IconButton } from '@/components/IconButton'
 import { t, tk } from '@shared/i18n'
 import { effectiveBindings, formatCombo } from '@shared/keybindings'
 import { useSettings } from '@/stores/settings'
 import { useLayout, type CenterView } from '@/stores/layout'
-import { cn } from '@/lib/utils'
 
 interface Item {
   view: CenterView
@@ -34,12 +35,10 @@ export function ActivityBar() {
     const shortcut = item.command && bindings[item.command] ? formatCombo(bindings[item.command] as string) : undefined
     return (
     <div key={item.view} className="relative flex justify-center">
-      <span
-        className={cn(
-          'absolute top-1.5 bottom-1.5 left-0 w-0.5 rounded-r bg-primary transition-opacity',
-          isActive(item.view) ? 'opacity-100' : 'opacity-0'
-        )}
-      />
+      {isActive(item.view) && (
+        // One indicator that glides from the previous item to the new one.
+        <motion.span layoutId="activity-indicator" transition={spring.layout} className="absolute top-1.5 bottom-1.5 left-0 w-0.5 rounded-r bg-primary" />
+      )}
       <IconButton
         icon={item.icon}
         label={t(item.label)}

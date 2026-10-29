@@ -18,6 +18,7 @@ export function registerTaskHandlers(agents: AgentDefinitionsService, tasks: Tas
   handle('tasks:fileDiff', ({ id, path }) => tasks.fileDiff(id, path))
   handle('tasks:merge', ({ id }) => tasks.merge(id))
   handle('tasks:abandon', ({ id }) => tasks.abandon(id))
+  handle('tasks:reorder', ({ id, beforeId }) => tasks.reorder(id, beforeId))
   handle('tasks:delete', async ({ id }) => {
     await tasks.delete(id)
     return null

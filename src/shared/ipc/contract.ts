@@ -105,6 +105,7 @@ export const requestSchemas = {
   'tasks:merge': z.object({ id: taskIdSchema }),
   'tasks:abandon': z.object({ id: taskIdSchema }),
   'tasks:delete': z.object({ id: taskIdSchema }),
+  'tasks:reorder': z.object({ id: taskIdSchema, beforeId: taskIdSchema.nullable() }),
   'metrics:dashboard': z.object({ range: z.enum(['24h', '7d', '30d']).default('7d') }),
   'metrics:transcript': z.object({ sessionId: z.string().min(1).max(64) }),
   'limits:list': z.undefined(),
@@ -175,6 +176,7 @@ export interface InvokeResponses {
   'tasks:merge': MergeResult
   'tasks:abandon': Task
   'tasks:delete': null
+  'tasks:reorder': Task[]
   'metrics:dashboard': Dashboard
   'metrics:transcript': SessionTranscript
   'limits:list': ProfileLimits[]

@@ -30,7 +30,7 @@ function Tab({ tab, active }: { tab: EditorTab; active: boolean }) {
           e.stopPropagation()
           close(tab.path)
         }}
-        className="relative flex size-5 shrink-0 items-center justify-center rounded hover:bg-accent"
+        className="press relative flex size-5 shrink-0 items-center justify-center rounded hover:bg-accent"
       >
         {tab.dirty && (
           <span className="absolute size-2 rounded-full bg-foreground/70 group-hover:opacity-0" aria-label={t('Unsaved')} />

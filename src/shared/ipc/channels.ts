@@ -57,6 +57,7 @@ export const INVOKE_CHANNELS = [
   'tasks:merge',
   'tasks:abandon',
   'tasks:delete',
+  'tasks:reorder',
   'metrics:dashboard',
   'metrics:transcript',
   'limits:list',

@@ -47,7 +47,8 @@ export function DataBlock() {
         <Button
           size="sm"
           variant="outline"
-          disabled={busy !== null}
+          disabled={busy !== null && busy !== 'export'}
+          loading={busy === 'export'}
           onClick={() =>
             void run('export', async () => {
               const result = await invoke('data:export')
@@ -62,7 +63,8 @@ export function DataBlock() {
         <Button
           size="sm"
           variant="outline"
-          disabled={busy !== null}
+          disabled={busy !== null && busy !== 'import'}
+          loading={busy === 'import'}
           onClick={() =>
             void run('import', async () => {
               const summary = await invoke('data:import')
@@ -103,6 +105,7 @@ export function DataBlock() {
             </Button>
             <Button
               variant="destructive"
+              loading={busy === 'purge'}
               onClick={() =>
                 void run('purge', async () => {
                   const { sessions } = await invoke('data:purge')

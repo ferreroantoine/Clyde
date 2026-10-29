@@ -311,5 +311,14 @@ export const migrations: Migration[] = [
         PRIMARY KEY (profile_id, window, period, threshold)
       );
     `
+  },
+  {
+    version: 10,
+    name: 'task order',
+    sql: `
+      -- Board order inside a column, set by drag and drop. New tasks go last.
+      ALTER TABLE tasks ADD COLUMN position REAL NOT NULL DEFAULT 0;
+      UPDATE tasks SET position = created_at;
+    `
   }
 ]

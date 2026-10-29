@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react'
+import { MotionConfig } from 'motion/react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Shell } from '@/layout/Shell'
 import { Toaster } from '@/layout/Toaster'
@@ -25,6 +26,7 @@ import { chime } from '@/lib/sound'
 import { useNotifications } from '@/stores/notifications'
 import { describeNotice } from '@shared/notices'
 import { resolveLocale, setLocale } from '@shared/i18n'
+import { effectiveLevel, useSystemReducedMotion } from '@/lib/motion'
 
 export function App() {
   const theme = useSettings((s) => s.settings.appearance.theme)
@@ -34,6 +36,11 @@ export function App() {
     document.documentElement.dataset['accent'] = accent
     document.documentElement.dataset['density'] = density
   }, [accent, density])
+  // Settings › Appearance › Animations, lowered by the system "reduce motion" preference.
+  const motionLevel = effectiveLevel(useSettings((s) => s.settings.appearance.animations), useSystemReducedMotion())
+  useEffect(() => {
+    document.documentElement.dataset['motion'] = motionLevel
+  }, [motionLevel])
   const language = useSettings((s) => s.settings.general.language)
   const locale = resolveLocale(language, navigator.language)
   // Set before the children render, so they already read the new language.
@@ -126,12 +133,14 @@ export function App() {
 
   return (
     // Keyed on the language so every screen renders again in it.
-    <TooltipProvider key={locale} delayDuration={400}>
-      <ErrorBoundary scope="Atelier">
-        <Shell />
-      </ErrorBoundary>
-      <CommandPalette />
-      <Toaster />
-    </TooltipProvider>
+    <MotionConfig reducedMotion={motionLevel === 'full' ? 'never' : 'always'} skipAnimations={motionLevel === 'off'}>
+      <TooltipProvider key={locale} delayDuration={400}>
+        <ErrorBoundary scope="Atelier">
+          <Shell />
+        </ErrorBoundary>
+        <CommandPalette />
+        <Toaster />
+      </TooltipProvider>
+    </MotionConfig>
   )
 }

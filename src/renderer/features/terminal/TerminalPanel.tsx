@@ -34,7 +34,7 @@ function Tab({ tab, active }: { tab: TerminalTab; active: boolean }) {
           e.stopPropagation()
           void close(tab.id)
         }}
-        className="flex size-4 items-center justify-center rounded opacity-0 group-hover:opacity-70 hover:bg-background"
+        className="press flex size-4 items-center justify-center rounded opacity-0 group-hover:opacity-70 hover:bg-background"
       >
         <X className="size-3" />
       </button>
