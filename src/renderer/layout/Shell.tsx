@@ -10,6 +10,7 @@ import { TerminalPanel } from '@/features/terminal/TerminalPanel'
 import { AgentPanel } from '@/features/agent-panel/AgentPanel'
 import { CenterPage } from '@/features/pages/CenterPage'
 import { cn } from '@/lib/utils'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 const storage = typeof window !== 'undefined' ? window.localStorage : undefined
 
@@ -59,7 +60,9 @@ export function Shell() {
                   </div>
                   {center !== 'editor' && (
                     <div className="absolute inset-0 bg-background">
-                      <CenterPage view={center} />
+                      <ErrorBoundary key={center} scope={center[0]?.toUpperCase() + center.slice(1)}>
+                        <CenterPage view={center} />
+                      </ErrorBoundary>
                     </div>
                   )}
                 </div>
@@ -91,7 +94,9 @@ export function Shell() {
             maxSize="50"
             className="bg-chrome"
           >
-            <AgentPanel />
+            <ErrorBoundary scope="The agent panel">
+              <AgentPanel />
+            </ErrorBoundary>
           </Panel>
         </Group>
       </div>
