@@ -6,6 +6,8 @@ import { registerWorkspaceHandlers } from './ipc/workspace'
 import { broadcast } from './ipc/events'
 import { MemorySettingsRepository, SettingsService } from './services/settings'
 import { WorkspaceService } from './services/workspace'
+import { PtyService } from './services/pty'
+import { registerTerminalHandlers } from './ipc/terminal'
 
 const log = createLogger('main')
 
@@ -32,9 +34,20 @@ if (!app.requestSingleInstanceLock()) {
       onChanged: (info) => broadcast('workspace:changed', info),
       onFsChanges: (changes) => broadcast('fs:changed', changes)
     })
+    const ptys = new PtyService(
+      {
+        onData: (id, data) => broadcast('pty:data', { id, data }),
+        onExit: (id, exitCode) => broadcast('pty:exit', { id, exitCode })
+      },
+      () => settings.getAll().terminalShell
+    )
     registerAppHandlers(settings)
     registerWorkspaceHandlers(workspace)
-    app.on('will-quit', () => void workspace.dispose())
+    registerTerminalHandlers(ptys, workspace)
+    app.on('will-quit', () => {
+      ptys.killAll()
+      void workspace.dispose()
+    })
 
     createMainWindow()
     log.info(`started v${app.getVersion()} (electron ${process.versions.electron})`)

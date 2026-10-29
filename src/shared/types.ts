@@ -60,6 +60,8 @@ export interface PtyInfo {
   shell: string
   cwd: string
   title: string
+  /** Windows build, used by xterm to adapt to ConPTY behavior. */
+  windowsBuild: number | null
 }
 
 export interface IpcError {
