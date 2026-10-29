@@ -4,7 +4,7 @@ import { parseToolInput, type AdapterEvent, type ChatAdapter, type ChatMessage, 
 
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam
 
-export type OpenAICompatKind = 'openai' | 'mistral' | 'ollama'
+export type OpenAICompatKind = 'openai' | 'ollama'
 
 export function toOpenAIMessages(system: string, messages: ChatMessage[]): Message[] {
   const out: Message[] = [{ role: 'system', content: system }]
@@ -42,24 +42,18 @@ function stopReason(reason: string | null | undefined): StopReason {
 
 const OPENAI_CHAT = /^(gpt-|o\d|chatgpt-)/i
 const OPENAI_NOT_CHAT = /(audio|realtime|transcribe|tts|image|search|instruct|embedding|moderation)/i
-const MISTRAL_NOT_CHAT = /(embed|moderation|ocr|transcribe)/i
 
 interface RawModel {
   id: string
   created?: number
   name?: string | null
   description?: string | null
-  capabilities?: { function_calling?: boolean; completion_chat?: boolean }
 }
 
 /** Keeps the models that can chat with tools, newest first. */
 export function filterModels(kind: OpenAICompatKind, models: RawModel[]): ModelOption[] {
   const usable = models.filter((m) => {
     if (kind === 'openai') return OPENAI_CHAT.test(m.id) && !OPENAI_NOT_CHAT.test(m.id)
-    if (kind === 'mistral') {
-      if (m.capabilities?.function_calling === false || m.capabilities?.completion_chat === false) return false
-      return !MISTRAL_NOT_CHAT.test(m.id)
-    }
     return true
   })
   const seen = new Set<string>()
@@ -69,7 +63,7 @@ export function filterModels(kind: OpenAICompatKind, models: RawModel[]): ModelO
     .map((m) => ({ value: m.id, displayName: m.name || m.id, description: m.description ?? '' }))
 }
 
-/** OpenAI Chat Completions, which Mistral and Ollama (`/v1`) also speak. */
+/** OpenAI Chat Completions, which Ollama (`/v1`) also speaks. */
 export class OpenAICompatAdapter implements ChatAdapter {
   constructor(
     private readonly client: OpenAI,
@@ -90,8 +84,7 @@ export class OpenAICompatAdapter implements ChatAdapter {
             }
           : {}),
         stream: true,
-        // Mistral rejects stream_options and sends usage on its last chunk anyway.
-        ...(this.kind === 'mistral' ? {} : { stream_options: { include_usage: true } })
+        stream_options: { include_usage: true }
       },
       { signal: req.signal }
     )

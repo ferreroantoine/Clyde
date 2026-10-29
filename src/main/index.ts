@@ -8,6 +8,7 @@ import { registerAppHandlers } from './ipc/app'
 import { registerWorkspaceHandlers } from './ipc/workspace'
 import { broadcast } from './ipc/events'
 import { MemorySettingsRepository, SettingsService } from './services/settings'
+import { NoticesService } from './services/notices'
 import { WorkspaceService } from './services/workspace'
 import { hasPwsh, PtyService } from './services/pty'
 import { registerTerminalHandlers } from './ipc/terminal'
@@ -99,7 +100,7 @@ if (!app.requestSingleInstanceLock()) {
       },
       () => settings.getAll().terminal.shell
     )
-    registerAppHandlers(settings)
+    registerAppHandlers(settings, db ? new NoticesService(db) : null)
     registerWorkspaceHandlers(workspace)
     registerTerminalHandlers(ptys, workspace)
 

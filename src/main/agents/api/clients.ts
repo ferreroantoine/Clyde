@@ -12,7 +12,6 @@ export interface ApiTarget {
   baseUrl: string
 }
 
-const MISTRAL_URL = 'https://api.mistral.ai/v1'
 const ANTHROPIC_URL = 'https://api.anthropic.com'
 
 /**
@@ -33,8 +32,6 @@ export function createAdapter(target: ApiTarget, fetch: typeof globalThis.fetch)
         new OpenAI({ ...common, apiKey: key(), baseURL: 'https://api.openai.com/v1', organization: null, project: null }),
         'openai'
       )
-    case 'mistral':
-      return new OpenAICompatAdapter(new OpenAI({ ...common, apiKey: key(), baseURL: MISTRAL_URL }), 'mistral')
     case 'ollama':
       // Ollama ignores the key, but the SDK requires one.
       return new OpenAICompatAdapter(

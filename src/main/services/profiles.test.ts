@@ -126,7 +126,7 @@ describe('API provider profiles', () => {
 
   it('rejects sign-in modes a kind does not support', () => {
     const { profiles } = setup()
-    expect(() => profiles.create({ kind: 'mistral', name: 'M', color: '#f97316', auth: 'subscription' })).toThrow(/cannot use/)
+    expect(() => profiles.create({ kind: 'openai', name: 'M', color: '#f97316', auth: 'subscription' })).toThrow(/cannot use/)
     expect(() => profiles.create({ kind: 'ollama', name: 'O', color: '#f97316', auth: 'api-key', apiKey: 'k' })).toThrow(/cannot use/)
     expect(() => profiles.create({ kind: 'anthropic', name: 'A', color: '#f97316', auth: 'api-key' })).toThrow(/API key is required/)
     expect(() =>

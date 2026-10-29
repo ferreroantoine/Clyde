@@ -1,4 +1,5 @@
 import type { Db } from './database'
+import { removeMistral } from './remove-mistral'
 
 export interface Migration {
   version: number
@@ -201,5 +202,21 @@ export const migrations: Migration[] = [
         ('seed-claude-3-5-haiku', 'anthropic', 'claude-3-5-haiku', 0.8, 4, 'seed', 0),
         ('seed-mistral-large', 'mistral', 'mistral-large', 0.5, 1.5, 'seed', 0);
     `
+  },
+  {
+    version: 7,
+    name: 'app notices, remove mistral',
+    sql: `
+      -- Messages main leaves for the user, shown once by the renderer.
+      CREATE TABLE app_notices (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        type       TEXT NOT NULL,
+        payload    TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        shown_at   INTEGER
+      );
+      DELETE FROM pricing WHERE kind = 'mistral';
+    `,
+    up: removeMistral
   }
 ]

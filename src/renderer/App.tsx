@@ -18,6 +18,9 @@ import { usePalette } from '@/stores/palette'
 import { CommandPalette } from '@/features/palette/CommandPalette'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { useGlobalErrorToasts } from '@/lib/errors'
+import { invoke } from '@/lib/ipc'
+import { useNotifications } from '@/stores/notifications'
+import { describeNotice } from '@shared/notices'
 
 export function App() {
   const theme = useSettings((s) => s.settings.appearance.theme)
@@ -39,6 +42,11 @@ export function App() {
     const offAgents = useAgents.getState().init()
     const offMcp = useMcp.getState().init()
     const offBoard = useBoard.getState().init()
+    void invoke('app:notices')
+      .then((notices) => {
+        for (const n of notices) useNotifications.getState().push({ level: 'info', persistent: true, ...describeNotice(n) })
+      })
+      .catch(() => undefined)
     return () => {
       offBoard()
       offMcp()

@@ -144,13 +144,6 @@ describe('OpenAICompatAdapter', () => {
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ stream_options: { include_usage: true } }), expect.anything())
   })
 
-  it('does not send stream_options to Mistral', async () => {
-    const create = vi.fn(async () => items(chunks))
-    const adapter = new OpenAICompatAdapter({ chat: { completions: { create } } } as unknown as OpenAI, 'mistral')
-    await collect(adapter.stream(request()))
-    expect((create.mock.calls[0] as unknown[] | undefined)?.[0]).not.toHaveProperty('stream_options')
-  })
-
   it('keeps chat models, newest first', () => {
     expect(
       filterModels('openai', [
@@ -161,13 +154,6 @@ describe('OpenAICompatAdapter', () => {
         { id: 'whisper-1', created: 5 }
       ]).map((m) => m.value)
     ).toEqual(['gpt-5', 'gpt-4o'])
-    expect(
-      filterModels('mistral', [
-        { id: 'mistral-large-latest', capabilities: { function_calling: true } },
-        { id: 'mistral-embed' },
-        { id: 'old-model', capabilities: { function_calling: false } }
-      ]).map((m) => m.value)
-    ).toEqual(['mistral-large-latest'])
     expect(filterModels('ollama', [{ id: 'llama3.2' }, { id: 'qwen3' }]).map((m) => m.value)).toEqual(['llama3.2', 'qwen3'])
   })
 })
