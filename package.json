@@ -12,6 +12,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "lint": "eslint .",
     "test": "vitest run",
+    "package": "electron-vite build && electron-builder --win --x64",
+    "package:dir": "electron-vite build && electron-builder --dir",
     "postinstall": "install-electron",
     "install:prebuilt": "npm install --ignore-scripts && install-electron",
     "drive": "node scripts/drive.mjs"
@@ -69,5 +71,6 @@
     "vite": "^8.3.5",
     "vitest": "^5.0.5",
     "zustand": "^5.0.16"
-  }
+  },
+  "author": "Atelier"
 }

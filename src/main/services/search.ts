@@ -1,7 +1,10 @@
 import { spawn } from 'node:child_process'
-import { rgPath } from '@vscode/ripgrep'
+import { rgPath as bundledRgPath } from '@vscode/ripgrep'
 import { AppError } from '@shared/errors'
 import type { SearchMatch, SearchResult } from '@shared/types'
+import { unpackedPath } from './unpacked'
+
+const rgPath = unpackedPath(bundledRgPath)
 
 export interface SearchOptions {
   query: string

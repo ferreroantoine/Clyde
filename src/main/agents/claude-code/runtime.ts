@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { AppError } from '@shared/errors'
+import { unpackedPath } from '../../services/unpacked'
 
 /** What a Claude Code process needs to run as one profile. */
 export interface ProfileRuntime {
@@ -61,7 +62,7 @@ export function resolveClaudeBinary(override: string): string {
   const exe = process.platform === 'win32' ? 'claude.exe' : 'claude'
   for (const pkg of binaryPackages(process.platform, process.arch)) {
     try {
-      const file = join(dirname(requireHere.resolve(`${pkg}/package.json`)), exe)
+      const file = unpackedPath(join(dirname(requireHere.resolve(`${pkg}/package.json`)), exe))
       if (existsSync(file)) return file
     } catch {
       // not installed for this platform variant
