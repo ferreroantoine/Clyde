@@ -117,3 +117,13 @@ Je travaille dans un conteneur Linux sans compte Claude Pro/Max, ChatGPT ou Goog
 - Raccourcis : tous modifiables, conflits signalés (commandes entre elles et touches de l'éditeur Monaco).
 - Barre d'état système (fermer = réduire, si choisi), notifications de bureau quand Atelier est en arrière-plan, sons.
 
+### Chantier 3 — fait
+- `motion` 14.2 (API `motion/react` vérifiée dans ses types : `MotionConfig reducedMotion/skipAnimations`, `AnimatePresence`, `LayoutGroup`, `layoutId`).
+- Tokens dans `renderer/lib/motion.ts` (durées 150/200/300 ms, ease-out, ressorts amortis, variants) et leurs équivalents CSS (`--motion-*`) dans `globals.css`.
+- Niveau effectif = réglage abaissé à « réduites » par `prefers-reduced-motion` ; `data-motion` sur `<html>` pour le CSS, `MotionConfig` pour motion. « Désactivées » coupe aussi transitions et animations CSS.
+- Boutons, onglets, lignes, cartes : survol, enfoncement (0,97 ; 0,99 pour les lignes), focus visible ; `Button loading` (spinner dans le bouton, désactivé).
+- Transcript : entrées en ressort, cascade plafonnée pour les éléments montés ensemble ; outil en cours = balayage lumineux, icône qui se transforme (cours → coche / erreur), secousse sur erreur (pas au chargement d'un historique) ; demande d'autorisation qui « pop » et luit deux fois ; curseur de frappe pendant le streaming ; défilement doux qui ne lâche le suivi que si l'utilisateur remonte.
+- Toasts : entrée/sortie et empilement animés. Panneaux : transition sur `flex-grow` seulement lors d'une ouverture/fermeture (jamais pendant un redimensionnement à la souris). Vues centrales, onglets, sections de Paramètres : fondu croisé ; indicateurs actifs qui glissent (`layoutId`).
+- Kanban : glisser-déposer HTML5 avec réorganisation animée (aperçu de l'emplacement, cartes qui glissent) ; ordre persistant (migration SQL 10, `tasks.position`, `tasks:reorder`) ; changement de colonne limité aux actions existantes (À faire → En cours = démarrer, À relire → Terminé = fusionner).
+- Skeletons : comptes, serveurs MCP, supervision, tableau, revue de diff, arborescence.
+

@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+import { spring, swap } from '@/lib/motion'
 import { RotateCcw, Search, X } from 'lucide-react'
 import { t } from '@shared/i18n'
 import { Button } from '@/components/ui/button'
@@ -47,7 +49,7 @@ function SectionView({ section, entries, ctx, searching }: { section: SectionSpe
           {t(section.label)}
         </h2>
         {section.resets && !searching && (
-          <Button size="xs" variant="ghost" disabled={resetting} onClick={() => void reset()}>
+          <Button size="xs" variant="ghost" loading={resetting} onClick={() => void reset()}>
             <RotateCcw /> {t('Reset section')}
           </Button>
         )}
@@ -95,12 +97,13 @@ export function SettingsPage() {
                 showSettings(section.id)
               }}
               className={cn(
-                'flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors',
-                active ? 'bg-accent font-medium text-foreground' : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
+                'press press-soft relative flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors',
+                active ? 'font-medium text-foreground' : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
               )}
             >
-              <Icon className="size-4 shrink-0" />
-              <span className="truncate">{t(section.label)}</span>
+              {active && <motion.span layoutId="settings-nav" transition={spring.layout} className="absolute inset-0 rounded-md bg-accent" />}
+              <Icon className="relative size-4 shrink-0" />
+              <span className="relative truncate">{t(section.label)}</span>
             </button>
           )
         })}
@@ -122,20 +125,24 @@ export function SettingsPage() {
                 type="button"
                 aria-label={t('Clear the search')}
                 onClick={() => setQuery('')}
-                className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="press absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 <X className="size-4" />
               </button>
             )}
           </div>
           {!searching && <p className="-mt-3 text-xs text-muted-foreground">{t('Changes apply and are saved as you make them.')}</p>}
-          {results.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">{t('No setting matches “{query}”.', { query: query.trim() })}</p>
-          ) : (
-            results.map(({ section, entries }) => (
-              <SectionView key={section.id} section={section} entries={entries} ctx={ctx} searching={searching} />
-            ))
-          )}
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div key={searching ? 'search' : current} variants={swap} initial="hidden" animate="shown" exit="gone" className="space-y-6">
+              {results.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">{t('No setting matches “{query}”.', { query: query.trim() })}</p>
+              ) : (
+                results.map(({ section, entries }) => (
+                  <SectionView key={section.id} section={section} entries={entries} ctx={ctx} searching={searching} />
+                ))
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
     </div>

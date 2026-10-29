@@ -76,7 +76,7 @@ function AgentForm({ agent, close }: { agent?: AgentDefinition; close: () => voi
                 aria-checked={profileId === p.id}
                 onClick={() => setProfileId(p.id)}
                 className={cn(
-                  'rounded-lg border px-3 py-1.5 text-left text-xs',
+                  'press rounded-lg border px-3 py-1.5 text-left text-xs',
                   profileId === p.id ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'hover:bg-accent/60'
                 )}
               >

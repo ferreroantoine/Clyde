@@ -942,5 +942,14 @@ export const fr: Record<string, string> = {
   'In progress': 'En cours',
   'To review': 'À relire',
   'Title is required': 'Le titre est requis',
-  'Describe the task': 'Décrivez la tâche'
+  'Describe the task': 'Décrivez la tâche',
+  // animations and board order
+  'Tasks can only be reordered within a column': 'Les tâches ne peuvent être réordonnées qu’à l’intérieur d’une colonne',
+  'Loading…': 'Chargement…',
+  '{count} h ago': 'il y a {count} h',
+  'Task {title}': 'Tâche {title}',
+  'Merged · {sha}': 'Fusionné · {sha}',
+  'Abandoned': 'Abandonné',
+  'Agent {name}': 'Agent {name}',
+  'Could not move the task': 'Impossible de déplacer la tâche'
 }

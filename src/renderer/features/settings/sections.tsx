@@ -228,7 +228,7 @@ export const SECTIONS: SectionSpec[] = [
                 aria-label={t(ACCENT_LABELS[a])}
                 title={t(ACCENT_LABELS[a])}
                 onClick={() => set('appearance.accent', a)}
-                className="size-6 rounded-full ring-offset-2 ring-offset-background transition-shadow focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                className="press size-6 rounded-full ring-offset-2 ring-offset-background transition-shadow focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 style={{
                   backgroundColor: ACCENT_SWATCH[a],
                   boxShadow: s.appearance.accent === a ? `0 0 0 2px var(--background), 0 0 0 4px ${ACCENT_SWATCH[a]}` : undefined

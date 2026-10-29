@@ -16,6 +16,8 @@ import { on } from '@/lib/ipc'
 import { applyEvent, emptyView } from '@/lib/transcript'
 import { useSupervision } from '@/stores/supervision'
 import { cn } from '@/lib/utils'
+import { Appear } from '@/components/Appear'
+import { SkeletonCards } from '@/components/Skeleton'
 
 const RANGES: Array<{ value: MetricsRange; label: string }> = [
   { value: '24h', label: tk('24 hours') },
@@ -362,7 +364,7 @@ function SessionsTable({ sessions }: { sessions: SessionRecord[] }) {
                 tabIndex={0}
                 onClick={() => void open(s.id)}
                 onKeyDown={(e) => e.key === 'Enter' && void open(s.id)}
-                className="cursor-pointer border-b last:border-0 hover:bg-accent/50 focus-visible:bg-accent focus-visible:outline-none"
+                className="press press-soft cursor-pointer border-b last:border-0 hover:bg-accent/50 focus-visible:bg-accent focus-visible:outline-none"
                 data-session-row={s.id}
               >
                 <td className="px-4 py-2 whitespace-nowrap text-muted-foreground tabular-nums">{shortDate(s.startedAt)}</td>
@@ -458,6 +460,7 @@ export function SupervisionPage() {
           </div>
         </div>
 
+        {!dashboard && <SkeletonCards count={3} className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-3 space-y-0" />}
         {dashboard && dashboard.profiles.length === 0 ? (
           <div className="rounded-xl border border-dashed py-14">
             <EmptyState icon={Gauge} title={t('No account yet')} description={t('Add an account and start an agent; its usage shows here.')} />
@@ -467,7 +470,9 @@ export function SupervisionPage() {
             <>
               <section className="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] gap-3" aria-label={t('Accounts')}>
                 {dashboard.profiles.map((p) => (
-                  <ProfileCard key={p.profileId} usage={p} onDiagnose={() => setDiagnosing(p.profileId)} />
+                  <Appear key={p.profileId}>
+                    <ProfileCard usage={p} onDiagnose={() => setDiagnosing(p.profileId)} />
+                  </Appear>
                 ))}
               </section>
               {dashboard.profiles.some((p) => p.billing === 'subscription') && (

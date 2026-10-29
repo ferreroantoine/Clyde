@@ -34,7 +34,7 @@ export function Sidebar() {
               type="button"
               onClick={() => showTab(t.id)}
               className={cn(
-                'rounded-md px-2 py-1 text-xs transition-colors',
+                'press rounded-md px-2 py-1 text-xs transition-colors',
                 tab === t.id ? 'bg-accent font-medium text-foreground' : 'text-muted-foreground hover:text-foreground'
               )}
             >

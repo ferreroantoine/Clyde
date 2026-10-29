@@ -57,7 +57,7 @@ export function McpPicker({ value, onChange }: { value: Set<string>; onChange: (
               />
               <button
                 type="button"
-                className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+                className="press press-soft flex min-w-0 flex-1 items-center gap-1.5 text-left"
                 aria-expanded={expanded}
                 onClick={() => {
                   const next = new Set(open)
@@ -230,7 +230,7 @@ export function NewSession() {
           type="button"
           aria-expanded={showPrompt}
           onClick={() => setShowPrompt(!showPrompt)}
-          className="flex items-center gap-1 text-xs font-medium"
+          className="press flex items-center gap-1 text-xs font-medium"
         >
           <ChevronRight className={cn('size-3 transition-transform', showPrompt && 'rotate-90')} />
           {t('System prompt')}

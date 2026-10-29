@@ -13,6 +13,7 @@ import { RichText } from './RichText'
 import { SessionLimitLine } from '@/features/limits/LimitGauge'
 import { useLimits } from '@/stores/limits'
 import { ToolCard } from './ToolCard'
+import { Appear } from '@/components/Appear'
 
 export const STATUS_LABELS: Record<AgentStatus, string> = {
   starting: tk('Starting'),
@@ -43,7 +44,20 @@ export const tokens = (n: number) =>
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
 
 /** `subscription` hides per-turn prices: on a plan, Claude Code's cost is not what you pay. */
-export function Item({ item, cwd, ended, subscription = false }: { item: TranscriptItem; cwd: string; ended: boolean; subscription?: boolean }) {
+export function Item({
+  item,
+  cwd,
+  ended,
+  subscription = false,
+  streaming = false
+}: {
+  item: TranscriptItem
+  cwd: string
+  ended: boolean
+  subscription?: boolean
+  /** The last text of a running turn: shows a typing caret. */
+  streaming?: boolean
+}) {
   switch (item.kind) {
     case 'user':
       return (
@@ -52,7 +66,7 @@ export function Item({ item, cwd, ended, subscription = false }: { item: Transcr
         </div>
       )
     case 'text':
-      return <RichText text={item.text} />
+      return <RichText text={item.text} streaming={streaming} />
     case 'tool':
       return <ToolCard tool={item} cwd={cwd} ended={ended} />
     case 'turn':
@@ -149,13 +163,16 @@ export function SessionPane({ view }: { view: SessionView }) {
   const profile = profileById(useProfiles((s) => s.profiles), view.info.profileId)
   const scroller = useRef<HTMLDivElement>(null)
   const stuck = useRef(true)
+  const lastTop = useRef(0)
   const ended = ENDED_STATUSES.has(view.info.status)
   const last = view.items.at(-1)
 
-  // Follow the conversation unless the user scrolled up to read.
+  // Follow the conversation unless the user scrolled up to read; glide when animations are on.
   useEffect(() => {
     const el = scroller.current
-    if (el && stuck.current) el.scrollTop = el.scrollHeight
+    if (!el || !stuck.current) return
+    const smooth = document.documentElement.dataset['motion'] === 'full'
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
   }, [view.items.length, last])
 
   const limit = view.rateLimit
@@ -199,8 +216,12 @@ export function SessionPane({ view }: { view: SessionView }) {
       <div
         ref={scroller}
         onScroll={(e) => {
+          // Only scrolling up lets go (a smooth auto-scroll in flight only goes down); reaching the end follows again.
           const el = e.currentTarget
-          stuck.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+          const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+          if (atEnd) stuck.current = true
+          else if (el.scrollTop < lastTop.current - 2) stuck.current = false
+          lastTop.current = el.scrollTop
         }}
         className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3"
         aria-live="polite"
@@ -211,11 +232,22 @@ export function SessionPane({ view }: { view: SessionView }) {
           </p>
         )}
         {view.items.map((item) => (
-          <Item key={itemKey(item)} item={item} cwd={view.info.cwd} ended={ended} subscription={subscription} />
+          <Appear key={itemKey(item)}>
+            <Item
+              item={item}
+              cwd={view.info.cwd}
+              ended={ended}
+              subscription={subscription}
+              streaming={item === last && item.kind === 'text' && !item.final && view.info.status === 'running'}
+            />
+          </Appear>
         ))}
         {view.info.status === 'running' && last?.kind !== 'text' && (
-          <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <StatusDot status="running" /> {' '}{t('Working…')}</p>
+          <Appear>
+            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <StatusDot status="running" /> {t('Working…')}
+            </p>
+          </Appear>
         )}
       </div>
       <Composer view={view} />

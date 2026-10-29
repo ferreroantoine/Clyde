@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from 'react'
+import { cn } from '@/lib/utils'
 
 /** Inline `code` and **bold**. Everything else stays plain text; nothing is parsed as HTML. */
 function inline(text: string, keyBase: string): ReactNode[] {
@@ -26,9 +27,13 @@ function inline(text: string, keyBase: string): ReactNode[] {
   return out
 }
 
-/** Agent text with fenced code blocks. A fence still being streamed renders as code too. */
-export function RichText({ text }: { text: string }) {
+/**
+ * Agent text with fenced code blocks. A fence still being streamed renders as code too.
+ * `streaming` adds a typing caret after the last block.
+ */
+export function RichText({ text, streaming = false }: { text: string; streaming?: boolean }) {
   const parts = text.split(/^```/m)
+  const lastPart = parts.findLastIndex((part, i) => i % 2 === 1 || part.replace(/^\n+|\n+$/g, '') !== '')
   return (
     <div className="space-y-2 text-[13px] leading-relaxed break-words">
       {parts.map((part, i) => {
@@ -40,7 +45,7 @@ export function RichText({ text }: { text: string }) {
             <pre
               key={i}
               data-lang={lang || undefined}
-              className="overflow-x-auto rounded-md border bg-muted/60 px-3 py-2 font-mono text-xs leading-snug"
+              className={cn('overflow-x-auto rounded-md border bg-muted/60 px-3 py-2 font-mono text-xs leading-snug', streaming && i === lastPart && 'stream-caret')}
             >
               {code.replace(/\n$/, '')}
             </pre>
@@ -49,7 +54,7 @@ export function RichText({ text }: { text: string }) {
         const trimmed = part.replace(/^\n+|\n+$/g, '')
         if (!trimmed) return null
         return (
-          <p key={i} className="whitespace-pre-wrap">
+          <p key={i} className={cn('whitespace-pre-wrap', streaming && i === lastPart && 'stream-caret')}>
             {trimmed.split('\n').map((line, j, lines) => (
               <Fragment key={j}>
                 {inline(line, `${i}-${j}`)}

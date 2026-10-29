@@ -1,9 +1,10 @@
-import { ChevronRight, LoaderCircle } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { t } from '@shared/i18n'
 import type { DirEntry } from '@shared/types'
 import { useExplorer } from '@/stores/explorer'
 import { useEditor } from '@/stores/editor'
 import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/Skeleton'
 import { FileIcon } from './FileIcon'
 
 const INDENT = 12
@@ -31,7 +32,7 @@ function Row({ entry, depth }: { entry: DirEntry; depth: number }) {
         title={entry.path}
         style={{ paddingLeft: 8 + depth * INDENT }}
         className={cn(
-          'flex h-6 w-full items-center gap-1.5 pr-2 text-left text-[13px] outline-none',
+          'press press-soft flex h-6 w-full items-center gap-1.5 pr-2 text-left text-[13px] outline-none',
           'hover:bg-accent/70 focus-visible:bg-accent',
           selected && 'bg-accent',
           isActive && !selected && 'text-foreground',
@@ -57,8 +58,8 @@ function Children({ path, depth }: { path: string; depth: number }) {
   const entries = useExplorer((s) => s.children[path])
   if (!entries) {
     return (
-      <div style={{ paddingLeft: 8 + depth * INDENT + 20 }} className="flex h-6 items-center text-muted-foreground">
-        <LoaderCircle className="size-3.5 animate-spin" />
+      <div style={{ paddingLeft: 8 + depth * INDENT + 20 }} className="flex h-6 items-center pr-4">
+        <Skeleton className="w-24" />
       </div>
     )
   }

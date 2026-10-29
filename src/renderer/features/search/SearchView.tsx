@@ -39,7 +39,7 @@ function FileGroup({ group }: { group: FileMatches }) {
           key={`${m.line}:${m.column}`}
           type="button"
           onClick={() => void open(m.path, { line: m.line, column: m.column, length: m.matchLength })}
-          className="flex h-6 w-full items-center gap-2 pr-3 pl-9 text-left text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+          className="press press-soft flex h-6 w-full items-center gap-2 pr-3 pl-9 text-left text-muted-foreground hover:bg-accent/70 hover:text-foreground"
         >
           <span className="w-7 shrink-0 text-right text-[10px] tabular-nums opacity-60">{m.line}</span>
           <Highlight preview={m.preview} start={m.previewStart} length={m.matchLength} />

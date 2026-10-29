@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { t, tn } from '@shared/i18n'
-import { ArrowLeft, CircleAlert, GitBranch, GitMerge, LoaderCircle, MessageSquareReply, Trash2 } from 'lucide-react'
+import { ArrowLeft, CircleAlert, GitBranch, GitMerge, MessageSquareReply, Trash2 } from 'lucide-react'
 import type { Task, TaskChange } from '@shared/tasks'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/EmptyState'
 import { useBoard } from '@/stores/board'
 import { cn } from '@/lib/utils'
+import { SkeletonLines } from '@/components/Skeleton'
 import { DiffView } from './DiffView'
 
 const STATUS_LETTER: Record<TaskChange['status'], { letter: string; className: string }> = {
@@ -53,8 +54,8 @@ export function ReviewView({ task }: { task: Task }) {
             <Trash2 /> {' '}{t('Abandon')}</Button>
           <Button size="sm" variant="outline" disabled={busy} onClick={() => setAsking(true)}>
             <MessageSquareReply /> {' '}{t('Request changes')}</Button>
-          <Button size="sm" disabled={busy || changes.length === 0} onClick={() => void merge(task.id)}>
-            {busy ? <LoaderCircle className="animate-spin" /> : <GitMerge />} {t('Merge into {branch}', { branch: task.baseBranch })}
+          <Button size="sm" loading={busy} disabled={changes.length === 0} onClick={() => void merge(task.id)}>
+            <GitMerge /> {t('Merge into {branch}', { branch: task.baseBranch })}
           </Button>
         </div>
       </header>
@@ -67,8 +68,7 @@ export function ReviewView({ task }: { task: Task }) {
       <div className="flex min-h-0 flex-1">
         <nav className="w-64 shrink-0 overflow-y-auto border-r py-1" aria-label={t('Changed files')}>
           {review?.loading && !review.changes && (
-            <p className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground">
-              <LoaderCircle className="size-3.5 animate-spin" /> {' '}{t('Reading the changes…')}</p>
+            <SkeletonLines count={5} className="px-3 py-2" />
           )}
           {changes.map((c) => {
             const s = STATUS_LETTER[c.status]
@@ -80,7 +80,7 @@ export function ReviewView({ task }: { task: Task }) {
                 onClick={() => void selectFile(c.path)}
                 aria-current={review?.selected === c.path}
                 className={cn(
-                  'flex w-full items-center gap-2 px-3 py-1 text-left text-xs hover:bg-accent/60',
+                  'press press-soft flex w-full items-center gap-2 px-3 py-1 text-left text-xs hover:bg-accent/60',
                   review?.selected === c.path && 'bg-accent'
                 )}
               >

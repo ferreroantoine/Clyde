@@ -84,7 +84,7 @@ export class TaskService {
   async list(): Promise<Task[]> {
     const root = await this.repoRoot().catch(() => null)
     if (!root) return []
-    const rows = this.db.prepare('SELECT * FROM tasks WHERE repo_root = ? ORDER BY created_at').all(root) as Row[]
+    const rows = this.db.prepare('SELECT * FROM tasks WHERE repo_root = ? ORDER BY position, created_at').all(root) as Row[]
     return rows.map(toTask)
   }
 
@@ -105,12 +105,36 @@ export class TaskService {
     const now = Date.now()
     this.db
       .prepare(
-        `INSERT INTO tasks (id, title, description, agent_id, repo_root, base_branch, branch, worktree_path, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'todo', ?, ?)`
+        `INSERT INTO tasks (id, title, description, agent_id, repo_root, base_branch, branch, worktree_path, status, position, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'todo', ?, ?, ?)`
       )
-      .run(id, data.title, data.description, data.agentId, repoRoot, baseBranch, ref.branch, ref.worktreePath, now, now)
+      .run(id, data.title, data.description, data.agentId, repoRoot, baseBranch, ref.branch, ref.worktreePath, this.lastPosition(repoRoot) + 1, now, now)
     await this.changed()
     return this.get(id)
+  }
+
+  /**
+   * Moves a task within its column, before `beforeId` (another task of the same column) or
+   * last. Changing column goes through the board's actions (start, merge), not through here.
+   */
+  async reorder(id: string, beforeId: string | null): Promise<Task[]> {
+    const task = this.get(id)
+    const column = this.db
+      .prepare('SELECT id, position FROM tasks WHERE repo_root = ? AND status = ? AND id != ? ORDER BY position, created_at')
+      .all(task.repoRoot, task.status, id) as Array<{ id: string; position: number }>
+    const index = beforeId ? column.findIndex((r) => r.id === beforeId) : column.length
+    if (index < 0) throw new AppError('invalid_request', t('Tasks can only be reordered within a column'))
+    const prev = column[index - 1]?.position
+    const next = column[index]?.position
+    const position = prev === undefined && next === undefined ? 0 : prev === undefined ? (next as number) - 1 : next === undefined ? prev + 1 : (prev + next) / 2
+    this.db.prepare('UPDATE tasks SET position = ? WHERE id = ?').run(position, id)
+    await this.changed()
+    return this.list()
+  }
+
+  private lastPosition(repoRoot: string): number {
+    const row = this.db.prepare('SELECT MAX(position) AS p FROM tasks WHERE repo_root = ?').get(repoRoot) as { p: number | null }
+    return row.p ?? 0
   }
 
   /** Starts the task's agent in its worktree with the task as first message. */

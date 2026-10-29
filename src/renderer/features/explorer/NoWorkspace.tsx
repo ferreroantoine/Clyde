@@ -34,7 +34,7 @@ export function NoWorkspace() {
               type="button"
               title={path}
               onClick={() => void open(path)}
-              className="flex w-full flex-col rounded-md px-2 py-1.5 text-left hover:bg-accent"
+              className="press press-soft flex w-full flex-col rounded-md px-2 py-1.5 text-left hover:bg-accent"
             >
               <span className="truncate text-[13px]">{shortName(path)}</span>
               <span className="truncate text-[11px] text-muted-foreground">{path}</span>

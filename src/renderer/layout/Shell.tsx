@@ -1,4 +1,6 @@
 import { Group, Panel, useDefaultLayout } from 'react-resizable-panels'
+import { AnimatePresence, motion } from 'motion/react'
+import { swap } from '@/lib/motion'
 import { t, tk } from '@shared/i18n'
 import type { CenterView } from '@/stores/layout'
 import { useLayout } from '@/stores/layout'
@@ -62,13 +64,15 @@ export function Shell() {
                   <div className={cn('h-full', center !== 'editor' && 'invisible')}>
                     <EditorArea />
                   </div>
-                  {center !== 'editor' && (
-                    <div className="absolute inset-0 bg-background">
-                      <ErrorBoundary key={center} scope={t(CENTER_SCOPES[center])}>
-                        <CenterPage view={center} />
-                      </ErrorBoundary>
-                    </div>
-                  )}
+                  <AnimatePresence initial={false}>
+                    {center !== 'editor' && (
+                      <motion.div key={center} variants={swap} initial="hidden" animate="shown" exit="gone" className="absolute inset-0 bg-background">
+                        <ErrorBoundary scope={t(CENTER_SCOPES[center])}>
+                          <CenterPage view={center} />
+                        </ErrorBoundary>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </Panel>
               <ResizeHandle orientation="vertical" />
