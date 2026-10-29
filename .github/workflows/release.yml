@@ -1,4 +1,5 @@
-# Builds the Windows installer on Windows, installs it, and checks that the installed app works.
+# Builds the Windows installer and portable exe on Windows, installs the first and starts the
+# second, and checks that both work.
 # Publishing: a new version in package.json is released once, from the first push that carries
 # it (or from a v<version> tag), as a prerelease when the version has a "-" (0.1.0-beta.1).
 name: Release
@@ -67,12 +68,28 @@ jobs:
           node scripts/smoke-packaged.mjs "$exe" release/smoke.png
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Start the portable exe and check it keeps its data next to itself
+        shell: pwsh
+        run: |
+          $source = Get-ChildItem release\Clyde-*-portable.exe | Select-Object -First 1
+          $dir = New-Item -ItemType Directory -Path (Join-Path $env:RUNNER_TEMP 'portable')
+          $exe = Copy-Item $source.FullName $dir -PassThru
+          $db = Join-Path $dir 'Clyde-data\clyde.db'
+          $watch = [Diagnostics.Stopwatch]::StartNew()
+          Start-Process -FilePath $exe.FullName
+          while (-not (Test-Path $db) -and $watch.Elapsed.TotalSeconds -lt 180) { Start-Sleep -Milliseconds 500 }
+          $started = Test-Path $db
+          Write-Host "Database next to the exe after $([int]$watch.Elapsed.TotalSeconds) s: $started"
+          Get-Process -Name 'Clyde', $exe.BaseName -ErrorAction SilentlyContinue | Stop-Process -Force
+          if (-not $started) { exit 1 }
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: clyde-windows
           path: |
             release/Clyde-Setup-*.exe
+            release/Clyde-*-portable.exe
             release/smoke.png
           if-no-files-found: ignore
 
@@ -85,4 +102,6 @@ jobs:
           name: Clyde ${{ steps.release.outputs.tag }}
           body_path: .github/RELEASE_NOTES.md
           prerelease: ${{ contains(steps.release.outputs.tag, '-') }}
-          files: release/Clyde-Setup-*.exe
+          files: |
+            release/Clyde-Setup-*.exe
+            release/Clyde-*-portable.exe

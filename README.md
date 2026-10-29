@@ -10,6 +10,8 @@
 
 Get **Clyde-Setup-&lt;version&gt;.exe** from the [releases page](https://github.com/ferreroantoine/clyde/releases) and run it. It installs for your user without admin rights, adds Start menu and desktop shortcuts, and starts Clyde. The installer is not code-signed yet: if SmartScreen says "Windows protected your PC", click **More info**, then **Run anyway**.
 
+No install wanted? Take **Clyde-&lt;version&gt;-portable.exe** from the same page: one file that runs from any folder or a USB stick and keeps its data in `Clyde-data` next to it. It unpacks itself at each start, so it opens a few seconds slower. API keys are encrypted for your Windows account, so on another computer you enter them again.
+
 Then open a folder and add an account in **Accounts**. The task board also needs [Git for Windows](https://git-scm.com/download/win).
 
 ## Tour
@@ -149,7 +151,7 @@ Main process
 - Every response is a `{ ok, data | error }` envelope with a stable error code, so failures reach the UI as readable messages instead of generic IPC rejections.
 - File access goes through `resolveInside`, which refuses any path outside the open workspace.
 - Logs (`%APPDATA%\Clyde\logs\main.log`) go through a redaction pass that masks API keys and tokens.
-- Data lives in `%APPDATA%\Clyde\clyde.db` (SQLite, WAL). Migrations are append-only in `src/main/services/db/migrations.ts` and tracked with `PRAGMA user_version`.
+- Data lives in `%APPDATA%\Clyde\clyde.db` (SQLite, WAL), or in `Clyde-data` next to the exe for the portable build. Migrations are append-only in `src/main/services/db/migrations.ts` and tracked with `PRAGMA user_version`.
 - API keys are encrypted with Electron `safeStorage` (DPAPI on Windows) and stored as ciphertext. They are decrypted in main only when an agent starts and never cross IPC. MCP environment variables and headers are stored the same way. On Linux without a keyring, Clyde refuses to store a key rather than keep it in clear.
 - Each account has its own Claude Code folder, `%APPDATA%\Clyde\claude-profiles\<id>`, used as `CLAUDE_CONFIG_DIR`. Deleting the account deletes the folder. Claude Code processes, and the commands of API agents, get the app's environment minus every `ANTHROPIC_*`, `CLAUDE*`, `OPENAI_*` and `MISTRAL_*` variable, so an account cannot pick up another one's key or token.
 - API agents talk to their provider through the official SDKs (`@anthropic-ai/sdk`, and `openai` for OpenAI, Mistral and Ollama's `/v1`). The key and URL are always passed explicitly, and requests go through Electron's `net.fetch`, so Windows proxy settings apply.
@@ -173,11 +175,11 @@ You sign in to a subscription account through Claude Code's own login, and the I
 
 ## Packaging
 
-`npm run package` builds `release/Clyde-Setup-<version>.exe`, a one-click per-user NSIS installer. Build it on Windows: npm installs the Claude Code binary of the machine it runs on, and that binary (about 280 MB) is most of the package. For a distribution build, set `CLYDE_DISTRIBUTION=1` first. The installer is not code-signed, so Windows SmartScreen warns on first run.
+`npm run package` builds `release/Clyde-Setup-<version>.exe`, a one-click per-user NSIS installer, and `release/Clyde-<version>-portable.exe`, which runs without installing and keeps its data in `Clyde-data` next to itself (Clyde switches its data folder when electron-builder's `PORTABLE_EXECUTABLE_DIR` is set). Build it on Windows: npm installs the Claude Code binary of the machine it runs on, and that binary (about 280 MB) is most of the package. For a distribution build, set `CLYDE_DISTRIBUTION=1` first. The installer is not code-signed, so Windows SmartScreen warns on first run.
 
 `npm run smoke:packaged -- <app executable>` launches a packaged app and checks the parts that only break once packaged: the database, the terminal, search and the bundled Claude Code binary.
 
-`.github/workflows/release.yml` runs on every push, on a Windows runner: it builds the installer, installs it silently and runs the smoke test on the installed app. To publish, bump the version in `package.json` (and update `.github/RELEASE_NOTES.md`): the first push that carries a version without a release creates the tag `v<version>` and a GitHub release with the installer. Versions with a `-` (such as `0.1.0-beta.1`) are published as prereleases. Pushing a tag `v<version>` also publishes it.
+`.github/workflows/release.yml` runs on every push, on a Windows runner: it builds the installer and the portable exe, installs the first silently and runs the smoke test on the installed app, then starts the portable exe and checks that its database appears next to it. To publish, bump the version in `package.json` (and update `.github/RELEASE_NOTES.md`): the first push that carries a version without a release creates the tag `v<version>` and a GitHub release with the installer. Versions with a `-` (such as `0.1.0-beta.2`) are published as prereleases. Pushing a tag `v<version>` also publishes it.
 
 ## Known limits
 

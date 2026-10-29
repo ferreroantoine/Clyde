@@ -33,8 +33,10 @@ const log = createLogger('main')
 
 app.setName('Clyde')
 app.setAppUserModelId('dev.clyde.app')
-// Lets scripts and tests run against a throwaway profile.
-const userDataOverride = process.env['CLYDE_USER_DATA']
+// CLYDE_USER_DATA lets scripts and tests run against a throwaway profile. The portable build
+// (electron-builder sets PORTABLE_EXECUTABLE_DIR) keeps its data in a folder next to the exe.
+const portableDir = process.env['PORTABLE_EXECUTABLE_DIR']
+const userDataOverride = process.env['CLYDE_USER_DATA'] || (portableDir ? join(portableDir, 'Clyde-data') : undefined)
 if (userDataOverride) app.setPath('userData', userDataOverride)
 
 let queryFn: Promise<QueryFn> | null = null
