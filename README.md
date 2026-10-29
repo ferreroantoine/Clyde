@@ -11,8 +11,8 @@ Docs: [original spec](docs/SPEC.md) (French), [approved plan](docs/PLAN.md).
 | Phase | Content | State |
 | --- | --- | --- |
 | 1 | Electron skeleton, layout, themes, explorer, Monaco, terminal, SQLite | done |
-| 2 | Account profiles, encrypted secrets, Claude Code provider, agent chat, permissions | next |
-| 3 | API providers (Anthropic, OpenAI, Mistral, Ollama), in-house agent loop, MCP | |
+| 2 | Account profiles, encrypted secrets, Claude Code provider, agent chat, permissions | done |
+| 3 | API providers (Anthropic, OpenAI, Mistral, Ollama), in-house agent loop, MCP | next |
 | 4 | Parallel agents, git worktrees, Kanban, diff review and merge | |
 | 5 | Supervision dashboard, metrics, command palette, polish | |
 
@@ -65,6 +65,18 @@ Both install commands end by downloading the Electron binary (`install-electron`
 - **Keyboard**: `Ctrl+B` sidebar, `Ctrl+J` or `` Ctrl+` `` terminal, `Ctrl+Alt+B` agent panel, `Ctrl+Shift+E` files, `Ctrl+Shift+F` search, `Ctrl+S` save, `Ctrl+,` settings.
 - **Terminal**: pwsh when installed, otherwise Windows PowerShell; another shell can be set in Settings. `Ctrl+C` copies when text is selected (otherwise it interrupts) and `Ctrl+V` pastes, as in Windows Terminal.
 - **Editor**: if a file changes on disk while you have unsaved edits, a banner lets you load the disk version or keep yours.
+- **Accounts** (key icon in the activity bar): add a Claude subscription or an Anthropic API key, each with a name, a short label and a color. A subscription account opens a terminal running Claude Code's own `claude auth login`; the browser does the rest. **Test connection** checks the sign-in (and the key against the API) and lists the models, without sending a prompt.
+- **Agents** (right panel): pick an account, an optional model and a permission level, then chat. Tool calls appear as collapsible cards; anything that needs your approval shows inline with *Allow once*, *Allow for the session* (the exact command, for shell tools) and *Deny*, where you can tell the agent what to do instead. Up to 4 agents run at once.
+
+### Permission levels
+
+| Level | Reads in the folder | File edits in the folder | Shell commands | Anything outside the folder |
+| --- | --- | --- | --- | --- |
+| Validate everything | run | ask | ask | ask |
+| Files auto, commands validated | run | run | ask | ask |
+| Autonomous in its folder | run | run | run, except `git push` and `cd` out of the folder | refused |
+
+MCP tools and tools Atelier does not know ask first, except MCP tools in autonomous mode. The checks run in a `PreToolUse` hook, which Claude Code calls before its own allow rules, so allow rules in your Claude settings cannot skip them. A shell command cannot be fully sandboxed this way: in autonomous mode, a command can still write outside the folder through absolute paths or scripts. Use the other levels when that matters.
 
 ## Architecture
 
@@ -74,8 +86,10 @@ Renderer (React, sandboxed, no Node access)
 Preload (contextBridge, no logic)
    |  ipcRenderer
 Main process
-   ipc/       one file per domain; every request is validated with zod
-   services/  workspace, files, watcher, search (ripgrep), pty, settings, db
+   ipc/         one file per domain; every request is validated with zod
+   services/    workspace, files, watcher, search (ripgrep), pty, settings, db, secrets, profiles
+   agents/      AgentManager, claude-code/ (provider, runtime, message translator)
+   permissions/ engine (pure allow/ask/deny) and approval broker
 ```
 
 - `src/shared/ipc/contract.ts` is the single definition of every channel: request schema, response type and event payloads. Main and renderer are both typed from it.
@@ -83,25 +97,26 @@ Main process
 - File access goes through `resolveInside`, which refuses any path outside the open workspace.
 - Logs (`%APPDATA%\Atelier\logs\main.log`) go through a redaction pass that masks API keys and tokens.
 - Data lives in `%APPDATA%\Atelier\atelier.db` (SQLite, WAL). Migrations are append-only in `src/main/services/db/migrations.ts` and tracked with `PRAGMA user_version`.
+- API keys are encrypted with Electron `safeStorage` (DPAPI on Windows) and stored as ciphertext. They are decrypted in main only when Claude Code starts and never cross IPC. On Linux without a keyring, Atelier refuses to store a key rather than keep it in clear.
+- Each account has its own Claude Code folder, `%APPDATA%\Atelier\claude-profiles\<id>`, used as `CLAUDE_CONFIG_DIR`. Deleting the account deletes the folder. Claude Code processes get the app's environment minus every `ANTHROPIC_*` and `CLAUDE*` variable, so an account cannot pick up another one's key or token.
+- Claude Code is the binary bundled with `@anthropic-ai/claude-agent-sdk`, or the path set in Settings. Sessions load your user, project and local Claude Code settings, like `claude` does.
 - Renderer state lives in zustand stores; components stay presentational.
 
 ```
 src/
-  shared/     IPC contract, types, settings schema, redaction (pure, tested)
-  main/       entry, window, logger, ipc/, services/
+  shared/     IPC contract, types, settings schema, profiles and agent events, redaction (pure, tested)
+  main/       entry, window, logger, ipc/, services/, agents/, permissions/
   preload/    window.atelier bridge
-  renderer/   layout/, features/ (explorer, editor, search, terminal, agent-panel, settings),
-              stores/, lib/ (ipc client, monaco, terminal registry, theme), components/ui (shadcn)
+  renderer/   layout/, features/ (explorer, editor, search, terminal, accounts, agent-panel, settings),
+              stores/, lib/ (ipc client, monaco, terminal registry, theme, transcript reducer), components/ui (shadcn)
 ```
 
-## Notes on Claude accounts (Phase 2)
+## Claude accounts and distribution builds
 
-Each Claude profile will get its own Claude Code configuration directory (`CLAUDE_CONFIG_DIR`), and you sign in through Claude Code's own `/login` flow. The IDE never reads the credentials. The Agent SDK documentation states that third-party products may not offer claude.ai login unless Anthropic has approved them. Subscription profiles are therefore marked "personal use", and a distribution build (`ATELIER_DISTRIBUTION=1`) will only allow API-key profiles.
+You sign in to a subscription account through Claude Code's own login, and the IDE never reads the credentials. The Agent SDK documentation states that third-party products may not offer claude.ai login unless Anthropic has approved them. Subscription accounts are therefore marked "Personal use", and a distribution build (`npm run build` with `ATELIER_DISTRIBUTION=1` set, `$env:ATELIER_DISTRIBUTION=1` in PowerShell) only allows API key accounts. Subscription accounts created by a personal build show as disabled there.
 
-## Troubleshooting
+## Known limits (Phase 2)
 
-- **`gyp ERR! find Python` during `npm install`**: install the build tools above, or use `npm run install:prebuilt`.
-- **`Error: Electron uninstall` from `npm run dev`**: the Electron binary was not downloaded; run `npx install-electron`.
-- **Files vanishing from the project or `node_modules`** (for example `Cannot find package ...` right after a working install): an endpoint security agent may be quarantining JavaScript files. Check its console and ask for an exclusion on the project folder, then reinstall with `npm ci`.
-- **Blank window after `npm run dev`**: check the terminal running electron-vite for build errors, then `%APPDATA%\Atelier\logs\main.log`.
-- **"Atelier could not open its database"**: the dialog shows the file path. Close other Atelier windows, or move the file aside to start fresh. Settings are kept in memory for that session.
+- Conversations are not saved yet: closing Atelier ends its agent sessions. History and supervision come in Phase 5.
+- Claude's `AskUserQuestion` tool is turned off until the panel can answer it; the agent asks in plain text instead.
+- Agents work in the open folder. Separate worktrees per agent come in Phase 4.
