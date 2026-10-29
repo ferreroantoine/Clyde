@@ -4,6 +4,8 @@ Agent-centric desktop IDE for Windows: several AI accounts and providers side by
 
 Stack: Electron 45, React 19, TypeScript (strict), electron-vite, Tailwind CSS v4 + shadcn/ui, Monaco, xterm.js + node-pty, SQLite (better-sqlite3).
 
+Docs: [original spec](docs/SPEC.md) (French), [approved plan](docs/PLAN.md).
+
 ## Status
 
 | Phase | Content | State |
