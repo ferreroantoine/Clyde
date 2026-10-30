@@ -143,7 +143,9 @@ describe('download and extract', () => {
     const out = join(src, 'bin')
     await extract(archive, out, 'linux')
     const exe = join(out, 'whisper-bin-ubuntu-x64', 'whisper-cli')
-    expect(statSync(exe).mode & 0o111).not.toBe(0)
+    // Windows has no executable bit: there, the file only has to be there.
+    if (process.platform === 'win32') expect(existsSync(exe)).toBe(true)
+    else expect(statSync(exe).mode & 0o111).not.toBe(0)
     expect(buildFor('linux', 'x64')?.exe).toBe('whisper-bin-ubuntu-x64/whisper-cli')
     expect(buildFor('darwin', 'arm64')).toBeNull()
   })
