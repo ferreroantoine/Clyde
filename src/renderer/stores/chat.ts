@@ -6,12 +6,15 @@ import { applyEvent, emptyView, type SessionView } from '@/lib/transcript'
 import { notify } from './notifications'
 import { useAgents } from './agents'
 import { useLayout } from './layout'
+import type { ReasoningEffort } from '@shared/profiles'
 
 /** Who answers a new conversation: a saved agent, or an account and a model. */
 export interface ChatTarget {
   agentId: string | null
   profileId: string
   model: string
+  /** Reasoning effort; empty is the model's default. */
+  effort?: ReasoningEffort | ''
   /** The agent's MCP tools are offered to the model. */
   toolsEnabled?: boolean
 }
@@ -48,7 +51,7 @@ interface ChatState {
   stop: () => Promise<void>
   regenerate: () => Promise<void>
   edit: (messageId: string, text: string) => Promise<void>
-  update: (id: string, fields: Partial<Pick<Conversation, 'title' | 'pinned' | 'agentId' | 'profileId' | 'model' | 'toolsEnabled' | 'useHistory'>>) => Promise<void>
+  update: (id: string, fields: Partial<Pick<Conversation, 'title' | 'pinned' | 'agentId' | 'profileId' | 'model' | 'effort' | 'toolsEnabled' | 'useHistory'>>) => Promise<void>
   remove: (id: string) => Promise<void>
   search: (query: string) => Promise<void>
   loadUsage: (id: string) => Promise<void>

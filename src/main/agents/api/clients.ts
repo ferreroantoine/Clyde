@@ -44,7 +44,17 @@ export function createAdapter(target: ApiTarget, fetch: typeof globalThis.fetch)
       // Ollama ignores the key, but the SDK requires one.
       return new OpenAICompatAdapter(
         new OpenAI({ ...common, apiKey: 'ollama', baseURL: `${target.baseUrl || DEFAULT_OLLAMA_URL}/v1` }),
-        'ollama'
+        'ollama',
+        async (model) => {
+          const response = await fetch(`${target.baseUrl || DEFAULT_OLLAMA_URL}/api/show`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ model })
+          })
+          if (!response.ok) return []
+          const data = (await response.json()) as { capabilities?: unknown }
+          return Array.isArray(data.capabilities) ? data.capabilities.filter((c): c is string => typeof c === 'string') : []
+        }
       )
   }
 }

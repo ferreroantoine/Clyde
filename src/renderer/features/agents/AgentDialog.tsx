@@ -11,6 +11,7 @@ import { useBoard } from '@/stores/board'
 import { useSettings } from '@/stores/settings'
 import { useProfiles } from '@/stores/profiles'
 import { cn } from '@/lib/utils'
+import { ModelPicker, type ModelChoice } from '@/components/ModelPicker'
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -33,19 +34,16 @@ export function AgentDialog({ open, onOpenChange, agent }: { open: boolean; onOp
 
 function AgentForm({ agent, close }: { agent?: AgentDefinition; close: () => void }) {
   const profiles = useProfiles((s) => s.profiles).filter((p) => p.usable)
-  const tests = useProfiles((s) => s.tests)
   const saveAgent = useBoard((s) => s.saveAgent)
   const [name, setName] = useState(agent?.name ?? '')
   const [profileId, setProfileId] = useState(agent?.profileId ?? profiles[0]?.id ?? '')
-  const [model, setModel] = useState(agent?.model ?? '')
+  const [choice, setChoice] = useState<ModelChoice>({ model: agent?.model ?? '', effort: agent?.effort ?? '' })
   const [level, setLevel] = useState<PermissionLevel>(agent?.permissionLevel ?? useSettings.getState().settings.agents.defaultPermission)
   const [prompt, setPrompt] = useState(agent?.systemPrompt ?? '')
   const [mcpTools, setMcpTools] = useState(new Set(agent?.mcpTools ?? []))
-  const test = tests[profileId]
-  const models = test && test !== 'testing' ? test.models : []
 
   const save = async () => {
-    const input = { name, profileId, model, permissionLevel: level, systemPrompt: prompt, mcpTools: [...mcpTools] }
+    const input = { name, profileId, model: choice.model, effort: choice.effort, permissionLevel: level, systemPrompt: prompt, mcpTools: [...mcpTools] }
     const saved = await saveAgent(agent ? { id: agent.id, ...input } : input)
     if (saved) close()
   }
@@ -74,7 +72,10 @@ function AgentForm({ agent, close }: { agent?: AgentDefinition; close: () => voi
                 type="button"
                 role="radio"
                 aria-checked={profileId === p.id}
-                onClick={() => setProfileId(p.id)}
+                onClick={() => {
+                  if (p.id !== profileId) setChoice({ model: '', effort: '' })
+                  setProfileId(p.id)
+                }}
                 className={cn(
                   'press rounded-lg border px-3 py-1.5 text-left text-xs',
                   profileId === p.id ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'hover:bg-accent/60'
@@ -86,15 +87,13 @@ function AgentForm({ agent, close }: { agent?: AgentDefinition; close: () => voi
             {profiles.length === 0 && <p className="text-xs text-muted-foreground">{t('Add an account first.')}</p>}
           </div>
         </Field>
-        <Field label={t('Model')}>
-          <Input list="agent-def-models" value={model} onChange={(e) => setModel(e.target.value)} placeholder={t('default')} className="font-mono text-xs" />
-          <datalist id="agent-def-models">
-            {models.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.displayName}
-              </option>
-            ))}
-          </datalist>
+        <Field label={t('Model and reasoning')}>
+          <ModelPicker
+            profileId={profileId || null}
+            value={choice}
+            onChange={setChoice}
+            {...(profiles.find((p) => p.id === profileId)?.defaultModel ? { defaultLabel: profiles.find((p) => p.id === profileId)?.defaultModel } : {})}
+          />
         </Field>
         <Field label={t('Permissions')}>
           <div className="grid gap-1.5">

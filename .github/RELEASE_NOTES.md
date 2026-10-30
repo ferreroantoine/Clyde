@@ -16,16 +16,12 @@ To uninstall, use *Settings › Apps* in Windows. Your accounts and history stay
 
 ## New in this version
 
-- **Providers**: Codex CLI (ChatGPT subscription), Antigravity CLI (Gemini subscription) and the Gemini API. Mistral is no longer supported: updating removes Mistral accounts and says so once.
-- **Usage limits**: 5-hour and weekly gauges per subscription account and per session, each marked official, estimated or unavailable; alerts and a 7-day history.
-- **Settings**: one searchable page, French translation, configuration export without secrets.
-- **Motion**: animations across the interface (*Full*, *Reduced* or *Off*); drag and drop on the task board.
-- **Chat**: plain conversations next to the agents, with Markdown, math, code, attachments and *Continue in the project*.
-- **Dictation**: local transcription with whisper.cpp, downloaded on demand from Settings › Voice, or an OpenAI or Gemini account.
-- **MCP catalog**: checked servers (Filesystem, Git, Fetch, GitHub, Playwright, Context7, Docker) with their context cost.
-- **Memory & context**: one memory shared by every agent (CLAUDE.md, AGENTS.md, GEMINI.md), proposals reviewed as a diff, prompt caching, shorter tool results, rolling summaries, *Compact* and *New session with summary*, and where the tokens go in Supervision.
+- **Model and reasoning effort**: one model picker in the agent panel, the chat and saved agents. It lists the account's models with a search, and also takes any model id you type. When the model supports it, you can set its reasoning effort (low, medium, high, and more on Claude, Codex and Antigravity). The agent panel header shows the effort a session uses.
+- **Dictation**: while it listens, *Enter* stops and inserts the text (without sending it), *Escape* cancels.
+- **Explorer**: the selected file follows the editor tab. Closing a tab goes back to the one you viewed before it, and with no file open nothing is selected.
+- **Selectable text**: messages in the agent panel, the chat and the Supervision transcripts can be selected and copied.
 
-Clyde 0.2 keeps the data of 0.1 (`%APPDATA%\Clyde`) and migrates it.
+Earlier in 0.2: Codex and Antigravity CLIs and the Gemini API; usage limits; one settings page in English or French; animations; Chat; local dictation; the MCP catalog; a shared memory and context savings.
 
 ## What's in it
 

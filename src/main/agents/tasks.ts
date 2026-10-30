@@ -247,6 +247,7 @@ export class TaskService {
     const session = await this.deps.sessions.start({
       profileId: agent.profileId,
       model: agent.model,
+      effort: agent.effort,
       permissionLevel: agent.permissionLevel,
       cwd: task.worktreePath,
       systemPrompt: [agent.systemPrompt.trim(), taskInstructions(task)].filter(Boolean).join('\n\n'),

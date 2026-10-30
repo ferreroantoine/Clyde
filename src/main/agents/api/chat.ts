@@ -1,4 +1,4 @@
-import type { ModelOption } from '@shared/profiles'
+import type { ModelOption, ReasoningEffort } from '@shared/profiles'
 
 /** A tool offered to the model. `inputSchema` is a JSON Schema object. */
 export interface ToolSpec {
@@ -54,6 +54,8 @@ export interface ChatRequest {
   messages: ChatMessage[]
   tools: ToolSpec[]
   signal: AbortSignal
+  /** Reasoning effort; absent leaves the model's default. */
+  effort?: ReasoningEffort
 }
 
 /** One streaming model call. Implementations never run tools; the agent loop does. */

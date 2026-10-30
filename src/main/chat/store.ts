@@ -11,6 +11,7 @@ interface ConversationRow {
   pinned: number
   agent_id: string | null
   profile_id: string
+  effort: string
   model: string
   use_history: number
   tools_enabled: number
@@ -37,6 +38,7 @@ const toConversation = (r: ConversationRow): Conversation => ({
   agentId: r.agent_id,
   profileId: r.profile_id,
   model: r.model,
+  effort: (r.effort ?? '') as Conversation['effort'],
   toolsEnabled: r.tools_enabled === 1,
   useHistory: r.use_history === 1,
   createdAt: r.created_at,
@@ -73,14 +75,14 @@ export class ChatStore {
     return toConversation(row)
   }
 
-  create(data: { agentId: string | null; profileId: string; model: string; toolsEnabled?: boolean }): Conversation {
+  create(data: { agentId: string | null; profileId: string; model: string; effort?: Conversation['effort']; toolsEnabled?: boolean }): Conversation {
     const id = randomUUID()
     const now = this.now()
     this.db
       .prepare(
-        `INSERT INTO conversations (id, title, agent_id, profile_id, model, tools_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO conversations (id, title, agent_id, profile_id, model, effort, tools_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(id, '', data.agentId, data.profileId, data.model, data.toolsEnabled ? 1 : 0, now, now)
+      .run(id, '', data.agentId, data.profileId, data.model, data.effort ?? '', data.toolsEnabled ? 1 : 0, now, now)
     return this.get(id)
   }
 
@@ -89,7 +91,7 @@ export class ChatStore {
     const next = { ...current, ...fields }
     this.db
       .prepare(
-        `UPDATE conversations SET title = ?, pinned = ?, agent_id = ?, profile_id = ?, model = ?, tools_enabled = ?, use_history = ?, updated_at = ? WHERE id = ?`
+        `UPDATE conversations SET title = ?, pinned = ?, agent_id = ?, profile_id = ?, model = ?, effort = ?, tools_enabled = ?, use_history = ?, updated_at = ? WHERE id = ?`
       )
       .run(
         next.title,
@@ -97,6 +99,7 @@ export class ChatStore {
         next.agentId,
         next.profileId,
         next.model,
+        next.effort,
         next.toolsEnabled ? 1 : 0,
         next.useHistory ? 1 : 0,
         touch ? this.now() : current.updatedAt,

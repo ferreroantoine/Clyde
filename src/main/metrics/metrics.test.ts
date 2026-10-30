@@ -32,6 +32,7 @@ function setup() {
     profileId,
     kind,
     model,
+    effort: '',
     permissionLevel: 'validate-all',
     cwd: '/repo',
     mcpTools: [],

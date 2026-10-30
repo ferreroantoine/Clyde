@@ -1,5 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk'
-import type { ModelOption } from '@shared/profiles'
+import type { ModelOption, ReasoningEffort } from '@shared/profiles'
 import { parseToolInput, type AdapterEvent, type ChatAdapter, type ChatMessage, type ChatRequest, type StopReason, type ToolCall } from './chat'
 
 type MessageParam = Anthropic.MessageParam
@@ -63,6 +63,16 @@ function stopReason(reason: string | null | undefined): StopReason {
   return 'other'
 }
 
+const ANTHROPIC_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
+type AnthropicEffort = (typeof ANTHROPIC_EFFORTS)[number]
+const isAnthropicEffort = (e: ReasoningEffort | undefined): e is AnthropicEffort => (ANTHROPIC_EFFORTS as readonly (string | undefined)[]).includes(e)
+
+/** The effort levels a model lists in its capabilities (`/v1/models`). */
+export function anthropicEfforts(effort: Anthropic.Models.EffortCapability | null | undefined): ReasoningEffort[] {
+  if (!effort?.supported) return []
+  return ANTHROPIC_EFFORTS.filter((level) => effort[level]?.supported)
+}
+
 export class AnthropicAdapter implements ChatAdapter {
   constructor(private readonly client: Anthropic) {}
 
@@ -72,6 +82,8 @@ export class AnthropicAdapter implements ChatAdapter {
         model: req.model,
         max_tokens: MAX_TOKENS,
         ...withCacheBreakpoints(req.system, toAnthropicMessages(req.messages)),
+        // Effort without extended thinking: the history keeps no thinking blocks to send back.
+        ...(isAnthropicEffort(req.effort) ? { output_config: { effort: req.effort } } : {}),
         tools: req.tools.map((t) => ({
           name: t.name,
           description: t.description,
@@ -125,7 +137,8 @@ export class AnthropicAdapter implements ChatAdapter {
   async listModels(): Promise<ModelOption[]> {
     const out: ModelOption[] = []
     for await (const model of this.client.models.list({ limit: 100 })) {
-      out.push({ value: model.id, displayName: model.display_name, description: '' })
+      const efforts = anthropicEfforts(model.capabilities?.effort)
+      out.push({ value: model.id, displayName: model.display_name, description: '', ...(efforts.length ? { efforts } : {}) })
     }
     return out
   }

@@ -89,16 +89,16 @@ export function ChatView() {
     const last = conversations[0]
     const first = profiles.find((p) => p.usable)
     if (last && profiles.some((p) => p.id === last.profileId && p.usable)) {
-      setDraftTarget({ agentId: last.agentId, profileId: last.profileId, model: last.model })
+      setDraftTarget({ agentId: last.agentId, profileId: last.profileId, model: last.model, effort: last.effort })
     } else if (first) setDraftTarget({ agentId: null, profileId: first.id, model: first.defaultModel })
   }, [draftTarget, profiles, conversations, setDraftTarget])
 
   const target: ChatTarget | null = conversation
-    ? { agentId: conversation.agentId, profileId: conversation.profileId, model: conversation.model, toolsEnabled: conversation.toolsEnabled }
+    ? { agentId: conversation.agentId, profileId: conversation.profileId, model: conversation.model, effort: conversation.effort, toolsEnabled: conversation.toolsEnabled }
     : draftTarget
   const agent = target?.agentId ? agents.find((a) => a.id === target.agentId) : undefined
   const onTarget = (next: ChatTarget) => {
-    if (conversation) void update(conversation.id, { agentId: next.agentId, profileId: next.profileId, model: next.model })
+    if (conversation) void update(conversation.id, { agentId: next.agentId, profileId: next.profileId, model: next.model, effort: next.effort ?? '' })
     else setDraftTarget({ ...next, toolsEnabled: draftTarget?.toolsEnabled ?? false })
   }
   const toolsEnabled = !!target?.toolsEnabled

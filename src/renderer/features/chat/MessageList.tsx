@@ -227,7 +227,7 @@ export function MessageList({ conversationId }: { conversationId: string }) {
   return (
     <div
       ref={scroller}
-      className="min-h-0 flex-1 overflow-y-auto"
+      className="selectable min-h-0 flex-1 overflow-y-auto"
       onScroll={(e) => {
         const el = e.currentTarget
         if (el.scrollHeight - el.scrollTop - el.clientHeight < 60) stuck.current = true

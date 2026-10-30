@@ -63,7 +63,7 @@ export function MicButton({
   const shortcut = binding ? formatCombo(binding) : ''
   const label =
     state === 'listening'
-      ? t('Stop dictation')
+      ? t('Stop dictation (Enter)')
       : state === 'transcribing'
         ? t('Transcribing…')
         : shortcut
@@ -119,7 +119,7 @@ export function DictationHint({ className }: { className?: string }) {
           className={cn('text-[11px] text-muted-foreground', className)}
           role="status"
         >
-          {state === 'listening' ? (hold ? t('Listening… release the keys to stop.') : t('Listening… click the microphone again to stop.')) : t('Transcribing…')}
+          {state === 'listening' ? (hold ? t('Listening… release the keys or press Enter to stop, Escape to cancel.') : t('Listening… press Enter or click the microphone to stop, Escape to cancel.')) : t('Transcribing…')}
         </motion.p>
       )}
     </AnimatePresence>

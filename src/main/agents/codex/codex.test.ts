@@ -314,6 +314,20 @@ describe('CodexSession', () => {
     await expect(done).resolves.toBeUndefined()
   })
 
+  it('asks for the chosen reasoning effort on each turn', async () => {
+    const fake = new FakeCodex(standardAnswers)
+    const s = new CodexSession(
+      { binary: 'c', env: {}, cwd: '/r', model: '', effort: 'high', permissionLevel: 'autonomous', platform: 'linux', instructions: '', mcpServers: {}, clientVersion: '1' },
+      { spawn: () => fake, emit: () => undefined, decide: () => ({ decision: 'allow' }), ask: async () => ({ behavior: 'allow' }) }
+    )
+    void s.start()
+    await vi.waitFor(() => expect(fake.requests('thread/start')).toHaveLength(1))
+    s.send('go')
+    await vi.waitFor(() => expect(fake.requests('turn/start')).toHaveLength(1))
+    expect(fake.requests('turn/start')[0]?.params).toMatchObject({ effort: 'high' })
+    s.stop()
+  })
+
   it('reads the plan limits after each turn and when Codex says they changed', async () => {
     const fake = new FakeCodex((msg) =>
       msg.method === 'account/rateLimits/read'

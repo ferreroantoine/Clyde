@@ -60,7 +60,7 @@ function DiagnosticDialog({ profileId, onClose }: { profileId: string | null; on
           <p className="flex items-center gap-2 py-6 text-xs text-muted-foreground">
             <LoaderCircle className="size-4 animate-spin" /> {' '}{t('Asking the CLI… (it starts without sending a prompt)')}</p>
         ) : (
-          <div className="max-h-[60vh] space-y-3 overflow-y-auto">
+          <div className="selectable max-h-[60vh] space-y-3 overflow-y-auto">
             {results.map((r) => (
               <section key={r.source} className="space-y-1">
                 <h3 className="flex items-center gap-1.5 text-xs font-medium">
@@ -368,6 +368,7 @@ function Transcript() {
       id: s.id,
       profileId: s.profileId,
       kind: s.kind,
+      effort: '',
       model: s.model,
       permissionLevel: 'validate-all',
       cwd: s.cwd,
@@ -389,7 +390,7 @@ function Transcript() {
             {transcript && `${transcript.session.profileName} · ${transcript.session.model || t('default model')} · ${new Date(transcript.session.startedAt).toLocaleString(intlLocale())}`}
           </DialogDescription>
         </DialogHeader>
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1" aria-label={t('Transcript')}>
+        <div className="selectable min-h-0 flex-1 space-y-3 overflow-y-auto pr-1" aria-label={t('Transcript')}>
           {view?.items.length === 0 && <p className="text-xs text-muted-foreground">{t('No message in this session.')}</p>}
           {view?.items.map((item) => (
             <Item key={itemKey(item)} item={item} cwd={view.info.cwd} ended subscription={transcript?.session.billing === 'subscription'} />
