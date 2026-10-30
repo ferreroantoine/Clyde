@@ -1,5 +1,5 @@
 import type OpenAI from 'openai'
-import type { ModelOption } from '@shared/profiles'
+import type { ModelOption, ReasoningEffort } from '@shared/profiles'
 import { parseToolInput, type AdapterEvent, type ChatAdapter, type ChatMessage, type ChatRequest, type StopReason } from './chat'
 
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam
@@ -78,14 +78,39 @@ export function filterModels(kind: OpenAICompatKind, models: RawModel[]): ModelO
   return usable
     .sort((a, b) => (b.created ?? 0) - (a.created ?? 0))
     .filter((m) => !seen.has(m.id) && seen.add(m.id))
-    .map((m) => ({ value: m.id, displayName: m.name || m.id, description: m.description ?? '' }))
+    .map((m) => {
+      const efforts = compatEfforts(kind, m.id)
+      return { value: m.id, displayName: m.name || m.id, description: m.description ?? '', ...(efforts.length ? { efforts } : {}) }
+    })
+}
+
+/**
+ * Reasoning efforts by model name, as no listing says it. The levels every reasoning model of
+ * the provider accepts: OpenAI's o-series and GPT-5 (minus the chat variants), and Gemini 2.5 and
+ * later (minimal / none exist only on some, so they are left out).
+ */
+export function compatEfforts(kind: OpenAICompatKind, id: string): ReasoningEffort[] {
+  if (kind === 'openai') return /^(o\d|gpt-5)/i.test(id) && !/chat/i.test(id) ? ['low', 'medium', 'high'] : []
+  if (kind === 'gemini') return /^gemini-(2\.5|[3-9])/i.test(id) ? ['low', 'medium', 'high'] : []
+  return []
+}
+
+/**
+ * Ollama tells per model whether it thinks (`/api/show` capabilities). gpt-oss takes levels; the
+ * other thinking models only turn it on or off.
+ */
+export function ollamaEfforts(id: string, capabilities: readonly string[]): ReasoningEffort[] {
+  if (!capabilities.includes('thinking')) return []
+  return /gpt-oss/i.test(id) ? ['low', 'medium', 'high'] : ['none', 'high']
 }
 
 /** OpenAI Chat Completions, which Gemini's compatibility endpoint and Ollama (`/v1`) also speak. */
 export class OpenAICompatAdapter implements ChatAdapter {
   constructor(
     private readonly client: OpenAI,
-    private readonly kind: OpenAICompatKind
+    private readonly kind: OpenAICompatKind,
+    /** Ollama only: a model's capabilities from its native `/api/show`. */
+    private readonly capabilities?: (model: string) => Promise<string[]>
   ) {}
 
   async *stream(req: ChatRequest): AsyncGenerator<AdapterEvent> {
@@ -102,7 +127,9 @@ export class OpenAICompatAdapter implements ChatAdapter {
             }
           : {}),
         stream: true,
-        stream_options: { include_usage: true }
+        stream_options: { include_usage: true },
+        // OpenAI and Gemini (ai.google.dev/gemini-api/docs/openai) and Ollama's /v1 all read it.
+        ...(req.effort ? { reasoning_effort: req.effort } : {})
       },
       { signal: req.signal }
     )
@@ -151,6 +178,14 @@ export class OpenAICompatAdapter implements ChatAdapter {
   async listModels(): Promise<ModelOption[]> {
     const raw: RawModel[] = []
     for await (const model of this.client.models.list()) raw.push(model as unknown as RawModel)
-    return filterModels(this.kind, raw)
+    const models = filterModels(this.kind, raw)
+    const capabilities = this.capabilities
+    if (!capabilities) return models
+    return Promise.all(
+      models.map(async (m) => {
+        const efforts = ollamaEfforts(m.value, await capabilities(m.value).catch(() => []))
+        return efforts.length ? { ...m, efforts } : m
+      })
+    )
   }
 }

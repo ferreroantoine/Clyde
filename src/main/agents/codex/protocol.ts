@@ -138,6 +138,9 @@ export interface Model {
   description: string
   hidden: boolean
   isDefault: boolean
+  /** Levels the model accepts for `turn/start`'s `effort`, with Codex's own description. */
+  supportedReasoningEfforts?: { reasoningEffort: string; description: string }[]
+  defaultReasoningEffort?: string
 }
 
 export interface ModelListResponse {

@@ -167,6 +167,7 @@ export class AgentManager {
       profileId: profile.id,
       kind: profile.kind,
       model: req.model || profile.defaultModel || (this.deps.defaultModel?.() ?? ''),
+      effort: req.effort,
       permissionLevel: req.permissionLevel,
       cwd,
       mcpTools: req.mcpTools,
@@ -247,6 +248,7 @@ export class AgentManager {
         env,
         cwd: info.cwd,
         model: info.model,
+        effort: info.effort,
         appendSystemPrompt: systemPrompt,
         mcpServers: mcp.servers,
         disallowedTools: [...mcp.disallowed, ...disallowed]
@@ -278,6 +280,7 @@ export class AgentManager {
         env: buildCodexEnv(this.deps.baseEnv ?? process.env, this.deps.profiles.configDir(profile.id)),
         cwd: info.cwd,
         model: info.model,
+        effort: info.effort,
         permissionLevel: info.permissionLevel,
         platform,
         instructions: systemPrompt,
@@ -332,6 +335,7 @@ export class AgentManager {
         home,
         cwd: info.cwd,
         model: info.model,
+        effort: info.effort,
         permissionLevel: info.permissionLevel,
         instructions: systemPrompt,
         servers: this.deps.mcp.agentServers(allowed),
@@ -373,6 +377,7 @@ export class AgentManager {
     return new ApiSession(
       {
         model: info.model,
+        effort: info.effort,
         memory: this.deps.memory?.() ?? '',
         summarizeAt: this.deps.summarizeAt?.() ?? 0,
         system: chat ? chatSystemPrompt(systemPrompt) : apiSystemPrompt(info.cwd, platform, systemPrompt),

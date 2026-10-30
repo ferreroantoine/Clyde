@@ -99,8 +99,11 @@ export function writeAgyConfig(home: string, config: AgyConfig): void {
   writeFileSync(paths.mcp, JSON.stringify(agyMcpConfig(config.servers), null, 2))
 }
 
+/** Levels `agy --effort` accepts, as `agy --help` lists them. */
+export const AGY_EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max']
+
 /** Arguments for one headless turn (antigravity.google/docs/cli/headless). */
-export function agyArgs(prompt: string, opts: { model: string; conversationId: string | null }): string[] {
+export function agyArgs(prompt: string, opts: { model: string; effort?: string; conversationId: string | null }): string[] {
   return [
     '-p',
     // A prompt starting with "-" would read as a flag.
@@ -108,6 +111,8 @@ export function agyArgs(prompt: string, opts: { model: string; conversationId: s
     '--output-format',
     'stream-json',
     ...(opts.model ? ['--model', opts.model] : []),
+    // `agy --help`: --effort low|medium|high|xhigh|max.
+    ...(opts.effort && AGY_EFFORTS.includes(opts.effort) ? ['--effort', opts.effort] : []),
     ...(opts.conversationId ? ['--conversation', opts.conversationId] : [])
   ]
 }

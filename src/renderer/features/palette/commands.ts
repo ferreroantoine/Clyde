@@ -258,6 +258,7 @@ export function buildCommands(): Command[] {
         void agents.start({
           profileId: agent.profileId,
           model: agent.model,
+          effort: agent.effort,
           permissionLevel: agent.permissionLevel,
           systemPrompt: agent.systemPrompt,
           mcpTools: agent.mcpTools,

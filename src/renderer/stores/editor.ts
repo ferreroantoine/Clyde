@@ -5,6 +5,8 @@ import { invoke } from '@/lib/ipc'
 import { disposeModel, getModel, languageFor, upsertModel } from '@/lib/monaco/models'
 import { notify } from './notifications'
 import { useLayout } from './layout'
+import { useExplorer } from './explorer'
+import { afterClose, ancestors, visit } from '@/lib/tab-history'
 
 export interface EditorTab {
   path: string
@@ -94,6 +96,17 @@ export const useEditor = create<EditorState>()((set, get) => {
     disposeModel(path)
   }
 
+  // Tabs in the order they were looked at, most recent last.
+  let history: string[] = []
+
+  /** Makes `path` the tab on screen; the explorer selects (and reveals) the same file, or nothing. */
+  const show = (path: string | null) => {
+    if (path) history = visit(history, path)
+    const explorer = useExplorer.getState()
+    explorer.select(path)
+    if (path) explorer.reveal(ancestors(path))
+  }
+
   return {
     tabs: [],
     active: null,
@@ -104,13 +117,17 @@ export const useEditor = create<EditorState>()((set, get) => {
       useLayout.getState().showCenter('editor')
       const existing = get().tabs.find((t) => t.path === path)
       set({ active: path, reveal: reveal ? { path, ...reveal } : null })
+      show(path)
       if (existing) return
       const tab: EditorTab = { path, name: nameOf(path), language: languageFor(path), status: 'loading', dirty: false }
       set({ tabs: [...get().tabs, tab] })
       await load(path)
     },
 
-    activate: (path) => set({ active: path }),
+    activate: (path) => {
+      set({ active: path })
+      show(path)
+    },
 
     close: (path) => {
       const { tabs, active } = get()
@@ -120,13 +137,17 @@ export const useEditor = create<EditorState>()((set, get) => {
       if (tab.dirty && !window.confirm(t('{name} has unsaved changes. Close it anyway?', { name: tab.name }))) return
       release(path)
       const rest = tabs.filter((t) => t.path !== path)
-      const nextActive = active === path ? (rest[index] ?? rest[index - 1] ?? null)?.path ?? null : active
+      const nextActive = afterClose(history, tabs.map((t) => t.path), path, active)
+      history = history.filter((p) => p !== path)
       set({ tabs: rest, active: nextActive, ...(nextActive ? {} : { cursor: null }) })
+      if (nextActive !== active) show(nextActive)
     },
 
     closeAll: () => {
       for (const tab of get().tabs) release(tab.path)
+      history = []
       set({ tabs: [], active: null, reveal: null, cursor: null })
+      useExplorer.getState().select(null)
     },
 
     save: async (path) => {

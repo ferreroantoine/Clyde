@@ -61,6 +61,8 @@ export interface CodexSessionConfig {
   env: Record<string, string>
   cwd: string
   model: string
+  /** Codex's reasoning effort (one of the model's `supportedReasoningEfforts`); empty is the model's default. */
+  effort?: string
   permissionLevel: PermissionLevel
   platform: NodeJS.Platform
   /** Added to Codex's instructions as developer instructions. */
@@ -180,7 +182,11 @@ export class CodexSession {
     const text = this.queue.shift() as string
     this.turn = 'starting'
     rpc
-      .request<TurnStartResponse>('turn/start', { threadId: this.threadId, input: [{ type: 'text', text, text_elements: [] }] })
+      .request<TurnStartResponse>('turn/start', {
+        threadId: this.threadId,
+        input: [{ type: 'text', text, text_elements: [] }],
+        ...(this.cfg.effort ? { effort: this.cfg.effort } : {})
+      })
       .then((res) => {
         // turn/completed may already have cleared it.
         if (this.turn === 'starting') this.turn = res.turn.id

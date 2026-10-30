@@ -177,6 +177,14 @@
   [contenteditable] {
     user-select: text;
   }
+  /* Conversations and transcripts: text can be selected and copied; their buttons stay chrome. */
+  .selectable {
+    user-select: text;
+    cursor: auto;
+  }
+  .selectable :is(button, [role='button'], [role='switch']) {
+    user-select: none;
+  }
   ::-webkit-scrollbar {
     width: 10px;
     height: 10px;

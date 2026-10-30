@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { EventChannel, InvokeChannel } from './channels'
 import type { Settings } from '../settings'
-import { profileCreateSchema, profileIdSchema, profileUpdateSchema, type ConnectionResult, type Profile } from '../profiles'
+import { profileCreateSchema, profileIdSchema, profileUpdateSchema, type ConnectionResult, type ModelOption, type Profile } from '../profiles'
 import {
   agentDefinitionInputSchema,
   agentDefinitionUpdateSchema,
@@ -92,6 +92,7 @@ export const requestSchemas = {
   'profiles:update': profileUpdateSchema,
   'profiles:delete': z.object({ id: profileIdSchema }),
   'profiles:test': z.object({ id: profileIdSchema }),
+  'profiles:models': z.object({ id: profileIdSchema, refresh: z.boolean().optional() }),
   'profiles:login': z.object({ id: profileIdSchema, ...dims }),
   'cli:status': z.object({ refresh: z.boolean().default(false) }),
   'agent:list': z.undefined(),
@@ -202,6 +203,7 @@ export interface InvokeResponses {
   'profiles:update': Profile
   'profiles:delete': null
   'profiles:test': ConnectionResult
+  'profiles:models': ModelOption[]
   'profiles:login': PtyInfo
   'cli:status': CliStatus[]
   'agent:list': AgentSessionInfo[]

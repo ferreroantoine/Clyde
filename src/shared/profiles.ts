@@ -146,10 +146,36 @@ export interface Profile {
   updatedAt: number
 }
 
+/** Reasoning effort levels, from none to most, as the providers name them. */
+export const REASONING_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number]
+
+export const EFFORT_LABELS: Record<ReasoningEffort, string> = {
+  none: tk('Off'),
+  minimal: tk('Minimal'),
+  low: tk('Low'),
+  medium: tk('Medium'),
+  high: tk('High'),
+  xhigh: tk('Extra high'),
+  max: tk('Max')
+}
+
+/** The listed model a choice stands for: the default one when no model is chosen. */
+export function findModel(models: readonly ModelOption[], value: string): ModelOption | undefined {
+  if (value) return models.find((m) => m.value === value)
+  return models.find((m) => m.isDefault) ?? models.find((m) => m.value === 'default')
+}
+
 export interface ModelOption {
   value: string
   displayName: string
   description: string
+  /** Reasoning efforts this model accepts, weakest first; absent when it has no such setting. */
+  efforts?: ReasoningEffort[]
+  /** The level it uses when none is chosen, when the provider says. */
+  defaultEffort?: ReasoningEffort
+  /** The account's (or the CLI's) default model. */
+  isDefault?: boolean
 }
 
 export interface ConnectionResult {

@@ -1,7 +1,7 @@
 import { t } from '@shared/i18n'
 import { net } from 'electron'
 import { AppError } from '@shared/errors'
-import { isApiKind } from '@shared/profiles'
+import { isApiKind, type ConnectionResult, type ModelOption, type ProfileKind, type ReasoningEffort } from '@shared/profiles'
 import { handle } from './router'
 import type { ProfilesService } from '../services/profiles'
 import type { PtyService } from '../services/pty'
@@ -12,7 +12,7 @@ import { buildCodexEnv, probeCodex, testCodexConnection } from '../agents/codex/
 import { spawnCli } from '../agents/cli/process'
 import { resolveAntigravityBinary, resolveCodexBinary } from '../agents/cli/resolve'
 import { spawnPty } from '../agents/cli/pty-process'
-import { buildAgyEnv, runAgy, testAntigravityConnection } from '../agents/antigravity/runtime'
+import { AGY_EFFORTS, buildAgyEnv, runAgy, testAntigravityConnection } from '../agents/antigravity/runtime'
 import type { CliDetectService } from '../services/cli-detect'
 
 export interface ProfileHandlerDeps {
@@ -25,6 +25,12 @@ export interface ProfileHandlerDeps {
   query: () => Promise<QueryFn>
   clientApp: string
   fetch: typeof globalThis.fetch
+}
+
+/** `agy --effort` takes the same levels for every model (`agy --help`); it lists no per-model levels. */
+function withEfforts(kind: ProfileKind, models: ModelOption[]): ModelOption[] {
+  if (kind !== 'antigravity') return models
+  return models.map((m) => (m.efforts ? m : { ...m, efforts: AGY_EFFORTS as ReasoningEffort[] }))
 }
 
 export function registerProfileHandlers({
@@ -68,7 +74,9 @@ export function registerProfileHandlers({
     profiles.delete(id)
     return null
   })
-  handle('profiles:test', ({ id }) => {
+  // The model picker's list, kept a few minutes: listing starts a CLI or calls the API.
+  const modelCache = new Map<string, { at: number; models: ModelOption[] }>()
+  const test = (id: string): Promise<ConnectionResult> => {
     const profile = profiles.requireUsable(id)
     if (isApiKind(profile.kind)) {
       const api = { kind: profile.kind, apiKey: profiles.apiKey(id), baseUrl: profile.baseUrl }
@@ -84,6 +92,20 @@ export function registerProfileHandlers({
     }
     // net.fetch goes through Chromium's network stack, so system proxies apply.
     return testConnection({ query, fetch: (url, init) => net.fetch(url, init) }, target(id))
+  }
+  handle('profiles:test', async ({ id }) => {
+    const result = await test(id)
+    if (result.ok) modelCache.set(id, { at: Date.now(), models: withEfforts(profiles.requireUsable(id).kind, result.models) })
+    return { ...result, models: withEfforts(profiles.requireUsable(id).kind, result.models) }
+  })
+  handle('profiles:models', async ({ id, refresh }) => {
+    const cached = modelCache.get(id)
+    if (cached && !refresh && Date.now() - cached.at < 10 * 60_000) return cached.models
+    const result = await test(id)
+    if (!result.ok) throw new AppError('agent_error', result.detail ?? result.status)
+    const models = withEfforts(profiles.requireUsable(id).kind, result.models)
+    modelCache.set(id, { at: Date.now(), models })
+    return models
   })
   // Runs the CLI's own login inside the profile's config dir. The IDE only relays the terminal.
   handle('profiles:login', ({ id, cols, rows }) => {

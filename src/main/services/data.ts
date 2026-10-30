@@ -1,6 +1,6 @@
 import { configExportSchema, CONFIG_FORMAT, type ConfigExport, type ImportSummary } from '@shared/config-export'
 import { t } from '@shared/i18n'
-import { PROFILE_KINDS, type ProfileKind } from '@shared/profiles'
+import { PROFILE_KINDS, REASONING_EFFORTS, type ProfileKind, type ReasoningEffort } from '@shared/profiles'
 import { PERMISSION_LEVELS } from '@shared/agent'
 import { PRICED_KINDS } from '@shared/pricing'
 import { redact, redactArgs } from '@shared/redact'
@@ -60,6 +60,7 @@ export class DataService {
         name: a.name,
         profileName: nameOf.get(a.profileId) ?? '',
         model: a.model,
+        effort: a.effort,
         systemPrompt: a.systemPrompt,
         permissionLevel: a.permissionLevel,
         mcpTools: a.mcpTools
@@ -137,6 +138,7 @@ export class DataService {
         name: a.name,
         profileId,
         model: a.model,
+        effort: (REASONING_EFFORTS as readonly string[]).includes(a.effort) ? (a.effort as ReasoningEffort) : '',
         systemPrompt: a.systemPrompt,
         permissionLevel: a.permissionLevel as never,
         mcpTools: a.mcpTools

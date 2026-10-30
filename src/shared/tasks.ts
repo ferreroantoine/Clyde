@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { tk } from './i18n'
 import { PERMISSION_LEVELS, type PermissionLevel } from './agent'
-import { profileIdSchema } from './profiles'
+import { profileIdSchema, REASONING_EFFORTS, type ReasoningEffort } from './profiles'
 
 export const agentIdSchema = z.uuid()
 export const taskIdSchema = z.uuid()
@@ -16,6 +16,8 @@ export const agentDefinitionInputSchema = z.object({
   name: z.string().trim().min(1, tk('Name is required')).max(60),
   profileId: profileIdSchema,
   model: z.string().trim().max(200).default(''),
+  /** Reasoning effort; empty leaves the model's default. */
+  effort: z.enum(REASONING_EFFORTS).or(z.literal('')).default(''),
   systemPrompt: z.string().max(20_000).default(''),
   permissionLevel: z.enum(PERMISSION_LEVELS).default('validate-all'),
   mcpTools
@@ -30,6 +32,7 @@ export interface AgentDefinition {
   name: string
   profileId: string
   model: string
+  effort: ReasoningEffort | ''
   systemPrompt: string
   permissionLevel: PermissionLevel
   mcpTools: string[]

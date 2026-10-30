@@ -427,5 +427,14 @@ export const migrations: Migration[] = [
       CREATE INDEX chat_chunks_conversation ON chat_chunks(conversation_id);
       ALTER TABLE conversations ADD COLUMN use_history INTEGER NOT NULL DEFAULT 0;
     `
+  },
+  {
+    version: 14,
+    name: 'reasoning effort',
+    sql: `
+      -- Reasoning effort of saved agents and chat conversations; empty is the model's default.
+      ALTER TABLE agents ADD COLUMN effort TEXT NOT NULL DEFAULT '';
+      ALTER TABLE conversations ADD COLUMN effort TEXT NOT NULL DEFAULT '';
+    `
   }
 ]
