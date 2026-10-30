@@ -5,6 +5,7 @@ import type { PermissionDecision, ToolRequest } from '../../permissions/engine'
 import type { ApprovalOutcome, ApprovalQuestion, QuestionAnswers } from '../../permissions/broker'
 import type { AdapterEvent, ChatAdapter, ChatMessage, ImageInput, ToolCall, ToolResult, ToolSpec } from './chat'
 import { ASK_USER, ASK_USER_SPEC, type ToolOutput } from './tools'
+import { parseTodoList, todosReceipt, UPDATE_TODOS, UPDATE_TODOS_DESCRIPTION, UPDATE_TODOS_SCHEMA } from '../todos'
 import {
   breakdown,
   compactToolResults,
@@ -37,6 +38,14 @@ export interface ApiSessionConfig {
   contextWindow?: number | null
   /** The conversation so far, when the session is resumed. */
   history?: ChatMessage[]
+  /** Offers update_todos, the task list shown in the Tasks view (project sessions). */
+  todos?: boolean
+}
+
+const UPDATE_TODOS_SPEC: ToolSpec = {
+  name: UPDATE_TODOS,
+  description: UPDATE_TODOS_DESCRIPTION,
+  inputSchema: UPDATE_TODOS_SCHEMA as unknown as Record<string, unknown>
 }
 
 export interface ApiSessionDeps {
@@ -133,7 +142,7 @@ export class ApiSession {
   }
 
   private get tools(): ToolSpec[] {
-    return [...this.cfg.tools, READ_TOOL_OUTPUT_SPEC, ...(this.deps.question ? [ASK_USER_SPEC] : [])]
+    return [...this.cfg.tools, READ_TOOL_OUTPUT_SPEC, ...(this.deps.question ? [ASK_USER_SPEC] : []), ...(this.cfg.todos ? [UPDATE_TODOS_SPEC] : [])]
   }
 
   /** Shortens tool results the model already read; keeps the full text for read_tool_output. */
@@ -285,6 +294,13 @@ export class ApiSession {
       const part = full.slice(offset, offset + 30_000)
       const rest = full.length - offset - part.length
       return { content: rest > 0 ? `${part}\n… [${rest} more characters: call again with offset ${offset + part.length}]` : part, isError: false }
+    }
+    // The task list changes nothing either: no permission. The manager turns the call into the
+    // `todos` event (as for Claude Code's TodoWrite); here the model only gets a receipt.
+    if (call.name === UPDATE_TODOS && this.cfg.todos) {
+      const items = parseTodoList(call.input['todos'])
+      if (!items) return { content: 'Give "todos": the whole list, each task with text and status (pending, in_progress, completed).', isError: true }
+      return { content: todosReceipt(items), isError: false }
     }
     // A question changes nothing, so it needs no permission; the user answers it in the panel.
     const ask = this.deps.question

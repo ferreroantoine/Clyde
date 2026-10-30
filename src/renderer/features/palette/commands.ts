@@ -5,7 +5,7 @@ import { useAgents, ENDED_STATUSES } from "@/stores/agents";
 import { useAgentDialog } from "@/stores/agent-dialog";
 import { useNextSession } from "@/stores/next-session";
 import { fromAgent } from "@/lib/next-session";
-import { useBoard } from "@/stores/board";
+import { useSavedAgents } from "@/stores/saved-agents";
 import { useEditor } from "@/stores/editor";
 import { useLayout } from "@/stores/layout";
 import { useMcp } from "@/stores/mcp";
@@ -70,7 +70,7 @@ export function buildCommands(): Command[] {
       id: "go.board",
       title: t("Go to Agents board"),
       group: t("Go to"),
-      run: () => layout.showCenter("agents"),
+      run: () => layout.showCenter("tasks"),
     },
     {
       id: "go.accounts",
@@ -251,7 +251,7 @@ export function buildCommands(): Command[] {
       },
     });
   }
-  for (const agent of useBoard.getState().agents) {
+  for (const agent of useSavedAgents.getState().agents) {
     const profile = profileById(profiles, agent.profileId);
     if (!workspace || !profile?.usable) continue;
     commands.push({

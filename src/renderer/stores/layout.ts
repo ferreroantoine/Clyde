@@ -1,8 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type CenterView = 'chat' | 'editor' | 'agents' | 'supervision' | 'settings'
-const CENTER_VIEWS: CenterView[] = ['chat', 'editor', 'agents', 'supervision', 'settings']
+export type CenterView = 'chat' | 'editor' | 'tasks' | 'supervision' | 'settings'
+const CENTER_VIEWS: CenterView[] = ['chat', 'editor', 'tasks', 'supervision', 'settings']
 
 export const SETTINGS_SECTIONS = [
   'general',
@@ -28,7 +28,7 @@ export type Intent = 'new-account' | 'new-mcp' | 'new-task'
 const INTENT_VIEW: Record<Intent, { view: CenterView; section?: SettingsSection }> = {
   'new-account': { view: 'settings', section: 'accounts' },
   'new-mcp': { view: 'settings', section: 'mcp' },
-  'new-task': { view: 'agents' }
+  'new-task': { view: 'tasks' }
 }
 
 interface LayoutState {
@@ -92,7 +92,9 @@ export const useLayout = create<LayoutState>()(
       // Views that no longer exist (Accounts and MCP moved into Settings) fall back to the editor.
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<LayoutState>
-        const center = p.center && CENTER_VIEWS.includes(p.center) ? p.center : current.center
+        // The Agents board became the Tasks view.
+        const stored = (p.center as string | undefined) === 'agents' ? 'tasks' : p.center
+        const center = stored && CENTER_VIEWS.includes(stored) ? stored : current.center
         const settingsSection = p.settingsSection && SETTINGS_SECTIONS.includes(p.settingsSection) ? p.settingsSection : current.settingsSection
         return { ...current, ...p, center, settingsSection }
       },

@@ -29,7 +29,8 @@ import { createAdapter } from './agents/api/clients'
 import { McpStore } from './mcp/store'
 import { McpHub } from './mcp/hub'
 import { registerMcpHandlers } from './ipc/mcp'
-import { registerTaskHandlers } from './ipc/tasks'
+import { registerAgentDefinitionHandlers } from './ipc/agent-definitions'
+import { registerTodoHandlers } from './ipc/todos'
 import { registerMetricsHandlers } from './ipc/metrics'
 import { MetricsService } from './metrics/metrics'
 import { setupLimits } from './limits/setup'
@@ -37,8 +38,8 @@ import { DataService } from './services/data'
 import { registerDataHandlers } from './ipc/data'
 import { registerLimitsHandlers } from './ipc/limits'
 import { AgentDefinitionsService } from './services/agent-definitions'
-import { WorktreeService } from './services/worktrees'
-import { TaskService } from './agents/tasks'
+import { TodoService } from './agents/todo-service'
+import { ClydeMcpServer } from './mcp/clyde-server'
 import { ChatStore } from './chat/store'
 import { ChatService } from './chat/service'
 import { ChatSearch, ollamaEmbed } from './chat/search'
@@ -89,13 +90,6 @@ function openAppDatabase(): Db | null {
     )
     return null
   }
-}
-
-/** %LOCALAPPDATA%\\Clyde\\worktrees on Windows (not roaming), the app data folder elsewhere. */
-function worktreesRoot(): string {
-  const local = process.env['LOCALAPPDATA']
-  if (process.platform === 'win32' && local && !userDataOverride) return join(local, 'Clyde', 'worktrees')
-  return join(app.getPath('userData'), 'worktrees')
 }
 
 function memoryDatabase(): Db {
@@ -198,9 +192,22 @@ if (!app.requestSingleInstanceLock()) {
       createAdapter: (target) => createAdapter(target, fetch)
     })
     const checkpoints = new CheckpointService(profileDb)
+    // The Tasks view: the user's tasks and the lists project sessions keep.
+    const todos = new TodoService(profileDb, {
+      root: () => workspace.current()?.root ?? null,
+      sessionRoot: (id) => {
+        const info = agents.get(id)
+        return info && !info.chatId ? info.cwd : null
+      },
+      onChanged: () => broadcast('todos:changed', null)
+    })
+    // update_todos for agents without a task-list tool (Antigravity).
+    const clydeMcp = new ClydeMcpServer((sessionId, items) => agents.note(sessionId, { type: 'todos', items }))
+    void clydeMcp.start().catch((err) => log.warn('could not start the clyde MCP server', err))
     const media = new MediaStore(join(app.getPath('userData'), 'session-media'))
     const agents = new AgentManager({
       media,
+      clydeMcp,
       memory: () => memory?.forPrompt() ?? '',
       summarizeAt: () => settings.getAll().memory.summarizeAt,
       summarize: (transcript, fallback, signal) =>
@@ -221,7 +228,7 @@ if (!app.requestSingleInstanceLock()) {
       onEvent: (envelope) => {
         broadcast('agent:event', envelope)
         metrics.onEvent(envelope)
-        tasks.onAgentEvent(envelope)
+        todos.onAgentEvent(envelope)
         chat.onAgentEvent(envelope)
         limitsSetup.onAgentEvent(envelope)
         guard.onEvent(envelope)
@@ -239,7 +246,7 @@ if (!app.requestSingleInstanceLock()) {
           void memory?.proposeFromSession(info.id).catch((err) => log.warn('memory proposal failed', err))
         }
         metrics.onSession(info)
-        tasks.onSession(info)
+        if (isEnded(info.status)) clydeMcp.release(info.id)
         if (mainWindow) refreshTray(mainWindow, background)
       },
       store: {
@@ -287,16 +294,8 @@ if (!app.requestSingleInstanceLock()) {
     mcp.start()
 
     const definitions = new AgentDefinitionsService(profileDb, (list) => broadcast('agents:changed', list))
-    const tasks: TaskService = new TaskService(profileDb, {
-      worktrees: new WorktreeService(() => settings.getAll().agents.worktreesFolder.trim() || worktreesRoot()),
-      deleteMergedWorktrees: () => settings.getAll().agents.deleteMergedWorktrees,
-      agents: definitions,
-      sessions: agents,
-      workspaceRoot: () => workspace.current()?.root ?? null,
-      onChanged: (list) => broadcast('tasks:changed', list)
-    })
-    tasks.recover()
-    registerTaskHandlers(definitions, tasks)
+    registerAgentDefinitionHandlers(definitions)
+    registerTodoHandlers(todos)
 
     // "Use my past conversations": embeddings from the first Ollama account (Settings › Memory & context).
     const chatSearch = new ChatSearch(

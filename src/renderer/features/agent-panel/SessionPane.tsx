@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { intlLocale, t, tk } from '@shared/i18n'
-import { ArrowLeftRight, CircleAlert, FoldVertical, Gauge, History, Play, RotateCcw, StepForward } from 'lucide-react'
+import { ArrowLeftRight, CircleAlert, FoldVertical, Gauge, History, ListTodo, Play, RotateCcw, StepForward } from 'lucide-react'
 import { PERMISSION_LEVEL_LABELS, type AgentStatus } from '@shared/agent'
 import { EFFORT_LABELS, kindLabel } from '@shared/profiles'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,9 @@ import { Composer } from './Composer'
 import { Appear } from '@/components/Appear'
 import { useSettings } from '@/stores/settings'
 import { LimitBar, SwitchDialog } from './SwitchAccount'
+import { progressOf } from '@/lib/todo-view'
+import { useLayout } from '@/stores/layout'
+import { useTodos } from '@/stores/todos'
 
 export const STATUS_LABELS: Record<AgentStatus, string> = {
   starting: tk('Starting'),
@@ -171,6 +174,36 @@ function SessionComposer({ view }: { view: SessionView }) {
               : t('Ask the agent… (Enter to send)')
       }
     />
+  )
+}
+
+/** The agent's task list in one line ("3/7 · Now: …"); a click shows it in the Tasks view. */
+function TodoProgress({ view }: { view: SessionView }) {
+  const progress = progressOf(view.todos)
+  if (!progress) return null
+  const { done, total, current } = progress
+  return (
+    <button
+      type="button"
+      className="press flex w-full shrink-0 items-center gap-2 border-b px-3 py-1.5 text-left text-[11px] text-muted-foreground hover:bg-accent/50"
+      title={t('Show this session’s tasks')}
+      data-testid="todo-progress"
+      onClick={() => {
+        useTodos.getState().setFilter({ kind: 'session', sessionId: view.info.id })
+        useLayout.getState().showCenter('tasks')
+      }}
+    >
+      <ListTodo className="size-3.5 shrink-0" />
+      <span className="font-medium text-foreground tabular-nums">
+        {done}/{total}
+      </span>
+      <span className="h-1 w-12 shrink-0 overflow-hidden rounded-full bg-muted">
+        <span className="block h-full rounded-full bg-primary/70" style={{ width: `${(done / total) * 100}%` }} />
+      </span>
+      <span className="min-w-0 truncate">
+        {current ? t('In progress: {task}', { task: current.active || current.text }) : done === total ? t('All done') : t('Nothing in progress')}
+      </span>
+    </button>
   )
 }
 
@@ -342,6 +375,7 @@ export function SessionPane({ view }: { view: SessionView }) {
         </div>
       )}
       <ResumeBar view={view} />
+      <TodoProgress view={view} />
       <ContextBar view={view} />
       <div
         ref={scroller}

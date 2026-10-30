@@ -17,7 +17,7 @@ import { CenterPage } from '@/features/pages/CenterPage'
 import { cn } from '@/lib/utils'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 
-const CENTER_SCOPES: Record<CenterView, string> = { chat: tk('The chat'), editor: tk('The editor'), agents: tk('The agents board'), supervision: tk('Supervision'), settings: tk('Settings') }
+const CENTER_SCOPES: Record<CenterView, string> = { chat: tk('The chat'), editor: tk('The editor'), tasks: tk('The tasks'), supervision: tk('Supervision'), settings: tk('Settings') }
 
 const storage = typeof window !== 'undefined' ? window.localStorage : undefined
 

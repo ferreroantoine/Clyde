@@ -26,6 +26,9 @@ const KINDS: Record<string, ToolKind> = {
   Agent: 'agent',
   Task: 'agent',
   TodoWrite: 'todo',
+  // Clyde's own task-list tool: built into its loop, and through the clyde MCP server.
+  update_todos: 'todo',
+  mcp__clyde__update_todos: 'todo',
   AskUserQuestion: 'question',
   ask_user: 'question',
   view_image: 'image'
@@ -146,16 +149,19 @@ export interface Todo {
   activeForm: string
 }
 
-/** The to-do list of a TodoWrite call, or null when it is malformed. */
+/** The to-do list of a TodoWrite or update_todos call, or null when it is malformed. */
 export function todosOf(input: Record<string, unknown>): Todo[] | null {
   const raw = input['todos']
   if (!Array.isArray(raw)) return null
   const todos: Todo[] = []
   for (const item of raw) {
-    const o = item as Partial<Todo> | null
-    if (!o || typeof o.content !== 'string') return null
-    const status = o.status === 'in_progress' || o.status === 'completed' ? o.status : 'pending'
-    todos.push({ content: o.content, status, activeForm: typeof o.activeForm === 'string' ? o.activeForm : o.content })
+    const o = item as Record<string, unknown> | null
+    // TodoWrite says content / activeForm, update_todos text / active.
+    const content = o?.['content'] ?? o?.['text']
+    if (!o || typeof content !== 'string') return null
+    const status = o['status'] === 'in_progress' || o['status'] === 'completed' ? o['status'] : 'pending'
+    const active = o['activeForm'] ?? o['active']
+    todos.push({ content, status, activeForm: typeof active === 'string' ? active : content })
   }
   return todos
 }

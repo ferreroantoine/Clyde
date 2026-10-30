@@ -18,7 +18,7 @@ import { isApiKind, type Profile } from '@shared/profiles'
 import type { ProfilesService } from '../services/profiles'
 import { ApprovalBroker, type QuestionAnswers } from '../permissions/broker'
 import { decide, type PermissionDecision, type ToolRequest } from '../permissions/engine'
-import type { McpHub } from '../mcp/hub'
+import type { AgentMcpServer, McpHub } from '../mcp/hub'
 import { ClaudeCodeSession, type QueryFn } from './claude-code/provider'
 import { buildProfileEnv, copyClaudeSession, findClaudeSessionFile, resolveClaudeBinary, withoutAccountVars } from './claude-code/runtime'
 import type { ChatAdapter, ChatMessage, ImageInput } from './api/chat'
@@ -37,6 +37,7 @@ import { resolveAntigravityBinary, resolveCodexBinary } from './cli/resolve'
 import { spawnPty, type SpawnPty } from './cli/pty-process'
 import { AntigravitySession } from './antigravity/session'
 import { buildAgyEnv } from './antigravity/runtime'
+import { todoReflex, todosFromToolCall } from './todos'
 
 /** Default cap on agents running at once (plan: "agent CPU guard"). */
 export const MAX_ACTIVE_SESSIONS = 4
@@ -86,6 +87,8 @@ export interface AgentManagerDeps {
   store?: SessionStore
   /** Keeps the images tools return (screenshots); without it they are dropped. */
   media?: Pick<MediaStore, 'save'>
+  /** Clyde's MCP server (update_todos), for agents without a task-list tool of their own. */
+  clydeMcp?: { serverFor(sessionId: string): AgentMcpServer | null }
 }
 
 /** What the manager drives: a Claude Code session or Clyde's own loop. */
@@ -348,11 +351,13 @@ export class AgentManager {
         : { question: (toolUseId: string, questions: AgentQuestion[], signal: AbortSignal) => this.broker.question(id, entry.prefix + toolUseId, questions, signal) })
     }
 
+    // Project sessions keep their task list by reflex (the Tasks view shows it); chat ones do not.
+    const projectPrompt = [req.systemPrompt.trim(), todoReflex(profile.kind)].filter(Boolean).join('\n\n')
     // CLI agents keep their own system prompt; in chat they get the chat guidance on top of it.
-    const cliPrompt = chat ? chatSystemPrompt(req.systemPrompt) : req.systemPrompt
+    const cliPrompt = chat ? chatSystemPrompt(req.systemPrompt) : projectPrompt
     let session: AgentSession
     if (isApiKind(profile.kind)) {
-      session = await this.apiSession(profile, apiKey, info, req.systemPrompt, allowed, platform, common, resume ? historyFromEvents(resume.events) : [])
+      session = await this.apiSession(profile, apiKey, info, chat ? req.systemPrompt : projectPrompt, allowed, platform, common, resume ? historyFromEvents(resume.events) : [])
     } else if (profile.kind === 'claude-code') {
       session = await this.claudeCodeSession(profile, apiKey, info, cliPrompt, allowed, common, chat ? CHAT_CLAUDE_DISALLOWED : [], resume?.resumeId ?? null)
     } else if (profile.kind === 'codex') {
@@ -485,6 +490,8 @@ export class AgentManager {
   ): AgentSession {
     const binary = (this.deps.resolveAntigravity ?? resolveAntigravityBinary)(this.deps.antigravityPath?.() ?? '')
     const home = this.deps.profiles.configDir(profile.id)
+    // agy has no task-list tool: Clyde's MCP server gives it update_todos (not in chat).
+    const clyde = info.chatId ? null : (this.deps.clydeMcp?.serverFor(info.id) ?? null)
     const log = this.deps.log
     return new AntigravitySession(
       {
@@ -497,6 +504,7 @@ export class AgentManager {
         permissionLevel: info.permissionLevel,
         instructions: systemPrompt,
         servers: this.deps.mcp.agentServers(allowed),
+        ...(clyde ? { clyde } : {}),
         cliVersion: this.deps.cliVersion?.('antigravity') ?? '',
         ...(conversationId ? { conversationId } : {})
       },
@@ -542,6 +550,7 @@ export class AgentManager {
         summarizeAt: this.deps.summarizeAt?.() ?? 0,
         history,
         system: chat ? chatSystemPrompt(systemPrompt) : apiSystemPrompt(info.cwd, platform, systemPrompt),
+        todos: !chat,
         tools: [...(chat ? BASE_TOOLS.filter((tool) => CHAT_API_TOOLS.has(tool.name)) : BASE_TOOLS), ...mcpTools.map(({ qualifiedName: _q, ...spec }) => spec)]
       },
       {
@@ -689,6 +698,11 @@ export class AgentManager {
       out = images.length ? { ...rest, images } : rest
     }
     this.emit(entry.info.id, out)
+    // TodoWrite and update_todos calls are the agent's task list: one common event for the Tasks view.
+    if (out.type === 'tool_call' && !out.parentToolUseId && !entry.info.chatId) {
+      const items = todosFromToolCall(out.name, out.input)
+      if (items) this.emit(entry.info.id, { type: 'todos', items })
+    }
   }
 
   private emit(sessionId: string, event: AgentEvent): void {

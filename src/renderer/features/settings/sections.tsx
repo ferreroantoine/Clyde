@@ -221,7 +221,7 @@ export const SECTIONS: SectionSpec[] = [
             options={[
               { value: 'chat', label: t('Chat') },
               { value: 'editor', label: t('Explorer') },
-              { value: 'agents', label: t('Agents') },
+              { value: 'tasks', label: t('Tasks') },
               { value: 'supervision', label: t('Supervision') }
             ]}
             onChange={(v) => set('general.startView', v)}
@@ -429,22 +429,6 @@ export const SECTIONS: SectionSpec[] = [
         keywords: 'parallel concurrent maximum',
         control: ({ s, set }) => (
           <NumberField label={t('Agents running at once')} min={1} max={16} value={s.agents.maxParallel} onChange={(v) => set('agents.maxParallel', v)} />
-        )
-      },
-      {
-        id: 'agents.worktreesFolder',
-        label: t('Worktrees folder'),
-        hint: t('Where board tasks get their git worktree. Empty means %LOCALAPPDATA%\\Clyde\\worktrees.'),
-        control: ({ s, set }) => (
-          <PathField label={t('Worktrees folder')} placeholder={t('default')} value={s.agents.worktreesFolder} onChange={(v) => set('agents.worktreesFolder', v)} />
-        )
-      },
-      {
-        id: 'agents.deleteMergedWorktrees',
-        label: t('Delete worktrees once merged'),
-        hint: t('Removes the folder and the task branch after a successful merge.'),
-        control: ({ s, set }) => (
-          <Toggle label={t('Delete worktrees once merged')} checked={s.agents.deleteMergedWorktrees} onChange={(v) => set('agents.deleteMergedWorktrees', v)} />
         )
       },
       {

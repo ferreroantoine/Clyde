@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { ProfileBadge } from '@/components/ProfileBadge'
 import { ModelPicker, type ModelChoice } from '@/components/ModelPicker'
 import { useAgentDialog } from '@/stores/agent-dialog'
-import { useBoard } from '@/stores/board'
+import { useSavedAgents } from '@/stores/saved-agents'
 import { useSettings } from '@/stores/settings'
 import { useProfiles } from '@/stores/profiles'
 import { cn } from '@/lib/utils'
@@ -39,8 +39,8 @@ export function AgentDialogHost() {
 
 function AgentForm({ agent, close }: { agent?: AgentDefinition; close: () => void }) {
   const profiles = useProfiles((s) => s.profiles).filter((p) => p.usable)
-  const saveAgent = useBoard((s) => s.saveAgent)
-  const deleteAgent = useBoard((s) => s.deleteAgent)
+  const saveAgent = useSavedAgents((s) => s.saveAgent)
+  const deleteAgent = useSavedAgents((s) => s.deleteAgent)
   const [name, setName] = useState(agent?.name ?? '')
   const [profileId, setProfileId] = useState(agent?.profileId ?? profiles[0]?.id ?? '')
   const [choice, setChoice] = useState<ModelChoice>({ model: agent?.model ?? '', effort: agent?.effort ?? '' })

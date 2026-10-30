@@ -46,6 +46,14 @@ export const settingsMigrations: Record<number, (doc: Raw) => Raw> = {
   2: (v2) => {
     const general = isObject(v2['general']) ? v2['general'] : {}
     return { ...v2, general: { ...general, closeBehavior: 'tray' } }
+  },
+  // The Agents board became the Tasks view: no worktree settings, and the start view is renamed.
+  3: (v3) => {
+    const general = isObject(v3['general']) ? v3['general'] : {}
+    const startView = general['startView'] === 'agents' ? { startView: 'tasks' } : {}
+    if (!isObject(v3['agents'])) return { ...v3, general: { ...general, ...startView } }
+    const { worktreesFolder: _folder, deleteMergedWorktrees: _cleanup, ...agents } = v3['agents']
+    return { ...v3, general: { ...general, ...startView }, agents }
   }
 }
 
