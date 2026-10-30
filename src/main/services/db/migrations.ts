@@ -447,5 +447,17 @@ export const migrations: Migration[] = [
       ALTER TABLE sessions ADD COLUMN chat_id TEXT;
       CREATE INDEX sessions_cwd ON sessions(cwd, started_at);
     `
+  },
+  {
+    version: 16,
+    name: 'scheduled resumes',
+    sql: `
+      -- Sessions to tell "continue" once their account's usage limit resets; survives a restart.
+      CREATE TABLE scheduled_resumes (
+        session_id TEXT PRIMARY KEY,
+        at         INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+    `
   }
 ]

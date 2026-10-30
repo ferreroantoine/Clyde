@@ -124,7 +124,9 @@ export class CodexTranslator {
         // Retries are reported as errors too ("Reconnecting... 2/5"); only the final one counts.
         if (p.willRetry) return []
         this.shownError = describeCodexError(p.error)
-        return [{ type: 'error', message: this.shownError }]
+        const limit: AgentEvent[] =
+          p.error.codexErrorInfo === 'usageLimitExceeded' ? [{ type: 'rate_limit', status: 'rejected', resetsAt: null, utilization: null, limitType: null }] : []
+        return [...limit, { type: 'error', message: this.shownError }]
       }
       default:
         return []

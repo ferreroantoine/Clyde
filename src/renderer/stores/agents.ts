@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { t } from '@shared/i18n'
-import { ENDED_STATUSES as ENDED, type AgentSessionInfo, type AgentStart, type ApprovalDecision, type SessionSummary } from '@shared/agent'
+import { ENDED_STATUSES as ENDED, type AgentSessionInfo, type AgentStart, type AgentSwitch, type ApprovalDecision, type SessionSummary } from '@shared/agent'
 import { invoke, on } from '@/lib/ipc'
 import { applyEvent, emptyView, type SessionView } from '@/lib/transcript'
 import { useWorkspace } from './workspace'
@@ -48,6 +48,12 @@ interface AgentsState {
   /** Brings an ended session back; `carryOn` also tells it to finish what it was doing. */
   resume: (id: string, carryOn?: boolean) => Promise<boolean>
   resuming: string | null
+  /** Moves a session to another account / model; the agent goes on from where it was. */
+  switchAccount: (id: string, target: { profileId: string; model: string; effort: AgentSwitch['effort']; carryOn: boolean }) => Promise<boolean>
+  /** Sessions Clyde will tell to carry on, with when (ms). */
+  scheduled: Record<string, number>
+  scheduleResume: (id: string) => Promise<void>
+  cancelResume: (id: string) => Promise<void>
 }
 
 export const ENDED_STATUSES: ReadonlySet<string> = ENDED
@@ -104,6 +110,29 @@ export const useAgents = create<AgentsState>()((set, get) => {
     focusTick: 0,
     history: [],
     resuming: null,
+    scheduled: {},
+
+    switchAccount: async (id, target) => {
+      set({ resuming: id })
+      try {
+        await invoke('agent:switch', { sessionId: id, ...target })
+        set({ activeId: id })
+        return true
+      } catch (err) {
+        notify.error(t('Could not switch the session to that account'), err)
+        return false
+      } finally {
+        set({ resuming: null })
+      }
+    },
+
+    scheduleResume: async (id) => {
+      await invoke('agent:scheduleResume', { sessionId: id }).catch((err) => notify.error(t('Could not plan the resume'), err))
+    },
+
+    cancelResume: async (id) => {
+      await invoke('agent:cancelResume', { sessionId: id }).catch((err) => notify.error(t('Could not cancel the resume'), err))
+    },
 
     loadHistory: async () => {
       const root = useWorkspace.getState().info?.root
@@ -179,6 +208,15 @@ export const useAgents = create<AgentsState>()((set, get) => {
         .then((list) => list.forEach(upsertSession))
         .catch(() => undefined)
       void get().loadHistory()
+      invoke('agent:scheduled')
+        .then((list) => set({ scheduled: Object.fromEntries(list.map((s) => [s.sessionId, s.at])) }))
+        .catch(() => undefined)
+      offs.push(
+        on('agent:resumeScheduled', ({ sessionId, at }) => {
+          const { [sessionId]: _old, ...rest } = get().scheduled
+          set({ scheduled: at === null ? rest : { ...rest, [sessionId]: at } })
+        })
+      )
       // Another project: its own sessions.
       const offWorkspace = useWorkspace.subscribe((state, previous) => {
         if (state.info?.root !== previous.info?.root) void get().loadHistory()

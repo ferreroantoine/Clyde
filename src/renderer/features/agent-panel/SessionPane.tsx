@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type SetStateAction } from 'react'
 import { intlLocale, t, tk } from '@shared/i18n'
-import { ArrowUp, CircleAlert, FoldVertical, Gauge, History, Play, RotateCcw, Square, StepForward } from 'lucide-react'
+import { ArrowLeftRight, ArrowUp, CircleAlert, FoldVertical, Gauge, History, Play, RotateCcw, Square, StepForward } from 'lucide-react'
 import { PERMISSION_LEVEL_LABELS, type AgentStatus } from '@shared/agent'
 import { EFFORT_LABELS, kindLabel } from '@shared/profiles'
 import { Button } from '@/components/ui/button'
@@ -20,6 +20,7 @@ import { EXPLORER_PATH_TYPE } from '@/features/explorer/FileTree'
 import { mention } from '@/features/explorer/mention'
 import { Appear } from '@/components/Appear'
 import { useSettings } from '@/stores/settings'
+import { LimitBar, SwitchDialog } from './SwitchAccount'
 
 export const STATUS_LABELS: Record<AgentStatus, string> = {
   starting: tk('Starting'),
@@ -376,6 +377,8 @@ export function SessionPane({ view }: { view: SessionView }) {
   useEffect(() => {
     if (subscription) void loadPlanUse(sessionId)
   }, [subscription, sessionId, loadPlanUse])
+  const [switching, setSwitching] = useState(false)
+  const busy = view.info.status === 'running' || view.info.status === 'awaiting-approval' || view.info.status === 'starting'
   return (
     <div className="flex h-full min-h-0 flex-col" data-session={view.info.id} data-status={view.info.status}>
       <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b px-3 py-2 text-[11px] text-muted-foreground">
@@ -387,9 +390,22 @@ export function SessionPane({ view }: { view: SessionView }) {
           <StatusDot status={view.info.status} />
           {t(STATUS_LABELS[view.info.status])}
           {!subscription && view.totals.costUsd > 0 && <span>· {usd(view.totals.costUsd)}</span>}
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            aria-label={t('Switch account or model')}
+            title={busy ? t('Wait for the agent to finish its turn, or interrupt it.') : t('Switch account or model')}
+            disabled={busy || !view.resumable}
+            onClick={() => setSwitching(true)}
+          >
+            <ArrowLeftRight />
+          </Button>
         </span>
       </div>
-      {limit && limit.status !== 'allowed' && (
+      <SwitchDialog view={view} open={switching} onOpenChange={setSwitching} />
+      <LimitBar view={view} onSwitch={() => setSwitching(true)} />
+      {/* A rejection is LimitBar's once the turn ended. */}
+      {limit && limit.status !== 'allowed' && !(limit.status === 'rejected' && view.limit) && (
         <p
           className={cn(
             'flex shrink-0 items-center gap-1.5 border-b px-3 py-1.5 text-[11px]',

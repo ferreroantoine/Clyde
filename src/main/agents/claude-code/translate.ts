@@ -187,7 +187,11 @@ export class MessageTranslator {
         })
       }
     }
-    if (msg.error && !subagent) out.push({ type: 'error', message: describeAssistantError(msg.error) })
+    if (msg.error && !subagent) {
+      // The limit itself, for the limit guard; rate_limit_event usually says it too, with the reset time.
+      if (msg.error === 'rate_limit') out.push({ type: 'rate_limit', status: 'rejected', resetsAt: null, utilization: null, limitType: null })
+      out.push({ type: 'error', message: describeAssistantError(msg.error) })
+    }
     return out
   }
 

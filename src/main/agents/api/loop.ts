@@ -249,6 +249,10 @@ export class ApiSession {
         subtype = 'error_during_execution'
         const message = this.deps.describeError(err)
         errors.push(message)
+        // Out of quota or rate limited: the limit guard may switch accounts or wait.
+        if ((err as { status?: number }).status === 429) {
+          this.deps.emit({ type: 'rate_limit', status: 'rejected', resetsAt: null, utilization: null, limitType: null })
+        }
         this.deps.emit({ type: 'error', message })
       }
     } finally {

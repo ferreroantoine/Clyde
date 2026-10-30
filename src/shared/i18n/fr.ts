@@ -337,7 +337,6 @@ export const fr: Record<string, string> = {
   'Add an account, then start an agent to chat with it here. Tool calls and approvals show up inline.': 'Ajoutez un compte, puis démarrez un agent pour discuter avec lui ici. Les appels d’outils et les autorisations s’affichent dans le fil.',
   'Open Accounts': 'Ouvrir Comptes',
   'New agent session': 'Nouvelle session d’agent',
-  'Choose the account explicitly; Clyde never switches it for you.': 'Choisissez le compte explicitement ; Clyde n’en change jamais à votre place.',
   'Account': 'Compte',
   'Claude Code · key': 'Claude Code · clé',
   'Model': 'Modèle',
@@ -1414,5 +1413,43 @@ export const fr: Record<string, string> = {
   '{count} web pages': '{count} pages web',
   '{done} of {total} done': '{done} sur {total} faites',
   // Iteration 3 — agent activity (2)
-  'Lists': 'Liste'
+  'Lists': 'Liste',
+  // Iteration 3 — usage limits and account switch
+  'Switch account or model': 'Changer de compte ou de modèle',
+  'Wait for the agent to finish its turn, or interrupt it.': 'Attendez que l’agent finisse son tour, ou interrompez-le.',
+  'in less than a minute': 'dans moins d’une minute',
+  'in {minutes} min': 'dans {minutes} min',
+  'in {hours} h {minutes}': 'dans {hours} h {minutes}',
+  'The session goes on in the same thread. Between two Claude Code accounts, or to an API account, the agent keeps the whole conversation; otherwise it gets the end of it.':
+    'La session continue dans le même fil. Entre deux comptes Claude Code, ou vers un compte API, l’agent garde toute la conversation ; sinon il en reçoit la fin.',
+  'current': 'actuel',
+  'Tell the agent to carry on with its task': 'Dire à l’agent de continuer sa tâche',
+  'Switch': 'Changer',
+  'Clyde tells the agent to carry on at {time} ({when}).': 'Clyde dira à l’agent de continuer à {time} ({when}).',
+  'Usage limit reached. It resets at {time} ({when}).': 'Limite d’utilisation atteinte. Elle se réinitialise à {time} ({when}).',
+  'Usage limit reached.': 'Limite d’utilisation atteinte.',
+  'Switch to {name}': 'Passer sur {name}',
+  'Switch account…': 'Changer de compte…',
+  'Wait and resume at {time}': 'Attendre et reprendre à {time}',
+  'Wait and resume': 'Attendre et reprendre',
+  'Do nothing': 'Ne rien faire',
+  'Fallback accounts': 'Comptes de secours',
+  'Use {name}': 'Utiliser {name}',
+  'Move up': 'Monter',
+  'Move down': 'Descendre',
+  'When an account hits its usage limit': 'Quand un compte atteint sa limite d’utilisation',
+  'In the middle of a task. Waiting resumes the session a minute after the limit resets, even after Clyde restarts.':
+    'En pleine tâche. Attendre reprend la session une minute après la réinitialisation de la limite, même si Clyde a redémarré.',
+  'Ask me': 'Me demander',
+  'Wait for the reset and resume': 'Attendre la réinitialisation et reprendre',
+  'Switch to a fallback account': 'Passer sur un compte de secours',
+  'In order. Clyde takes the first one under 95% of its limits; with none, it waits for the reset.':
+    'Dans l’ordre. Clyde prend le premier sous 95 % de ses limites ; s’il n’y en a aucun, il attend la réinitialisation.',
+  'Continued on {name} ({model}), with the whole conversation.': 'Suite sur {name} ({model}), avec toute la conversation.',
+  'Continued on {name} ({model}). The agent got the end of this conversation.': 'Suite sur {name} ({model}). L’agent a reçu la fin de cette conversation.',
+  'Could not switch the session to that account': 'Impossible de passer la session sur ce compte',
+  'Could not plan the resume': 'Impossible de planifier la reprise',
+  'Could not cancel the resume': 'Impossible d’annuler la reprise',
+  'Choose the account; at a usage limit, Clyde switches it only if Settings › Agents says so.':
+    'Choisissez le compte ; à une limite d’utilisation, Clyde n’en change que si Paramètres › Agents le prévoit.'
 }
