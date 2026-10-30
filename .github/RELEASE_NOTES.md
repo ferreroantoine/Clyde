@@ -16,12 +16,13 @@ To uninstall, use *Settings › Apps* in Windows. Your accounts and history stay
 
 ## New in this version
 
-- **Model and reasoning effort**: one model picker in the agent panel, the chat and saved agents. It lists the account's models with a search, and also takes any model id you type. When the model supports it, you can set its reasoning effort (low, medium, high, and more on Claude, Codex and Antigravity). The agent panel header shows the effort a session uses.
-- **Dictation**: while it listens, *Enter* stops and inserts the text (without sending it), *Escape* cancels.
-- **Explorer**: the selected file follows the editor tab. Closing a tab goes back to the one you viewed before it, and with no file open nothing is selected.
-- **Selectable text**: messages in the agent panel, the chat and the Supervision transcripts can be selected and copied.
+- **Runs in the tray**: closing the window hides Clyde to the system tray and agents keep working; quitting while they do asks first. Sessions cut by a shutdown are listed as interrupted in the agent panel and can be resumed under the same id (optionally at startup).
+- **Usage limits**: when an account hits its limit, the session shows when it resets and offers to switch to a fallback account, wait and resume, or do nothing. *Settings › Agents* sets the default and the ordered fallback accounts. Any session can also be moved by hand to another account, model or effort without losing its conversation.
+- **Agent panel**: see the agent's reasoning, the screenshots and images its tools return (as thumbnails with a viewer), and tool cards that read as sentences with diffs, commands and to-do checklists.
+- **Questions from agents**: multiple-choice questions show as a clickable card (single or multiple choice, "Other…", Skip) in Claude Code and API agent sessions.
+- **Explorer menu**: right-click for open, @mention in the agent session, explain, create a task, new file or folder, rename in place (F2), duplicate, Recycle Bin (Del), copy paths, show in File Explorer, open a terminal there. Files dragged onto the agent composer become @mentions.
 
-Earlier in 0.2: Codex and Antigravity CLIs and the Gemini API; usage limits; one settings page in English or French; animations; Chat; local dictation; the MCP catalog; a shared memory and context savings.
+Earlier in 0.2: the model picker with reasoning effort, dictation shortcuts; Codex and Antigravity CLIs and the Gemini API; usage limits; one settings page in English or French; animations; Chat; local dictation; the MCP catalog; a shared memory and context savings.
 
 ## What's in it
 
