@@ -8,6 +8,8 @@ import { useEditor } from '@/stores/editor'
 import { useWorkspace } from '@/stores/workspace'
 import { MonacoHost } from './MonacoHost'
 import { TabBar } from './TabBar'
+import { useGit } from '@/stores/git'
+import { GitDiffPane } from '@/features/git/GitDiffPane'
 
 /** Shortcuts shown on the welcome screen, with the keys currently bound to them. */
 const WELCOME_COMMANDS = ['layout.sidebar', 'view.search', 'layout.terminal', 'layout.agentPanel', 'file.save', 'view.settings']
@@ -74,15 +76,26 @@ export function EditorArea() {
   const active = useEditor((s) => s.active)
   const tab = tabs.find((t) => t.path === active) ?? null
   const ready = tab?.status === 'ready'
+  const gitView = useGit((s) => s.view !== null)
 
   return (
     <div className="flex h-full flex-col bg-editor">
-      {tabs.length > 0 && <TabBar />}
+      {tabs.length > 0 && (
+        // Picking a tab, even the active one, leaves the diff.
+        <div onMouseDownCapture={() => gitView && useGit.getState().show(null)}>
+          <TabBar />
+        </div>
+      )}
       {tab?.conflict && <ConflictBanner path={tab.path} kind={tab.conflict} />}
       <div className="relative min-h-0 flex-1">
         <div className={ready ? 'h-full' : 'invisible h-full'}>
           <MonacoHost path={tab?.path ?? null} ready={ready} />
         </div>
+        {gitView && (
+          <div className="absolute inset-0 z-10">
+            <GitDiffPane />
+          </div>
+        )}
         {!tab && (
           <div className="absolute inset-0">
             <Welcome />

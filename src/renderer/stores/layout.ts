@@ -21,7 +21,7 @@ export const SETTINGS_SECTIONS = [
   'about'
 ] as const
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]
-export type SidebarTab = 'files' | 'search'
+export type SidebarTab = 'files' | 'search' | 'git'
 /** A dialog another part of the UI (the command palette) asked a page to open. */
 export type Intent = 'new-account' | 'new-mcp' | 'new-task' | 'new-agent'
 

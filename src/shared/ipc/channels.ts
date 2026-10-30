@@ -156,7 +156,8 @@ export const INVOKE_CHANNELS = [
   'git:checkpoints',
   'git:checkpointChanges',
   'git:restoreCheckpoint',
-  'git:fileSessions'
+  'git:fileSessions',
+  'git:ignored'
 ] as const
 
 export const EVENT_CHANNELS = [

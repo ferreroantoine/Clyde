@@ -81,5 +81,6 @@ export function registerGitHandlers(deps: {
   handle('git:checkpoints', () => (git.current() ? checkpoints.list(root()) : []))
   handle('git:checkpointChanges', ({ sessionId }) => checkpoints.changes(root(), sessionId))
   handle('git:restoreCheckpoint', ({ sessionId }) => checkpoints.restore(root(), sessionId, deps.trash))
+  handle('git:ignored', ({ paths }) => git.ignored(paths))
   handle('git:fileSessions', () => (git.current() ? checkpoints.fileSessions(root()) : {}))
 }

@@ -20,6 +20,8 @@ import { useMcp } from '@/stores/mcp'
 import { useBoard } from '@/stores/board'
 import { useLimits } from '@/stores/limits'
 import { useChat } from '@/stores/chat'
+import { useGit } from '@/stores/git'
+import { PromptDialog } from '@/components/PromptDialog'
 import { usePalette } from '@/stores/palette'
 import { CommandPalette } from '@/features/palette/CommandPalette'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -87,6 +89,7 @@ export function App() {
     const offChat = useChat.getState().init()
     const offVoice = useVoice.getState().init()
     const offMemory = useMemory.getState().init()
+    const offGit = useGit.getState().init()
     void invoke('app:notices')
       .then((notices) => {
         for (const n of notices) useNotifications.getState().push({ level: 'info', persistent: true, ...describeNotice(n) })
@@ -94,6 +97,7 @@ export function App() {
       .catch(() => undefined)
     return () => {
       offBoard()
+      offGit()
       offMemory()
       offLimits()
       offChat()
@@ -127,6 +131,7 @@ export function App() {
       'view.chat': () => layout().showCenter('chat'),
       'view.explorer': () => layout().showSidebarTab('files'),
       'view.search': () => layout().showSidebarTab('search'),
+      'view.source': () => layout().showSidebarTab('git'),
       'view.settings': () => layout().showSettings(),
       'layout.sidebar': () => layout().toggleSidebar(),
       'layout.terminal': () => layout().toggleTerminal(),
@@ -154,6 +159,7 @@ export function App() {
           <Shell />
         </ErrorBoundary>
         <CommandPalette />
+        <PromptDialog />
         <Toaster />
       </TooltipProvider>
     </MotionConfig>

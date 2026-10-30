@@ -233,7 +233,9 @@ export const requestSchemas = {
   'git:checkpoints': z.undefined(),
   'git:checkpointChanges': gitSchemas.session,
   'git:restoreCheckpoint': gitSchemas.session,
-  'git:fileSessions': z.undefined()
+  'git:fileSessions': z.undefined(),
+  /** Open-folder paths (explorer entries); answers those git ignores. */
+  'git:ignored': z.object({ paths: z.array(z.string().min(1).max(4096)).max(2000) })
 } satisfies Record<InvokeChannel, z.ZodType>
 
 export interface InvokeResponses {
@@ -401,6 +403,7 @@ export interface InvokeResponses {
   'git:restoreCheckpoint': number
   /** Agent sessions that wrote each file, by repository-relative path. */
   'git:fileSessions': Record<string, FileSession[]>
+  'git:ignored': string[]
 }
 
 export interface EventPayloads {
