@@ -1,9 +1,10 @@
-import { Bot, FolderGit2, Moon, PanelBottom, PanelLeft, PanelRight, Sun } from 'lucide-react'
+import { ArrowDown, ArrowUp, Bot, FolderGit2, GitBranch, Moon, PanelBottom, PanelLeft, PanelRight, Sun } from 'lucide-react'
 import { t, tn } from '@shared/i18n'
 import { effectiveBindings, formatCombo } from '@shared/keybindings'
 import { isEnded } from '@shared/agent'
 import { IconButton } from '@/components/IconButton'
 import { useLayout } from '@/stores/layout'
+import { hasTextPreview } from '@/lib/viewers'
 import { useSettings } from '@/stores/settings'
 import { useWorkspace } from '@/stores/workspace'
 import { useEditor } from '@/stores/editor'
@@ -14,6 +15,34 @@ import { ProfileBadge } from '@/components/ProfileBadge'
 import { STATUS_LABELS } from '@/features/agent-panel/SessionPane'
 import { MiniGauge } from '@/features/limits/LimitGauge'
 import { useLimits } from '@/stores/limits'
+import { useGit } from '@/stores/git'
+
+/** The branch, how far it is from its upstream, and a merge or rebase under way. */
+function Branch() {
+  const status = useGit((s) => s.status)
+  const showSidebarTab = useLayout((s) => s.showSidebarTab)
+  if (!status?.isRepo) return null
+  const name = status.branch ?? (status.head ? status.head.slice(0, 7) : t('No commit yet'))
+  return (
+    <button type="button" onClick={() => showSidebarTab('git')} className="flex items-center gap-1 rounded px-1 hover:bg-accent" title={t('Source control')} data-git-branch={status.branch ?? ''}>
+      <GitBranch className="size-3" />
+      <span className="max-w-40 truncate">{name}</span>
+      {status.operation && <span className="text-warning">({status.operation})</span>}
+      {status.behind > 0 && (
+        <span className="flex items-center tabular-nums">
+          <ArrowDown className="size-3" />
+          {status.behind}
+        </span>
+      )}
+      {status.ahead > 0 && (
+        <span className="flex items-center tabular-nums">
+          <ArrowUp className="size-3" />
+          {status.ahead}
+        </span>
+      )}
+    </button>
+  )
+}
 
 function ActiveAgent() {
   const info = useAgents((s) => (s.activeId ? s.sessions[s.activeId]?.info : undefined))
@@ -53,8 +82,13 @@ function ProfileGauges({ profileId, color }: { profileId: string; color: string 
 
 export function StatusBar() {
   const workspace = useWorkspace((s) => s.info)
-  const cursor = useEditor((s) => s.cursor)
-  const language = useEditor((s) => s.tabs.find((t) => t.path === s.active)?.language)
+  // Line, column and language belong to the code view, not to an image, a PDF or a preview.
+  const coding = useEditor((s) => {
+    const tab = s.tabs.find((t) => t.path === s.active)
+    return !!tab && tab.hasText && !(hasTextPreview(tab.viewer) && tab.mode === 'preview')
+  })
+  const cursor = useEditor((s) => (coding ? s.cursor : null))
+  const language = useEditor((s) => (coding ? s.tabs.find((t) => t.path === s.active)?.language : undefined))
   const theme = useResolvedTheme((s) => s.theme)
   const updateSetting = useSettings((s) => s.update)
   const layout = useLayout()
@@ -68,6 +102,7 @@ export function StatusBar() {
           <FolderGit2 className="size-3" />
           {workspace ? workspace.name : t('No folder open')}
         </span>
+        <Branch />
         <ActiveAgent />
       </div>
       <div className="flex items-center gap-0.5">
@@ -82,7 +117,7 @@ export function StatusBar() {
           label={t('Toggle sidebar')}
           {...shortcutOf('layout.sidebar')}
           side="top"
-          active={layout.sidebarOpen}
+          active={layout.sidebarOpen && layout.center === 'editor'}
           onClick={layout.toggleSidebar}
           className="size-5"
         />

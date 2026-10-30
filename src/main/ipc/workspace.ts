@@ -3,7 +3,7 @@ import { handle } from './router'
 import { t } from '@shared/i18n'
 import { AppError } from '@shared/errors'
 import type { WorkspaceService } from '../services/workspace'
-import { createDir, createFile, duplicate, listDir, readText, renamePath, writeText } from '../services/files'
+import { createDir, createFile, duplicate, listDir, readText, renamePath, statFile, writeText } from '../services/files'
 import { resolveInside } from '../services/paths'
 import { listFiles, searchText } from '../services/search'
 
@@ -38,6 +38,13 @@ export function registerWorkspaceHandlers(workspace: WorkspaceService, projectsF
     shell.showItemInFolder(resolveInside(workspace.requireRoot(), path))
     return null
   })
+  // Files no viewer can show open in the app Windows associates with them.
+  handle('fs:openDefault', async ({ path }) => {
+    const error = await shell.openPath(resolveInside(workspace.requireRoot(), path))
+    if (error) throw new AppError('io_error', error)
+    return null
+  })
+  handle('fs:stat', ({ path }) => statFile(workspace.requireRoot(), path))
   handle('search:text', (opts) => searchText(workspace.requireRoot(), opts))
   handle('files:list', () => listFiles(workspace.requireRoot()))
 }

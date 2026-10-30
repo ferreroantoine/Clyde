@@ -262,6 +262,29 @@ describe('CodexTranslator', () => {
     ])
   })
 
+  it('turns Codex’s plan into the task list', () => {
+    const t = new CodexTranslator('linux')
+    expect(
+      t.translate('turn/plan/updated', {
+        threadId: 'th',
+        turnId: 'u',
+        explanation: null,
+        plan: [
+          { step: 'Inspect', status: 'completed' },
+          { step: 'Patch', status: 'inProgress' }
+        ]
+      })
+    ).toEqual([
+      {
+        type: 'todos',
+        items: [
+          { text: 'Inspect', status: 'completed' },
+          { text: 'Patch', status: 'in_progress' }
+        ]
+      }
+    ])
+  })
+
   it('reports each turn’s own tokens from the thread totals', () => {
     const t = new CodexTranslator('linux')
     const usage = (input: number, output: number) => ({

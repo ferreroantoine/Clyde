@@ -1,17 +1,18 @@
 import { ChevronsDownUp, FolderOpen, RefreshCw } from 'lucide-react'
-import { t } from '@shared/i18n'
+import { t, tk } from '@shared/i18n'
 import { IconButton } from '@/components/IconButton'
 import { useLayout, type SidebarTab } from '@/stores/layout'
 import { useWorkspace } from '@/stores/workspace'
 import { useExplorer } from '@/stores/explorer'
 import { SearchView } from '@/features/search/SearchView'
+import { SourceView } from '@/features/git/SourceView'
 import { cn } from '@/lib/utils'
 import { FileTree } from './FileTree'
 import { NoWorkspace } from './NoWorkspace'
 
 const TABS: Array<{ id: SidebarTab; label: string }> = [
-  { id: 'files', label: 'Files' },
-  { id: 'search', label: 'Search' }
+  { id: 'files', label: tk('Files') },
+  { id: 'search', label: tk('Search') }
 ]
 
 export function Sidebar() {
@@ -25,23 +26,27 @@ export function Sidebar() {
   if (!info) return <NoWorkspace />
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-w-0 flex-col overflow-hidden">
       <div className="flex h-9 shrink-0 items-center justify-between border-b px-2">
-        <div className="flex items-center gap-0.5">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => showTab(t.id)}
-              className={cn(
-                'press rounded-md px-2 py-1 text-xs transition-colors',
-                tab === t.id ? 'bg-accent font-medium text-foreground' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {tab === 'git' ? (
+          <span className="truncate px-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">{t('Source control')}</span>
+        ) : (
+          <div className="flex items-center gap-0.5">
+            {TABS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => showTab(item.id)}
+                className={cn(
+                  'press rounded-md px-2 py-1 text-xs transition-colors',
+                  tab === item.id ? 'bg-accent font-medium text-foreground' : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {t(item.label)}
+              </button>
+            ))}
+          </div>
+        )}
         {tab === 'files' && (
           <div className="flex items-center gap-0.5">
             <IconButton icon={FolderOpen} label={t('Open folder')} onClick={() => void pick()} />
@@ -60,6 +65,8 @@ export function Sidebar() {
           </div>
           <FileTree />
         </div>
+      ) : tab === 'git' ? (
+        <SourceView />
       ) : (
         <SearchView />
       )}

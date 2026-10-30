@@ -21,6 +21,7 @@ export const KEY_COMMANDS: KeyCommandSpec[] = [
   { id: 'view.chat', label: tk('Show Chat'), defaultCombo: 'ctrl+shift+l' },
   { id: 'view.explorer', label: tk('Show Explorer'), defaultCombo: 'ctrl+shift+e' },
   { id: 'view.search', label: tk('Search in files'), defaultCombo: 'ctrl+shift+f' },
+  { id: 'view.source', label: tk('Show Source control'), defaultCombo: 'ctrl+shift+g' },
   { id: 'view.settings', label: tk('Open Settings'), defaultCombo: 'ctrl+,' },
   { id: 'layout.sidebar', label: tk('Toggle sidebar'), defaultCombo: 'ctrl+b' },
   { id: 'layout.terminal', label: tk('Toggle terminal'), defaultCombo: 'ctrl+j' },

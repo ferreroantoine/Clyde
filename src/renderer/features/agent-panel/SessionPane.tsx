@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type SetStateAction } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { intlLocale, t, tk } from '@shared/i18n'
-import { ArrowLeftRight, ArrowUp, CircleAlert, FoldVertical, Gauge, History, Play, RotateCcw, Square, StepForward } from 'lucide-react'
+import { ArrowLeftRight, CircleAlert, FoldVertical, Gauge, History, ListTodo, Play, RotateCcw, StepForward } from 'lucide-react'
 import { PERMISSION_LEVEL_LABELS, type AgentStatus } from '@shared/agent'
 import { EFFORT_LABELS, kindLabel } from '@shared/profiles'
 import { Button } from '@/components/ui/button'
@@ -9,18 +9,19 @@ import type { SessionView, TranscriptItem } from '@/lib/transcript'
 import { ENDED_STATUSES, useAgents } from '@/stores/agents'
 import { profileById, useProfiles } from '@/stores/profiles'
 import { cn } from '@/lib/utils'
-import { MicButton } from '@/components/MicButton'
 import { RichText } from './RichText'
 import { SessionLimitLine } from '@/features/limits/LimitGauge'
 import { useLimits } from '@/stores/limits'
 import { ToolCard } from './ToolCard'
 import { ActionGroup, ThinkingBlock } from './Activity'
 import { groupRows } from '@/lib/activity'
-import { EXPLORER_PATH_TYPE } from '@/features/explorer/FileTree'
-import { mention } from '@/features/explorer/mention'
+import { Composer } from './Composer'
 import { Appear } from '@/components/Appear'
 import { useSettings } from '@/stores/settings'
 import { LimitBar, SwitchDialog } from './SwitchAccount'
+import { progressOf } from '@/lib/todo-view'
+import { useLayout } from '@/stores/layout'
+import { useTodos } from '@/stores/todos'
 
 export const STATUS_LABELS: Record<AgentStatus, string> = {
   starting: tk('Starting'),
@@ -147,112 +148,62 @@ export function TranscriptRows({ view, live = true, subscription = false }: { vi
   )
 }
 
-function Composer({ view }: { view: SessionView }) {
+function SessionComposer({ view }: { view: SessionView }) {
   const send = useAgents((s) => s.send)
   const interrupt = useAgents((s) => s.interrupt)
-  const id = view.info.id
-  const text = useAgents((s) => s.drafts[id] ?? '')
-  const storeDraft = useAgents((s) => s.setDraft)
-  const setText = useCallback((value: SetStateAction<string>) => {
-    const current = useAgents.getState().drafts[id] ?? ''
-    storeDraft(id, typeof value === 'function' ? value(current) : value)
-  }, [id, storeDraft])
-  const focusTick = useAgents((s) => s.focusTick)
-  const area = useRef<HTMLTextAreaElement>(null)
   const status = view.info.status
-
-  // Text added from elsewhere (the explorer) gets the focus, the caret at its end.
-  useEffect(() => {
-    const el = area.current
-    if (!focusTick || !el) return
-    el.focus()
-    el.setSelectionRange(el.value.length, el.value.length)
-  }, [focusTick])
   const ended = ENDED_STATUSES.has(status)
   // An ended session that can come back takes messages: sending resumes it first.
   const closed = ended && !view.resumable
   const busy = status === 'running' || status === 'awaiting-approval'
-
-  useLayoutEffect(() => {
-    const el = area.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`
-  }, [text])
-
-  const submit = async () => {
-    const value = text.trim()
-    if (!value || closed || status === 'starting') return
-    setText('')
-    if (!(await send(value))) setText(value)
-  }
-
-  const [over, setOver] = useState(false)
-
   return (
-    <div
-      className="border-t p-2"
-      // Files dragged from the Explorer become @mentions, which Claude Code reads itself.
-      onDragOver={(e) => {
-        if (closed || !e.dataTransfer.types.includes(EXPLORER_PATH_TYPE)) return
-        e.preventDefault()
-        e.dataTransfer.dropEffect = 'copy'
-        setOver(true)
-      }}
-      onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false)
-      }}
-      onDrop={(e) => {
-        setOver(false)
-        const path = e.dataTransfer.getData(EXPLORER_PATH_TYPE)
-        if (!path) return
-        e.preventDefault()
-        setText((current) => (current && !/\s$/.test(current) ? `${current} ` : current) + mention(path))
-        area.current?.focus()
+    <Composer
+      draftId={view.info.id}
+      locked={closed}
+      canSend={status !== 'starting'}
+      busy={busy}
+      onSubmit={send}
+      onInterrupt={() => void interrupt()}
+      placeholder={
+        closed
+          ? t('This session has ended')
+          : ended
+            ? t('Write to resume this session… (Enter to send)')
+            : busy
+              ? t('Queue a follow-up…')
+              : t('Ask the agent… (Enter to send)')
+      }
+    />
+  )
+}
+
+/** The agent's task list in one line ("3/7 · Now: …"); a click shows it in the Tasks view. */
+function TodoProgress({ view }: { view: SessionView }) {
+  const progress = progressOf(view.todos)
+  if (!progress) return null
+  const { done, total, current } = progress
+  return (
+    <button
+      type="button"
+      className="press flex w-full shrink-0 items-center gap-2 border-b px-3 py-1.5 text-left text-[11px] text-muted-foreground hover:bg-accent/50"
+      title={t('Show this session’s tasks')}
+      data-testid="todo-progress"
+      onClick={() => {
+        useTodos.getState().setFilter({ kind: 'session', sessionId: view.info.id })
+        useLayout.getState().showCenter('tasks')
       }}
     >
-      <div
-        className={cn(
-          'flex items-end gap-1.5 rounded-lg border bg-background px-2 py-1.5 focus-within:ring-2 focus-within:ring-ring',
-          over && 'border-primary ring-2 ring-primary/30'
-        )}
-      >
-        <textarea
-          ref={area}
-          rows={1}
-          value={text}
-          disabled={closed}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault()
-              void submit()
-            }
-          }}
-          placeholder={
-            closed
-              ? t('This session has ended')
-              : ended
-                ? t('Write to resume this session… (Enter to send)')
-                : busy
-                  ? t('Queue a follow-up…')
-                  : t('Ask the agent… (Enter to send)')
-          }
-          aria-label={t('Message to the agent')}
-          className="max-h-[200px] min-h-6 flex-1 resize-none bg-transparent py-0.5 text-[13px] outline-none placeholder:text-muted-foreground"
-        />
-        <MicButton inputRef={area} setValue={setText} size="xs" />
-        {busy ? (
-          <Button type="button" size="icon-xs" variant="outline" aria-label={t('Interrupt the agent')} onClick={() => void interrupt()}>
-            <Square className="fill-current" />
-          </Button>
-        ) : (
-          <Button type="button" size="icon-xs" aria-label={t('Send')} disabled={!text.trim() || closed} onClick={() => void submit()}>
-            <ArrowUp />
-          </Button>
-        )}
-      </div>
-    </div>
+      <ListTodo className="size-3.5 shrink-0" />
+      <span className="font-medium text-foreground tabular-nums">
+        {done}/{total}
+      </span>
+      <span className="h-1 w-12 shrink-0 overflow-hidden rounded-full bg-muted">
+        <span className="block h-full rounded-full bg-primary/70" style={{ width: `${(done / total) * 100}%` }} />
+      </span>
+      <span className="min-w-0 truncate">
+        {current ? t('In progress: {task}', { task: current.active || current.text }) : done === total ? t('All done') : t('Nothing in progress')}
+      </span>
+    </button>
   )
 }
 
@@ -424,6 +375,7 @@ export function SessionPane({ view }: { view: SessionView }) {
         </div>
       )}
       <ResumeBar view={view} />
+      <TodoProgress view={view} />
       <ContextBar view={view} />
       <div
         ref={scroller}
@@ -452,7 +404,7 @@ export function SessionPane({ view }: { view: SessionView }) {
           </Appear>
         )}
       </div>
-      <Composer view={view} />
+      <SessionComposer view={view} />
     </div>
   )
 }

@@ -1,12 +1,19 @@
 import { useEffect, useRef } from 'react'
-import type { TaskFileDiff } from '@shared/tasks'
+
+/** One file before and after; `unsupported` (binary, too large) shows a placeholder instead. */
+export interface FileDiff {
+  path: string
+  original: string
+  modified: string
+  unsupported: boolean
+}
 import { monaco } from '@/lib/monaco/setup'
 import { languageFor } from '@/lib/monaco/models'
 import { useResolvedTheme } from '@/lib/theme'
 import { useSettings } from '@/stores/settings'
 
 /** Side-by-side diff of one file, base on the left, the agent's version on the right. Read-only. */
-export function DiffView({ diff }: { diff: TaskFileDiff }) {
+export function DiffView({ diff }: { diff: FileDiff }) {
   const container = useRef<HTMLDivElement>(null)
   const editor = useRef<monaco.editor.IStandaloneDiffEditor | null>(null)
   const theme = useResolvedTheme((s) => s.theme)

@@ -1,5 +1,6 @@
 import { t } from '@shared/i18n'
 import type { AgentEvent } from '@shared/agent'
+import { todosFromCodexPlan } from '../todos'
 import { imageMime, mcpImages } from '../media'
 import type { FileUpdateChange, Notifications, ThreadItem, TokenUsageBreakdown, Turn, TurnError } from './protocol'
 
@@ -112,6 +113,9 @@ export class CodexTranslator {
         return [this.turnEnd((params as Notifications['turn/completed']).turn)]
       case 'thread/compacted':
         return [{ type: 'context_compacted' }]
+      // Codex's plan is its task list.
+      case 'turn/plan/updated':
+        return [{ type: 'todos', items: todosFromCodexPlan((params as Notifications['turn/plan/updated']).plan) }]
       case 'thread/tokenUsage/updated': {
         const usage = (params as Notifications['thread/tokenUsage/updated']).tokenUsage
         this.total = usage.total

@@ -1,7 +1,7 @@
 import type { AppNotice } from '@shared/notices'
 import type { Db } from './db/database'
 
-const KNOWN = new Set<AppNotice['type']>(['mistral-removed'])
+const KNOWN = new Set<AppNotice['type']>(['mistral-removed', 'task-worktrees-left'])
 
 export class NoticesService {
   constructor(private readonly db: Db) {}

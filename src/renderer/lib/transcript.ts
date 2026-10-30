@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentEventEnvelope, AgentQuestion, AgentSessionInfo, ApprovalDecision, ToolImage } from '@shared/agent'
+import type { AgentEvent, AgentEventEnvelope, AgentQuestion, AgentSessionInfo, ApprovalDecision, TodoItem, ToolImage } from '@shared/agent'
 import { t, tn } from '@shared/i18n'
 
 export interface Approval {
@@ -68,6 +68,8 @@ export interface SessionView {
   resumable: boolean
   /** The account hit a usage limit and nothing was sent since; `resetsAt` in ms when known. */
   limit: { resetsAt: number | null } | null
+  /** The agent's task list, as it last wrote it (TodoWrite, Codex's plan, update_todos). */
+  todos: TodoItem[] | null
 }
 
 export function emptyView(info: AgentSessionInfo): SessionView {
@@ -80,7 +82,8 @@ export function emptyView(info: AgentSessionInfo): SessionView {
     totals: { costUsd: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 },
     context: null,
     resumable: true,
-    limit: null
+    limit: null,
+    todos: null
   }
 }
 
@@ -211,6 +214,8 @@ function reduce(view: SessionView, event: AgentEvent, seq: number): SessionView 
       }
     case 'rate_limit':
       return { ...view, rateLimit: withoutType(event) }
+    case 'todos':
+      return { ...view, todos: event.items }
     case 'error':
       return { ...view, items: [...items, { kind: 'error', id: `error-${seq}`, message: event.message }] }
     case 'context_summarized':

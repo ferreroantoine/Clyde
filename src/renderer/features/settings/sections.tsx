@@ -33,6 +33,7 @@ import { McpPage } from '@/features/mcp/McpPage'
 import { PricesSection } from './PricesSection'
 import { ShortcutsEditor } from './ShortcutsEditor'
 import { DataBlock } from './DataBlock'
+import { SavedAgentsBlock } from './SavedAgentsBlock'
 import { MemoryCoreBlock, MemoryDocsBlock, MemoryProposalsBlock } from './MemoryBlocks'
 import { AboutBlock } from './AboutBlock'
 
@@ -220,7 +221,7 @@ export const SECTIONS: SectionSpec[] = [
             options={[
               { value: 'chat', label: t('Chat') },
               { value: 'editor', label: t('Explorer') },
-              { value: 'agents', label: t('Agents') },
+              { value: 'tasks', label: t('Tasks') },
               { value: 'supervision', label: t('Supervision') }
             ]}
             onChange={(v) => set('general.startView', v)}
@@ -399,6 +400,7 @@ export const SECTIONS: SectionSpec[] = [
     icon: Bot,
     resets: 'agents',
     entries: () => [
+      { id: 'agents.saved', label: t('Saved agents'), keywords: 'agent create edit delete new', block: () => <SavedAgentsBlock /> },
       {
         id: 'agents.defaultPermission',
         label: t('Default permission level'),
@@ -430,27 +432,20 @@ export const SECTIONS: SectionSpec[] = [
         )
       },
       {
-        id: 'agents.worktreesFolder',
-        label: t('Worktrees folder'),
-        hint: t('Where board tasks get their git worktree. Empty means %LOCALAPPDATA%\\Clyde\\worktrees.'),
-        control: ({ s, set }) => (
-          <PathField label={t('Worktrees folder')} placeholder={t('default')} value={s.agents.worktreesFolder} onChange={(v) => set('agents.worktreesFolder', v)} />
-        )
-      },
-      {
-        id: 'agents.deleteMergedWorktrees',
-        label: t('Delete worktrees once merged'),
-        hint: t('Removes the folder and the task branch after a successful merge.'),
-        control: ({ s, set }) => (
-          <Toggle label={t('Delete worktrees once merged')} checked={s.agents.deleteMergedWorktrees} onChange={(v) => set('agents.deleteMergedWorktrees', v)} />
-        )
-      },
-      {
         id: 'agents.resumeOnStart',
         label: t('Resume interrupted sessions at startup'),
         hint: t('Sessions that were working when Clyde closed (within a day) start again and carry on where they stopped.'),
         control: ({ s, set }) => (
           <Toggle label={t('Resume interrupted sessions at startup')} checked={s.agents.resumeOnStart} onChange={(v) => set('agents.resumeOnStart', v)} />
+        )
+      },
+      {
+        id: 'agents.gitCheckpoints',
+        label: t('Restore point before each session'),
+        hint: t('In a git repository, Clyde records the files before an agent works on them, so the Source view can undo everything it did.'),
+        keywords: 'git checkpoint undo restore stash',
+        control: ({ s, set }) => (
+          <Toggle label={t('Restore point before each session')} checked={s.agents.gitCheckpoints} onChange={(v) => set('agents.gitCheckpoints', v)} />
         )
       },
       {
