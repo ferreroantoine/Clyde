@@ -26,14 +26,14 @@ describe('buildProfileEnv', () => {
         GOOGLE_CHROME_BIN: '/usr/bin/chrome'
       },
       { configDir: '/data/claude-profiles/p1', apiKey: null },
-      'atelier/0.1.0'
+      'clyde/0.1.0'
     )
     expect(env).toEqual({
       PATH: '/usr/bin',
       HOME: '/home/me',
       GOOGLE_CHROME_BIN: '/usr/bin/chrome',
       CLAUDE_CONFIG_DIR: '/data/claude-profiles/p1',
-      CLAUDE_AGENT_SDK_CLIENT_APP: 'atelier/0.1.0'
+      CLAUDE_AGENT_SDK_CLIENT_APP: 'clyde/0.1.0'
     })
   })
 

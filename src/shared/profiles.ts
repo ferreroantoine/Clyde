@@ -3,7 +3,7 @@ import { t, tk } from './i18n'
 
 /**
  * CLI kinds drive a vendor's coding CLI, signed in with its own login: Claude Code (Agent SDK),
- * Codex (`codex app-server`) and Antigravity (`agy` headless). API kinds run Atelier's own
+ * Codex (`codex app-server`) and Antigravity (`agy` headless). API kinds run Clyde's own
  * agent loop against a vendor API.
  */
 export const PROFILE_KINDS = ['claude-code', 'anthropic', 'codex', 'openai', 'antigravity', 'gemini', 'ollama'] as const
@@ -48,7 +48,7 @@ export function isApiKind(kind: ProfileKind): kind is ApiProfileKind {
 
 /**
  * How a profile signs in. A subscription uses the CLI's own login flow inside the profile's
- * config dir (Atelier never sees the credentials); an API key is stored encrypted; a local
+ * config dir (Clyde never sees the credentials); an API key is stored encrypted; a local
  * Ollama needs nothing.
  */
 export const AUTH_MODES = ['subscription', 'api-key', 'none'] as const
@@ -69,7 +69,7 @@ export const KIND_AUTH: Record<ProfileKind, readonly AuthMode[]> = {
 
 /**
  * Antigravity keeps its sign-in in the OS keyring, one per Windows user, so two Antigravity
- * profiles would share an account. Atelier allows one.
+ * profiles would share an account. Clyde allows one.
  */
 export const SINGLE_PROFILE_KINDS: readonly ProfileKind[] = ['antigravity']
 

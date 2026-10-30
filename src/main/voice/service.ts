@@ -65,7 +65,7 @@ export class VoiceService {
 
   async installBinary(): Promise<void> {
     const build = this.build()
-    if (!build) throw new AppError('not_allowed', t('Atelier cannot download whisper.cpp for this system. Install it (on macOS: brew install whisper-cpp) or set its path.'))
+    if (!build) throw new AppError('not_allowed', t('Clyde cannot download whisper.cpp for this system. Install it (on macOS: brew install whisper-cpp) or set its path.'))
     const bin = join(this.deps.root, 'bin')
     mkdirSync(this.deps.root, { recursive: true })
     const archive = join(this.deps.root, build.url.endsWith('.zip') ? 'whisper.zip' : 'whisper.tar.gz')
@@ -108,7 +108,7 @@ export class VoiceService {
     if (!exe) throw new AppError('not_found', t('whisper.cpp is not installed. Download it in Settings › Voice.'))
     const model = this.modelPath(voice.model)
     if (!existsSync(model)) throw new AppError('not_found', t('The {model} model is not downloaded. Download it in Settings › Voice.', { model: voice.model }))
-    const file = join(tmpdir(), `atelier-dictation-${randomUUID()}.wav`)
+    const file = join(tmpdir(), `clyde-dictation-${randomUUID()}.wav`)
     writeFileSync(file, wav)
     try {
       const args = ['-m', model, '-f', file, '-l', voice.language, '-nt', '-np', '-t', String(Math.max(1, Math.min(8, cpus().length)))]

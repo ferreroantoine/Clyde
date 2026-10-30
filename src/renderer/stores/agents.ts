@@ -18,7 +18,7 @@ interface AgentsState {
   start: (request: AgentStart) => Promise<boolean>
   send: (text: string) => Promise<boolean>
   interrupt: () => Promise<void>
-  /** Asks the agent to compact its own conversation (Claude Code /compact, Codex, Atelier's summary). */
+  /** Asks the agent to compact its own conversation (Claude Code /compact, Codex, Clyde's summary). */
   compact: (id: string) => Promise<void>
   /** Ends a session and starts the same agent again with a summary of it. */
   continueWithSummary: (id: string) => Promise<void>

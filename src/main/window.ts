@@ -9,7 +9,7 @@ export function createMainWindow(): BrowserWindow {
     minHeight: 600,
     show: false,
     backgroundColor: '#ffffff',
-    title: 'Atelier',
+    title: 'Clyde',
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

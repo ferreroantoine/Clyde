@@ -22,8 +22,8 @@ function setup() {
   const db = new Database(':memory:')
   db.pragma('foreign_keys = ON')
   migrate(db)
-  const root = mkdtempSync(join(tmpdir(), 'atelier-chat-'))
-  const workspace = mkdtempSync(join(tmpdir(), 'atelier-ws-'))
+  const root = mkdtempSync(join(tmpdir(), 'clyde-chat-'))
+  const workspace = mkdtempSync(join(tmpdir(), 'clyde-ws-'))
   const starts: AgentStart[] = []
   const sent: Array<{ id: string; text: string; images: ImageInput[] }> = []
   const stopped: string[] = []

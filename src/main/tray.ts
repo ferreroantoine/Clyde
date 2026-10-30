@@ -28,14 +28,14 @@ function ensureTray(win: BrowserWindow): void {
     return
   }
   tray = new Tray(icon())
-  tray.setToolTip('Atelier')
+  tray.setToolTip('Clyde')
   tray.setContextMenu(menu(win))
   tray.on('click', () => show(win))
 }
 
 function menu(win: BrowserWindow): Electron.Menu {
   return Menu.buildFromTemplate([
-    { label: t('Show Atelier'), click: () => show(win) },
+    { label: t('Show Clyde'), click: () => show(win) },
     { type: 'separator' },
     { label: t('Quit'), click: () => app.quit() }
   ])

@@ -20,7 +20,7 @@ import type {
 import { CodexTranslator, shellToolName, versionFromUserAgent } from './translate'
 import { parseCodexRateLimits, type LimitReading } from '@shared/limits'
 
-/** Notifications Atelier never reads; opting out keeps the pipe quiet. */
+/** Notifications Clyde never reads; opting out keeps the pipe quiet. */
 const QUIET = [
   'thread/status/changed',
   'thread/readState/changed',
@@ -39,7 +39,7 @@ const QUIET = [
 
 /**
  * How each permission level maps onto Codex. Codex enforces its sandbox itself and asks
- * Atelier (an approval request) before anything outside it; Atelier's permission engine
+ * Clyde (an approval request) before anything outside it; Clyde's permission engine
  * then decides, and asks the user when the level says so.
  * - validate-all: read-only sandbox, every non-trivial command and every edit asks.
  * - files-auto: edits inside the folder run; commands ask.
@@ -109,7 +109,7 @@ export class CodexSession {
     rpc.onRequest((method, params) => this.serverRequest(method, params))
     try {
       const init = await rpc.request<InitializeResponse>('initialize', {
-        clientInfo: { name: 'atelier', title: 'Atelier', version: this.cfg.clientVersion },
+        clientInfo: { name: 'clyde', title: 'Clyde', version: this.cfg.clientVersion },
         capabilities: { experimentalApi: false, requestAttestation: false, optOutNotificationMethods: QUIET }
       })
       rpc.notify('initialized')
@@ -265,15 +265,15 @@ export class CodexSession {
         return { permissions: granted, scope: 'turn' }
       }
       case 'item/tool/requestUserInput':
-        // Atelier has no UI for the agent's questions yet; an empty answer lets it carry on.
+        // Clyde has no UI for the agent's questions yet; an empty answer lets it carry on.
         return { answers: {} }
       case 'mcpServer/elicitation/request':
         return { action: 'decline', content: null, _meta: null }
       case 'applyPatchApproval':
       case 'execCommandApproval':
-        return { decision: { denied: { rejection: 'Atelier only answers v2 approval requests.' } } }
+        return { decision: { denied: { rejection: 'Clyde only answers v2 approval requests.' } } }
       default:
-        throw { code: -32601, message: `Atelier does not handle ${method}` }
+        throw { code: -32601, message: `Clyde does not handle ${method}` }
     }
   }
 

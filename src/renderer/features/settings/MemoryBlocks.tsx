@@ -55,7 +55,7 @@ export function MemoryCoreBlock({ scope }: { scope: MemoryScope }) {
           <p className="truncate text-xs text-muted-foreground" title={part.dir}>
             {scope === 'user'
               ? t('Sent to every account (CLAUDE.md, AGENTS.md, GEMINI.md of each account), never into a repository.')
-              : t('In {path}, copied into the project’s CLAUDE.md and AGENTS.md (and GEMINI.md when there is one).', { path: '.atelier/memory' })}
+              : t('In {path}, copied into the project’s CLAUDE.md and AGENTS.md (and GEMINI.md when there is one).', { path: '.clyde/memory' })}
           </p>
         </div>
         <div className="flex items-center gap-1.5">

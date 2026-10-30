@@ -28,12 +28,12 @@ describe('managed block', () => {
     const removed = upsertBlock(twice, '')
     expect(removed).not.toContain(BLOCK_START)
     expect(removed).toContain('More rules after.')
-    expect(upsertBlock('', '- a')).toMatch(/^<!-- atelier:memory -->/)
+    expect(upsertBlock('', '- a')).toMatch(/^<!-- clyde:memory -->/)
   })
 
   it('lists detailed notes after the core', () => {
-    expect(blockContent('- core', [{ name: 'release.md', title: 'Release process', content: '' }], '.atelier/memory/docs')).toBe(
-      '- core\n\nDetailed notes, to read only when the task needs them (in .atelier/memory/docs):\n- release.md: Release process'
+    expect(blockContent('- core', [{ name: 'release.md', title: 'Release process', content: '' }], '.clyde/memory/docs')).toBe(
+      '- core\n\nDetailed notes, to read only when the task needs them (in .clyde/memory/docs):\n- release.md: Release process'
     )
     expect(docFileName('Processus de déploiement !')).toBe('processus-de-deploiement.md')
   })
@@ -42,9 +42,9 @@ describe('managed block', () => {
 function setup() {
   const db = new Database(':memory:')
   migrate(db)
-  const repo = tmp('atelier-mem-repo-')
-  const userDir = tmp('atelier-mem-user-')
-  const configs = tmp('atelier-mem-cfg-')
+  const repo = tmp('clyde-mem-repo-')
+  const userDir = tmp('clyde-mem-user-')
+  const configs = tmp('clyde-mem-cfg-')
   const profiles = [
     { id: 'c', kind: 'claude-code', auth: 'subscription' },
     { id: 'x', kind: 'codex', auth: 'subscription' },
@@ -116,7 +116,7 @@ describe('MemoryService', () => {
     const h = setup()
     const state = h.memory.saveCore('project', '- Deploy key: sk-ant-api03-abcdefghijklmnop\n- token: use JWT for the API')
     expect(state.redacted).toBe(true)
-    const core = readFileSync(join(h.repo, '.atelier', 'memory', 'core.md'), 'utf8')
+    const core = readFileSync(join(h.repo, '.clyde', 'memory', 'core.md'), 'utf8')
     expect(core).not.toContain('abcdefghijklmnop')
     expect(core).toContain('token: use JWT')
     expect(readFileSync(join(h.repo, 'CLAUDE.md'), 'utf8')).not.toContain('abcdefghijklmnop')
@@ -129,16 +129,16 @@ describe('MemoryService', () => {
     const made = await h.memory.proposeFromSession('as-1')
     expect(made).toHaveLength(1)
     expect(made[0]).toMatchObject({ scope: 'project', kind: 'session', before: '- Tests: jest.\n', reason: 'The session switched to vitest.' })
-    expect(readFileSync(join(h.repo, '.atelier', 'memory', 'core.md'), 'utf8')).toBe('- Tests: jest.\n')
+    expect(readFileSync(join(h.repo, '.clyde', 'memory', 'core.md'), 'utf8')).toBe('- Tests: jest.\n')
     h.memory.accept(made[0]?.id as string)
-    expect(readFileSync(join(h.repo, '.atelier', 'memory', 'core.md'), 'utf8')).toContain('pnpm')
+    expect(readFileSync(join(h.repo, '.clyde', 'memory', 'core.md'), 'utf8')).toContain('pnpm')
     expect(h.memory.proposals()).toEqual([])
 
     h.complete.mockResolvedValueOnce('- Tests: vitest.')
     const tidy = await h.memory.consolidate('project')
     expect(tidy?.kind).toBe('consolidate')
     h.memory.reject(tidy?.id as string)
-    expect(readFileSync(join(h.repo, '.atelier', 'memory', 'core.md'), 'utf8')).toContain('pnpm')
+    expect(readFileSync(join(h.repo, '.clyde', 'memory', 'core.md'), 'utf8')).toContain('pnpm')
   })
 
   it('parses proposals defensively', () => {

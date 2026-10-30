@@ -19,7 +19,7 @@ export interface AntigravitySessionConfig {
   cwd: string
   model: string
   permissionLevel: PermissionLevel
-  /** Atelier's instructions; agy has no flag for them, so they open the first message. */
+  /** Clyde's instructions; agy has no flag for them, so they open the first message. */
   instructions: string
   servers: AgentMcpServer[]
   cliVersion: string

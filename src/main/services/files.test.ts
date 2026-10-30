@@ -7,7 +7,7 @@ import { listDir, readText, writeText } from './files'
 let root: string
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'atelier-files-'))
+  root = mkdtempSync(join(tmpdir(), 'clyde-files-'))
   mkdirSync(join(root, 'src'))
   mkdirSync(join(root, '.git'))
   writeFileSync(join(root, 'b.txt'), 'bee')

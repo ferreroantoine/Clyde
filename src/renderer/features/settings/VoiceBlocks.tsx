@@ -42,7 +42,7 @@ export function WhisperBinaryBlock() {
             <span className="truncate" title={binary?.path ?? undefined}>
               {binary?.path
                 ? binary.source === 'downloaded'
-                  ? t('Downloaded by Atelier (release b5454, CPU).')
+                  ? t('Downloaded by Clyde (release b5454, CPU).')
                   : binary.source === 'custom'
                     ? t('Your build: {path}', { path: binary.path })
                     : t('Found on the PATH: {path}', { path: binary.path })

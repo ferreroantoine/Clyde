@@ -76,7 +76,7 @@ describe('DataService', () => {
     expect(b.agents.list()[0]).toMatchObject({ name: 'Reviewer', permissionLevel: 'files-auto' })
     // Importing twice adds nothing.
     expect(await b.data.importConfig(JSON.parse(text))).toMatchObject({ profiles: 0, mcpServers: 0, agents: 0 })
-    await expect(b.data.importConfig({ hello: 1 })).rejects.toThrow(/not an Atelier configuration/)
+    await expect(b.data.importConfig({ hello: 1 })).rejects.toThrow(/not a Clyde configuration/)
   })
 
   it('purges the history but keeps running sessions', () => {

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { ProfileKind } from './profiles'
 
-/** Kinds Atelier estimates a cost for: the API kinds. Claude Code reports its own; Ollama runs locally for free. */
+/** Kinds Clyde estimates a cost for: the API kinds. Claude Code reports its own; Ollama runs locally for free. */
 export const PRICED_KINDS = ['anthropic', 'openai', 'gemini'] as const
 export type PricedKind = (typeof PRICED_KINDS)[number]
 
@@ -16,7 +16,7 @@ export type PriceInput = z.input<typeof priceInputSchema>
 
 export interface PriceRow extends z.output<typeof priceInputSchema> {
   id: string
-  /** `seed` rows ship with Atelier; editing one makes it `user`. */
+  /** `seed` rows ship with Clyde; editing one makes it `user`. */
   source: 'seed' | 'user'
   updatedAt: number
 }

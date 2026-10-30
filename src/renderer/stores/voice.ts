@@ -51,7 +51,7 @@ function focusedTarget(): string | null {
 function micError(err: unknown): string {
   const name = (err as DOMException | undefined)?.name
   if (name === 'NotAllowedError' || name === 'SecurityError') {
-    return t('Atelier may not use the microphone. Allow it in the system privacy settings, then try again.')
+    return t('Clyde may not use the microphone. Allow it in the system privacy settings, then try again.')
   }
   if (name === 'NotFoundError' || name === 'OverconstrainedError') return t('No microphone found. Plug one in, or choose another in Settings › Voice.')
   if (name === 'NotReadableError') return t('The microphone is busy in another application.')

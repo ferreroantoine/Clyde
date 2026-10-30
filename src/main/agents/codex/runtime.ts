@@ -47,7 +47,7 @@ export async function probeCodex(
   const timer = setTimeout(() => rpc.close(new Error(t('Codex did not answer in time'))), timeoutMs)
   try {
     const init = await rpc.request<InitializeResponse>('initialize', {
-      clientInfo: { name: 'atelier', title: 'Atelier', version: target.clientVersion },
+      clientInfo: { name: 'clyde', title: 'Clyde', version: target.clientVersion },
       capabilities: { experimentalApi: false, requestAttestation: false }
     })
     rpc.notify('initialized')

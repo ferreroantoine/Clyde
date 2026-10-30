@@ -16,7 +16,7 @@ export const ANIMATION_LEVELS = ['full', 'reduced', 'off'] as const
 export type AnimationLevel = (typeof ANIMATION_LEVELS)[number]
 const PERMISSION_LEVELS = ['validate-all', 'files-auto', 'autonomous'] as const
 export const VOICE_ENGINES = ['local', 'api'] as const
-/** Whisper models Atelier can download (ggml files of the whisper.cpp repository on Hugging Face). */
+/** Whisper models Clyde can download (ggml files of the whisper.cpp repository on Hugging Face). */
 export const WHISPER_MODEL_IDS = ['tiny', 'base', 'small', 'medium', 'large-v3-turbo-q5_0', 'large-v3-turbo'] as const
 export type WhisperModelId = (typeof WHISPER_MODEL_IDS)[number]
 export const VOICE_LANGUAGES = ['auto', 'fr', 'en', 'de', 'es', 'it', 'pt', 'nl'] as const
@@ -54,7 +54,7 @@ export const settingsSchema = z.object({
     /** Used when neither the agent nor its account sets one. */
     defaultModel: z.string().trim().max(200).default(''),
     maxParallel: z.number().int().min(1).max(16).default(4),
-    /** Empty means %LOCALAPPDATA%\\Atelier\\worktrees. */
+    /** Empty means %LOCALAPPDATA%\\Clyde\\worktrees. */
     worktreesFolder: path.default(''),
     deleteMergedWorktrees: z.boolean().default(true)
   }),
@@ -109,7 +109,7 @@ export const settingsSchema = z.object({
     rewrite: z.boolean().default(false),
     /** The account that rewrites; empty means the first Ollama account. */
     rewriteProfileId: z.string().max(64).default(''),
-    /** A whisper-cli built by the user (e.g. with Vulkan); empty means the one Atelier downloads. */
+    /** A whisper-cli built by the user (e.g. with Vulkan); empty means the one Clyde downloads. */
     whisperPath: path.default(''),
     useGpu: z.boolean().default(true)
   }),
@@ -117,11 +117,11 @@ export const settingsSchema = z.object({
   memory: section({
     /** Tokens the memory core may use; past it, Settings › Memory warns. */
     coreBudget: z.number().int().min(200).max(20_000).default(1_500),
-    /** Atelier's loop summarizes older turns past this many tokens of history (0: never). */
+    /** Clyde's loop summarizes older turns past this many tokens of history (0: never). */
     summarizeAt: z.number().int().min(0).max(2_000_000).default(80_000),
     /** CLI sessions suggest compacting past this share of the context window. */
     compactSuggestPct: z.number().int().min(30).max(98).default(80),
-    /** The account for Atelier's own small tasks (summaries, titles, memory proposals). Empty: the first Ollama account. */
+    /** The account for Clyde's own small tasks (summaries, titles, memory proposals). Empty: the first Ollama account. */
     internalProfileId: z.string().max(64).default(''),
     internalModel: z.string().trim().max(200).default(''),
     /** At the end of a session, the agent proposes memory changes to review. */

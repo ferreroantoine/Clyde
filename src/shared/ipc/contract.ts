@@ -269,7 +269,7 @@ export interface InvokeResponses {
   'voice:deleteModel': VoiceStatus
   'voice:cancel': null
   'voice:transcribe': { text: string; raw: string }
-  /** Whether the system lets Atelier use the microphone (asks on macOS). */
+  /** Whether the system lets Clyde use the microphone (asks on macOS). */
   'voice:micAccess': boolean
   'metrics:dashboard': Dashboard
   'metrics:transcript': SessionTranscript

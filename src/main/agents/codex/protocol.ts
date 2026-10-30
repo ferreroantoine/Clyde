@@ -1,6 +1,6 @@
 /**
- * The part of the `codex app-server` v2 protocol Atelier uses, copied by hand from the
- * bindings `codex app-server generate-ts` produces (Codex CLI 0.165.0). Fields Atelier does
+ * The part of the `codex app-server` v2 protocol Clyde uses, copied by hand from the
+ * bindings `codex app-server generate-ts` produces (Codex CLI 0.165.0). Fields Clyde does
  * not read are left out; unknown fields and item types are ignored at runtime.
  */
 
@@ -145,7 +145,7 @@ export interface ModelListResponse {
   nextCursor: string | null
 }
 
-/** Server notifications Atelier reads. */
+/** Server notifications Clyde reads. */
 export interface Notifications {
   'item/started': { item: ThreadItem; threadId: string; turnId: string }
   'item/completed': { item: ThreadItem; threadId: string; turnId: string }

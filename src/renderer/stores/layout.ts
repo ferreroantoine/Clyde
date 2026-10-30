@@ -88,7 +88,7 @@ export const useLayout = create<LayoutState>()(
       clearIntent: () => set({ intent: null })
     }),
     {
-      name: 'atelier.layout',
+      name: 'clyde.layout',
       // Views that no longer exist (Accounts and MCP moved into Settings) fall back to the editor.
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<LayoutState>

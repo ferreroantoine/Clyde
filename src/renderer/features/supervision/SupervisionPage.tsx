@@ -160,7 +160,7 @@ const BREAKDOWN_PARTS: Array<{ key: keyof ContextBreakdown; label: string; color
   { key: 'output', label: tk('Answers'), color: '#22c55e' }
 ]
 
-/** "Where my tokens go": the parts of every request, summed over the sessions Atelier's loop ran. */
+/** "Where my tokens go": the parts of every request, summed over the sessions Clyde's loop ran. */
 function TokenBreakdown({ sessions }: { sessions: SessionRecord[] }) {
   const measured = sessions.filter((s) => s.breakdown)
   const cli = sessions.filter((s) => !isApiKind(s.kind)).length
@@ -499,7 +499,7 @@ export function SupervisionPage() {
           <div>
             <h1 className="text-lg font-semibold tracking-tight">{t('Supervision')}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {t('Sessions and tokens per account; plan limits for subscriptions, cost for API accounts (estimates from Settings › Prices). Each value says whether the CLI reported it or Atelier computed it.')}</p>
+              {t('Sessions and tokens per account; plan limits for subscriptions, cost for API accounts (estimates from Settings › Prices). Each value says whether the CLI reported it or Clyde computed it.')}</p>
           </div>
           <div className="flex items-center gap-2" role="group" aria-label={t('Period')}>
             <div className="flex rounded-lg border bg-muted p-0.5">

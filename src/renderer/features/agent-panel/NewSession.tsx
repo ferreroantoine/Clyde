@@ -157,7 +157,7 @@ export function NewSession() {
     >
       <div>
         <h2 className="text-sm font-semibold">{t('New agent session')}</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">{t('Choose the account explicitly; Atelier never switches it for you.')}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{t('Choose the account explicitly; Clyde never switches it for you.')}</p>
       </div>
 
       <fieldset className="space-y-1.5">

@@ -6,8 +6,7 @@
     </linearGradient>
   </defs>
   <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)"/>
-  <!-- An "A" drawn as a workbench trestle, with a spark for the agents. -->
-  <path d="M152 380 L256 124 L360 380" fill="none" stroke="#fff" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M196 300 H316" stroke="#fff" stroke-width="40" stroke-linecap="round"/>
-  <circle cx="368" cy="148" r="30" fill="#c7d2fe"/>
+  <!-- A "C" for Clyde, with a spark in its opening for the agents. -->
+  <path d="M342 168 A124 124 0 1 0 342 344" fill="none" stroke="#fff" stroke-width="46" stroke-linecap="round"/>
+  <circle cx="372" cy="256" r="30" fill="#c7d2fe"/>
 </svg>

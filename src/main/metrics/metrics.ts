@@ -241,6 +241,9 @@ export class MetricsService {
 
     const profiles: ProfileUsage[] = this.deps.profiles().map((p) => {
       const u = byProfile.get(p.id)
+      // Local models cost nothing: their cost is exact and never "unpriced".
+      const local = p.kind === 'ollama'
+      const unpriced = local ? 0 : (u?.unpriced ?? 0)
       return {
         profileId: p.id,
         name: p.name,
@@ -252,9 +255,9 @@ export class MetricsService {
         inputTokens: u?.input ?? 0,
         outputTokens: u?.output ?? 0,
         costUsd: u?.cost ?? 0,
-        costEstimated: (u?.estimated ?? 0) === 1 || (u?.unpriced ?? 0) > 0,
+        costEstimated: !local && ((u?.estimated ?? 0) === 1 || unpriced > 0),
         cacheReadTokens: u?.cache_read ?? 0,
-        unpricedTurns: u?.unpriced ?? 0
+        unpricedTurns: unpriced
       }
     })
 
@@ -278,7 +281,7 @@ export class MetricsService {
     return { range, generatedAt: this.now(), profiles, daily: [...daily.values()], sessions }
   }
 
-  /** A session's tokens by part, summed over its turns (Atelier's own loop only). */
+  /** A session's tokens by part, summed over its turns (Clyde's own loop only). */
   private breakdownOf(sessionId: string): ContextBreakdown | null {
     const row = this.db
       .prepare(

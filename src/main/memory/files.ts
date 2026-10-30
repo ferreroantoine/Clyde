@@ -3,17 +3,17 @@ import { basename, dirname, join } from 'node:path'
 import { redactSecrets } from '@shared/redact'
 
 /**
- * The memory files. Atelier's own Markdown is the source of truth; the files each CLI reads
- * (CLAUDE.md, AGENTS.md, GEMINI.md) only get a managed block, between markers, that Atelier
+ * The memory files. Clyde's own Markdown is the source of truth; the files each CLI reads
+ * (CLAUDE.md, AGENTS.md, GEMINI.md) only get a managed block, between markers, that Clyde
  * rewrites. Everything outside the markers stays the user's.
  *
- * - Project memory: `<repo>/.atelier/memory/core.md`, plus detailed notes in `docs/*.md`.
+ * - Project memory: `<repo>/.clyde/memory/core.md`, plus detailed notes in `docs/*.md`.
  * - User memory: `<userData>/memory/core.md` and `docs/`; it reaches each account's own global
  *   file, never a repository (a project file may be committed).
  */
 
-export const BLOCK_START = '<!-- atelier:memory -->'
-export const BLOCK_END = '<!-- /atelier:memory -->'
+export const BLOCK_START = '<!-- clyde:memory -->'
+export const BLOCK_END = '<!-- /clyde:memory -->'
 
 export type { MemoryScope } from '@shared/memory'
 
@@ -25,7 +25,7 @@ export interface MemoryDoc {
 }
 
 export function projectMemoryDir(repo: string): string {
-  return join(repo, '.atelier', 'memory')
+  return join(repo, '.clyde', 'memory')
 }
 
 export function readCore(dir: string): string {
@@ -90,7 +90,7 @@ export function blockContent(core: string, docs: readonly MemoryDoc[], docsPath:
 /** Replaces (or appends) the managed block in a file's text; an empty block removes it. */
 export function upsertBlock(text: string, content: string): string {
   const block = content.trim()
-    ? `${BLOCK_START}\n<!-- Written by Atelier from its memory; edit it in Atelier, changes here are overwritten. -->\n${content.trim()}\n${BLOCK_END}`
+    ? `${BLOCK_START}\n<!-- Written by Clyde from its memory; edit it in Clyde, changes here are overwritten. -->\n${content.trim()}\n${BLOCK_END}`
     : ''
   const start = text.indexOf(BLOCK_START)
   const end = text.indexOf(BLOCK_END)

@@ -150,7 +150,7 @@ export function App() {
     // Keyed on the language so every screen renders again in it.
     <MotionConfig reducedMotion={motionLevel === 'full' ? 'never' : 'always'} skipAnimations={motionLevel === 'off'}>
       <TooltipProvider key={locale} delayDuration={400}>
-        <ErrorBoundary scope="Atelier">
+        <ErrorBoundary scope="Clyde">
           <Shell />
         </ErrorBoundary>
         <CommandPalette />

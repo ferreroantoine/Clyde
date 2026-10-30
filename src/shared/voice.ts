@@ -1,7 +1,7 @@
 import { tk } from './i18n'
 import type { WhisperModelId } from './settings'
 
-/** A Whisper model Atelier can download. Sizes and SHA-256 are those Hugging Face serves. */
+/** A Whisper model Clyde can download. Sizes and SHA-256 are those Hugging Face serves. */
 export interface WhisperModel {
   id: WhisperModelId
   label: string
@@ -30,7 +30,7 @@ export interface VoiceModelState {
 }
 
 export interface VoiceStatus {
-  /** whisper-cli: where it is, and whether Atelier can download it on this platform. */
+  /** whisper-cli: where it is, and whether Clyde can download it on this platform. */
   binary: { path: string | null; source: 'custom' | 'downloaded' | 'path' | null; downloadable: boolean }
   models: VoiceModelState[]
 }

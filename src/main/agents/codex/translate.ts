@@ -12,7 +12,7 @@ export function shellToolName(platform: NodeJS.Platform): 'PowerShell' | 'Bash' 
   return platform === 'win32' ? 'PowerShell' : 'Bash'
 }
 
-/** `atelier/0.165.0 (…)`: Codex puts its own version after the client name. */
+/** `clyde/0.165.0 (…)`: Codex puts its own version after the client name. */
 export function versionFromUserAgent(userAgent: string): string {
   return /\/(\d+\.\d+\.\d+[\w.-]*)/.exec(userAgent)?.[1] ?? ''
 }

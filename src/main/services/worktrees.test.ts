@@ -8,15 +8,17 @@ import { branchSlug, parseNameStatus, WorktreeService } from './worktrees'
 const sh = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), 'atelier-repo-'))
+  const dir = mkdtempSync(join(tmpdir(), 'clyde-repo-'))
   sh(dir, 'init', '-q', '-b', 'main')
   sh(dir, 'config', 'user.email', 'me@example.com')
   sh(dir, 'config', 'user.name', 'Me')
+  // Git for Windows checks files out with CRLF by default; the assertions compare exact bytes.
+  sh(dir, 'config', 'core.autocrlf', 'false')
   writeFileSync(join(dir, 'a.txt'), 'one\ntwo\n')
   writeFileSync(join(dir, 'old.txt'), 'bye\n')
   sh(dir, 'add', '.')
   sh(dir, 'commit', '-q', '-m', 'init')
-  const service = new WorktreeService(mkdtempSync(join(tmpdir(), 'atelier-wt-')))
+  const service = new WorktreeService(mkdtempSync(join(tmpdir(), 'clyde-wt-')))
   return { dir, service }
 }
 
@@ -43,10 +45,10 @@ describe('WorktreeService', () => {
     expect(await service.isRepo(dir)).toBe(true)
     expect(await service.currentBranch(dir)).toBe('main')
     const ref = await service.create(dir, 'main', 'feature-1')
-    expect(ref.branch).toBe('atelier/feature-1')
+    expect(ref.branch).toBe('clyde/feature-1')
     expect(ref.worktreePath.startsWith(dir)).toBe(false)
     expect(readFileSync(join(ref.worktreePath, 'a.txt'), 'utf8')).toBe('one\ntwo\n')
-    expect(sh(ref.worktreePath, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('atelier/feature-1')
+    expect(sh(ref.worktreePath, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('clyde/feature-1')
   })
 
   it('lists committed, uncommitted and untracked changes with both versions', async () => {
@@ -79,7 +81,7 @@ describe('WorktreeService', () => {
     expect(readFileSync(join(dir, 'b.txt'), 'utf8')).toBe('from the agent\n')
     expect(sh(dir, 'log', '-1', '--format=%P').split(' ')).toHaveLength(2)
     expect(existsSync(ref.worktreePath)).toBe(false)
-    expect(sh(dir, 'branch', '--list', 'atelier/*')).toBe('')
+    expect(sh(dir, 'branch', '--list', 'clyde/*')).toBe('')
   })
 
   it('aborts a conflicting merge and reports the files', async () => {
@@ -112,6 +114,6 @@ describe('WorktreeService', () => {
     await service.remove(ref, { deleteBranch: true })
     expect(existsSync(ref.worktreePath)).toBe(false)
     expect(sh(dir, 'worktree', 'list').split('\n')).toHaveLength(1)
-    expect(sh(dir, 'branch', '--list', 'atelier/*')).toBe('')
+    expect(sh(dir, 'branch', '--list', 'clyde/*')).toBe('')
   })
 })

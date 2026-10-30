@@ -16,7 +16,7 @@ export async function invoke<C extends InvokeChannel>(
   channel: C,
   ...args: InvokeArgs<C>
 ): Promise<InvokeResponses[C]> {
-  const result = await window.atelier.invoke(channel, ...args)
+  const result = await window.clyde.invoke(channel, ...args)
   if (!result.ok) throw new IpcClientError(result.error.code, result.error.message)
   return result.data
 }
@@ -25,5 +25,5 @@ export function on<E extends EventChannel>(
   channel: E,
   listener: (payload: EventPayloads[E]) => void
 ): () => void {
-  return window.atelier.on(channel, listener)
+  return window.clyde.on(channel, listener)
 }

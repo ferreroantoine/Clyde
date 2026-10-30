@@ -77,7 +77,7 @@ export class DataService {
    */
   async importConfig(raw: unknown): Promise<ImportSummary> {
     const parsed = configExportSchema.safeParse(raw)
-    if (!parsed.success) throw new AppError('invalid_request', t('This file is not an Atelier configuration export.'))
+    if (!parsed.success) throw new AppError('invalid_request', t('This file is not a Clyde configuration export.'))
     const doc = parsed.data
     const { settings, profiles, agents, mcp, metrics } = this.deps
     const summary: ImportSummary = { settings: true, profiles: 0, mcpServers: 0, agents: 0, prices: 0, skipped: [] }

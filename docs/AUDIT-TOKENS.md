@@ -4,8 +4,8 @@ Mesuré le 29/10/2026 sur le code du commit du chantier 7. Ordres de grandeur en
 
 ## Méthode
 
-- **Claude Code** (binaire 2.1.312 fourni avec l'Agent SDK, celui qu'Atelier lance) et **Codex CLI** (0.165.0) : lancés contre un faux serveur API local qui enregistre le corps de chaque requête puis répond une erreur. On voit exactement ce que le CLI enverrait au premier tour d'un « hello ». HOME et dossier de config vides, pour ne pas compter de config personnelle.
-- **Boucle API d'Atelier** (Anthropic, OpenAI, Gemini, Ollama) et **Chat** : tailles mesurées sur le code (prompt système, définitions d'outils) et sur les serveurs MCP réels (chantier 7).
+- **Claude Code** (binaire 2.1.312 fourni avec l'Agent SDK, celui que Clyde lance) et **Codex CLI** (0.165.0) : lancés contre un faux serveur API local qui enregistre le corps de chaque requête puis répond une erreur. On voit exactement ce que le CLI enverrait au premier tour d'un « hello ». HOME et dossier de config vides, pour ne pas compter de config personnelle.
+- **Boucle API de Clyde** (Anthropic, OpenAI, Gemini, Ollama) et **Chat** : tailles mesurées sur le code (prompt système, définitions d'outils) et sur les serveurs MCP réels (chantier 7).
 - **Antigravity** : non mesurable ici (pas de `agy` installable ni de compte). Voir « Limites ».
 
 ## Résultats
@@ -22,7 +22,7 @@ Mesuré le 29/10/2026 sur le code du commit du chantier 7. Ordres de grandeur en
 
 - Le cache de prompt est **déjà utilisé** : `cache_control: ephemeral` sur deux blocs système. Les tours suivants relisent ce préfixe à prix réduit.
 - `CLAUDE.md` (projet et utilisateur) et les outils MCP autorisés s'ajoutent ; l'historique et sa compaction automatique sont gérés par Claude Code.
-- Ce que l'IDE voit : `input_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `output_tokens` et, par modèle, `contextWindow`. **Aujourd'hui Atelier additionne les trois entrées** : impossible d'afficher le taux de cache ni une jauge de contexte.
+- Ce que l'IDE voit : `input_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, `output_tokens` et, par modèle, `contextWindow`. **Aujourd'hui Clyde additionne les trois entrées** : impossible d'afficher le taux de cache ni une jauge de contexte.
 - Une partie des outils mesurés dépend de l'environnement (outils propres à ce build) : le chiffre exact varie un peu d'une machine à l'autre.
 
 ### Codex CLI (abonnement ChatGPT)
@@ -35,9 +35,9 @@ Mesuré le 29/10/2026 sur le code du commit du chantier 7. Ordres de grandeur en
 
 - `prompt_cache_key` est envoyé : le cache de préfixe d'OpenAI est utilisé.
 - Les définitions d'outils n'apparaissent pas avec un fournisseur personnalisé ; avec une connexion ChatGPT elles s'ajoutent (non mesurées ici).
-- Codex rapporte `thread/tokenUsage/updated` : entrée, entrée en cache, écriture en cache, sortie, raisonnement, et **`modelContextWindow`**. Il a une compaction native (`thread/compact/start`). Atelier n'utilise aujourd'hui que les totaux.
+- Codex rapporte `thread/tokenUsage/updated` : entrée, entrée en cache, écriture en cache, sortie, raisonnement, et **`modelContextWindow`**. Il a une compaction native (`thread/compact/start`). Clyde n'utilise aujourd'hui que les totaux.
 
-### Boucle API d'Atelier (Anthropic, OpenAI, Gemini, Ollama)
+### Boucle API de Clyde (Anthropic, OpenAI, Gemini, Ollama)
 
 | Partie | Taille | ≈ tokens |
 | --- | --- | --- |
