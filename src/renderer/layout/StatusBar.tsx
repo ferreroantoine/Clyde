@@ -111,7 +111,7 @@ export function StatusBar() {
           label={t('Toggle sidebar')}
           {...shortcutOf('layout.sidebar')}
           side="top"
-          active={layout.sidebarOpen}
+          active={layout.sidebarOpen && layout.center === 'editor'}
           onClick={layout.toggleSidebar}
           className="size-5"
         />

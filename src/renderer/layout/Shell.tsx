@@ -22,8 +22,8 @@ const storage = typeof window !== 'undefined' ? window.localStorage : undefined
 
 export function Shell() {
   const center = useLayout((s) => s.center)
-  // The Chat view has its own conversation list: the Explorer steps aside (and comes back after).
-  const sidebar = usePanelSync(useLayout((s) => s.sidebarOpen && s.center !== 'chat'), useLayout((s) => s.setSidebarOpen))
+  // The sidebar (files, search, source) belongs to the editor: other views hide it, and it comes back with the editor.
+  const sidebar = usePanelSync(useLayout((s) => s.sidebarOpen && s.center === 'editor'), useLayout((s) => s.setSidebarOpen))
   const agent = usePanelSync(useLayout((s) => s.agentPanelOpen), useLayout((s) => s.setAgentPanelOpen))
   const terminal = usePanelSync(useLayout((s) => s.terminalOpen), useLayout((s) => s.setTerminalOpen))
 
