@@ -1370,6 +1370,7 @@ export const fr: Record<string, string> = {
   'Delegates to a subagent': 'Délègue à un sous-agent',
   'Edits': 'Modifie',
   'Image from the agent': 'Image de l’agent',
+  'Image': 'Image',
   'Looks at an image': 'Regarde une image',
   'Open the image': 'Ouvrir l’image',
   'Opens': 'Ouvre',

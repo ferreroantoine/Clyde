@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ImageOff } from 'lucide-react'
 import { t } from '@shared/i18n'
 import type { ToolImage } from '@shared/agent'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { ImageViewer } from '@/components/ImageViewer'
 import { invoke } from '@/lib/ipc'
 import { cn } from '@/lib/utils'
 
@@ -69,12 +69,7 @@ export function ToolImages({ sessionId, images, className }: { sessionId: string
           <Thumb key={image.id} sessionId={sessionId} image={image} onOpen={setOpen} />
         ))}
       </div>
-      <Dialog open={!!open} onOpenChange={(o) => !o && setOpen(null)}>
-        <DialogContent className="max-w-[90vw] p-2 sm:max-w-[90vw]">
-          <DialogTitle className="sr-only">{t('Image from the agent')}</DialogTitle>
-          {open && <img src={open} alt="" className="max-h-[85vh] w-full object-contain" />}
-        </DialogContent>
-      </Dialog>
+      <ImageViewer src={open} alt={t('Image from the agent')} onClose={() => setOpen(null)} />
     </>
   )
 }
