@@ -12,6 +12,7 @@ import { Sidebar } from '@/features/explorer/Sidebar'
 import { EditorArea } from '@/features/editor/EditorArea'
 import { TerminalPanel } from '@/features/terminal/TerminalPanel'
 import { AgentPanel } from '@/features/agent-panel/AgentPanel'
+import { AgentDialogHost } from '@/features/agent-panel/AgentDialog'
 import { CenterPage } from '@/features/pages/CenterPage'
 import { cn } from '@/lib/utils'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -110,6 +111,7 @@ export function Shell() {
         </Group>
       </div>
       <StatusBar />
+      <AgentDialogHost />
     </div>
   )
 }

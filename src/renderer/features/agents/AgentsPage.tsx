@@ -42,7 +42,7 @@ import { MicButton } from '@/components/MicButton'
 import { Appear } from '@/components/Appear'
 import { enter, spring, swap } from '@/lib/motion'
 import { Skeleton } from '@/components/Skeleton'
-import { AgentDialog } from './AgentDialog'
+import { useAgentDialog } from '@/stores/agent-dialog'
 import { ReviewView } from './ReviewView'
 
 function relativeTime(ms: number): string {
@@ -487,14 +487,12 @@ function AgentCard({ agent, onEdit }: { agent: AgentDefinition; onEdit: () => vo
 
 function AgentsList() {
   const agents = useBoard((s) => s.agents)
-  const [editing, setEditing] = useState<AgentDefinition | 'new' | null>(null)
-  const intent = useLayout((s) => s.intent)
-  const clearIntent = useLayout((s) => s.clearIntent)
+  const openDialog = useAgentDialog((s) => s.open)
   return (
     <div className="h-full overflow-y-auto px-6 py-5">
       <div className="mb-4 flex items-center justify-between">
         <p className="text-xs text-muted-foreground">{t('Saved agents run tasks on the board, or chat with you in the open folder.')}</p>
-        <Button size="sm" onClick={() => setEditing('new')}>
+        <Button size="sm" onClick={() => openDialog('new')}>
           <Plus /> {' '}{t('New agent')}</Button>
       </div>
       {agents.length === 0 ? (
@@ -505,20 +503,11 @@ function AgentsList() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {agents.map((a) => (
             <Appear key={a.id}>
-              <AgentCard agent={a} onEdit={() => setEditing(a)} />
+              <AgentCard agent={a} onEdit={() => openDialog(a)} />
             </Appear>
           ))}
         </div>
       )}
-      <AgentDialog
-        open={editing !== null || intent === 'new-agent'}
-        onOpenChange={(o) => {
-          if (o) return
-          setEditing(null)
-          if (intent === 'new-agent') clearIntent()
-        }}
-        {...(editing && editing !== 'new' ? { agent: editing } : {})}
-      />
     </div>
   )
 }
@@ -526,7 +515,7 @@ function AgentsList() {
 export function AgentsPage() {
   const [chosenTab, setTab] = useState<'board' | 'agents'>('board')
   const intent = useLayout((s) => s.intent)
-  const tab = intent === 'new-agent' ? 'agents' : intent === 'new-task' ? 'board' : chosenTab
+  const tab = intent === 'new-task' ? 'board' : chosenTab
   const review = useBoard((s) => s.review)
   const reviewTask = useBoard((s) => (s.review ? s.tasks.find((t) => t.id === s.review?.taskId) : undefined))
   if (review && reviewTask) return <ReviewView task={reviewTask} />

@@ -2,6 +2,9 @@ import { t } from "@shared/i18n";
 import { effectiveBindings, formatCombo } from "@shared/keybindings";
 import { PROFILE_KIND_LABELS } from "@shared/profiles";
 import { useAgents, ENDED_STATUSES } from "@/stores/agents";
+import { useAgentDialog } from "@/stores/agent-dialog";
+import { useNextSession } from "@/stores/next-session";
+import { fromAgent } from "@/lib/next-session";
 import { useBoard } from "@/stores/board";
 import { useEditor } from "@/stores/editor";
 import { useLayout } from "@/stores/layout";
@@ -179,7 +182,13 @@ export function buildCommands(): Command[] {
       id: "new.agent",
       title: t("New saved agent…"),
       group: t("Create"),
-      run: () => layout.request("new-agent"),
+      // Created from the agent panel's point of view: it answers the next session.
+      run: () =>
+        useAgentDialog.getState().open("new", (agent) => {
+          useNextSession.getState().save(useWorkspace.getState().info?.root ?? "", fromAgent(agent));
+          agents.select(null);
+          showAgentPanel();
+        }),
     },
     {
       id: "new.account",

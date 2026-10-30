@@ -1,17 +1,19 @@
 import { useState, type ReactNode } from 'react'
+import { Trash2 } from 'lucide-react'
 import { t } from '@shared/i18n'
-import { PERMISSION_LEVELS, PERMISSION_LEVEL_LABELS, type PermissionLevel, ANTIGRAVITY_LEVEL_HINTS } from '@shared/agent'
+import type { PermissionLevel } from '@shared/agent'
 import type { AgentDefinition } from '@shared/tasks'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { ProfileBadge } from '@/components/ProfileBadge'
-import { LEVEL_HINTS, McpPicker } from '@/features/agent-panel/NewSession'
+import { ModelPicker, type ModelChoice } from '@/components/ModelPicker'
+import { useAgentDialog } from '@/stores/agent-dialog'
 import { useBoard } from '@/stores/board'
 import { useSettings } from '@/stores/settings'
 import { useProfiles } from '@/stores/profiles'
 import { cn } from '@/lib/utils'
-import { ModelPicker, type ModelChoice } from '@/components/ModelPicker'
+import { McpPicker, PermissionPicker } from './SessionSettings'
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -22,11 +24,14 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-export function AgentDialog({ open, onOpenChange, agent }: { open: boolean; onOpenChange: (o: boolean) => void; agent?: AgentDefinition }) {
+/** The app's one agent dialog (see useAgentDialog): create, edit or delete a saved agent. */
+export function AgentDialogHost() {
+  const editing = useAgentDialog((s) => s.editing)
+  const close = useAgentDialog((s) => s.close)
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={editing !== null} onOpenChange={(o) => !o && close()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-        <AgentForm {...(agent ? { agent } : {})} close={() => onOpenChange(false)} />
+        {editing && <AgentForm key={editing === 'new' ? 'new' : editing.id} {...(editing !== 'new' ? { agent: editing } : {})} close={close} />}
       </DialogContent>
     </Dialog>
   )
@@ -35,17 +40,22 @@ export function AgentDialog({ open, onOpenChange, agent }: { open: boolean; onOp
 function AgentForm({ agent, close }: { agent?: AgentDefinition; close: () => void }) {
   const profiles = useProfiles((s) => s.profiles).filter((p) => p.usable)
   const saveAgent = useBoard((s) => s.saveAgent)
+  const deleteAgent = useBoard((s) => s.deleteAgent)
   const [name, setName] = useState(agent?.name ?? '')
   const [profileId, setProfileId] = useState(agent?.profileId ?? profiles[0]?.id ?? '')
   const [choice, setChoice] = useState<ModelChoice>({ model: agent?.model ?? '', effort: agent?.effort ?? '' })
   const [level, setLevel] = useState<PermissionLevel>(agent?.permissionLevel ?? useSettings.getState().settings.agents.defaultPermission)
   const [prompt, setPrompt] = useState(agent?.systemPrompt ?? '')
   const [mcpTools, setMcpTools] = useState(new Set(agent?.mcpTools ?? []))
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const profile = profiles.find((p) => p.id === profileId)
 
   const save = async () => {
     const input = { name, profileId, model: choice.model, effort: choice.effort, permissionLevel: level, systemPrompt: prompt, mcpTools: [...mcpTools] }
     const saved = await saveAgent(agent ? { id: agent.id, ...input } : input)
-    if (saved) close()
+    if (!saved) return
+    useAgentDialog.getState().onSaved?.(saved)
+    close()
   }
 
   return (
@@ -88,27 +98,10 @@ function AgentForm({ agent, close }: { agent?: AgentDefinition; close: () => voi
           </div>
         </Field>
         <Field label={t('Model and reasoning')}>
-          <ModelPicker
-            profileId={profileId || null}
-            value={choice}
-            onChange={setChoice}
-            {...(profiles.find((p) => p.id === profileId)?.defaultModel ? { defaultLabel: profiles.find((p) => p.id === profileId)?.defaultModel } : {})}
-          />
+          <ModelPicker profileId={profileId || null} value={choice} onChange={setChoice} {...(profile?.defaultModel ? { defaultLabel: profile.defaultModel } : {})} />
         </Field>
         <Field label={t('Permissions')}>
-          <div className="grid gap-1.5">
-            {PERMISSION_LEVELS.map((l) => (
-              <label key={l} className={cn('flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-1.5 text-xs', level === l && 'border-primary bg-primary/5')}>
-                <input type="radio" name="agent-level" checked={level === l} onChange={() => setLevel(l)} className="mt-0.5 accent-[var(--primary)]" />
-                <span>
-                  <span className="block font-medium">{t(PERMISSION_LEVEL_LABELS[l])}</span>
-                  <span className="block text-[11px] text-muted-foreground">
-                    {profiles.find((p) => p.id === profileId)?.kind === 'antigravity' ? t(ANTIGRAVITY_LEVEL_HINTS[l]) : t(LEVEL_HINTS[l])}
-                  </span>
-                </span>
-              </label>
-            ))}
-          </div>
+          <PermissionPicker value={level} onChange={setLevel} kind={profile?.kind} name="agent-level" />
         </Field>
         <Field label={t('MCP tools')}>
           <McpPicker value={mcpTools} onChange={setMcpTools} />
@@ -122,9 +115,23 @@ function AgentForm({ agent, close }: { agent?: AgentDefinition; close: () => voi
             className="min-h-20 w-full resize-y rounded-md border bg-transparent px-3 py-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </Field>
-        <DialogFooter>
+        <DialogFooter className="items-center">
+          {agent && (
+            <Button
+              type="button"
+              variant={confirmDelete ? 'destructive' : 'ghost'}
+              className="sm:mr-auto"
+              onClick={() => {
+                if (!confirmDelete) return setConfirmDelete(true)
+                void deleteAgent(agent.id).then(close)
+              }}
+            >
+              <Trash2 /> {confirmDelete ? t('Delete {name}', { name: agent.name }) : t('Delete')}
+            </Button>
+          )}
           <Button type="button" variant="ghost" onClick={close}>
-            {t('Cancel')}</Button>
+            {t('Cancel')}
+          </Button>
           <Button type="submit" disabled={!name.trim() || !profileId}>
             {agent ? t('Save') : t('Create agent')}
           </Button>
