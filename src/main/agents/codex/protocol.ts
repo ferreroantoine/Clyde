@@ -158,6 +158,7 @@ export interface ModelListResponse {
 
 /** Server notifications Clyde reads. */
 export interface Notifications {
+  'turn/plan/updated': { threadId: string; turnId: string; explanation: string | null; plan: Array<{ step: string; status: 'pending' | 'inProgress' | 'completed' }> }
   'item/started': { item: ThreadItem; threadId: string; turnId: string }
   'item/completed': { item: ThreadItem; threadId: string; turnId: string }
   'item/agentMessage/delta': { threadId: string; turnId: string; itemId: string; delta: string }

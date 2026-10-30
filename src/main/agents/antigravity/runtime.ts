@@ -30,17 +30,21 @@ export function buildAgyEnv(base: NodeJS.ProcessEnv, home: string, platform: Nod
  * - validate-all: read only. No edits, commands, browsing or MCP tools.
  * - files-auto: edits inside the folder (Antigravity's default); commands are refused.
  * - autonomous: edits and commands inside the folder, the agent's MCP tools; git push refused.
+ * `always` (Clyde's own update_todos) is allowed at every level. Deny wins over allow, so the
+ * lower levels then deny the agent's MCP tools one by one instead of `mcp(*)`.
  */
-export function agyPermissions(level: PermissionLevel, mcpTools: string[]): { allow: string[]; deny: string[]; ask: string[] } {
+export function agyPermissions(level: PermissionLevel, mcpTools: string[], always: string[] = []): { allow: string[]; deny: string[]; ask: string[] } {
   const protect = ['write_file(.git/)']
+  const mcp = (names: string[]) => names.map((t) => `mcp(${t})`)
+  const denyMcp = always.length ? mcp(mcpTools) : ['mcp(*)']
   switch (level) {
     case 'validate-all':
-      return { allow: [], deny: ['write_file(*)', 'command(*)', 'execute_url(*)', 'mcp(*)', ...protect], ask: [] }
+      return { allow: mcp(always), deny: ['write_file(*)', 'command(*)', 'execute_url(*)', ...denyMcp, ...protect], ask: [] }
     case 'files-auto':
-      return { allow: [], deny: ['command(*)', 'execute_url(*)', 'mcp(*)', ...protect], ask: [] }
+      return { allow: mcp(always), deny: ['command(*)', 'execute_url(*)', ...denyMcp, ...protect], ask: [] }
     case 'autonomous':
       return {
-        allow: ['command(*)', ...mcpTools.map((t) => `mcp(${t})`)],
+        allow: ['command(*)', ...mcp(mcpTools), ...mcp(always)],
         deny: ['command(git push)', 'command(regex:git .*push.*)', ...protect],
         ask: []
       }
@@ -67,6 +71,8 @@ export function agyMcpConfig(servers: AgentMcpServer[]): { mcpServers: Record<st
 export interface AgyConfig {
   level: PermissionLevel
   servers: AgentMcpServer[]
+  /** Clyde's MCP server (update_todos), allowed whatever the level. */
+  clyde?: AgentMcpServer
 }
 
 /** Paths under the profile's home that agy reads (antigravity.google/docs: permissions, mcp). */
@@ -92,11 +98,11 @@ export function writeAgyConfig(home: string, config: AgyConfig): void {
       // unreadable: start over
     }
   }
-  settings['permissions'] = agyPermissions(config.level, agyMcpToolNames(config.servers))
+  settings['permissions'] = agyPermissions(config.level, agyMcpToolNames(config.servers), config.clyde ? agyMcpToolNames([config.clyde]) : [])
   mkdirSync(join(paths.settings, '..'), { recursive: true })
   writeFileSync(paths.settings, JSON.stringify(settings, null, 2))
   mkdirSync(join(paths.mcp, '..'), { recursive: true })
-  writeFileSync(paths.mcp, JSON.stringify(agyMcpConfig(config.servers), null, 2))
+  writeFileSync(paths.mcp, JSON.stringify(agyMcpConfig(config.clyde ? [...config.servers, config.clyde] : config.servers), null, 2))
 }
 
 /** Levels `agy --effort` accepts, as `agy --help` lists them. */

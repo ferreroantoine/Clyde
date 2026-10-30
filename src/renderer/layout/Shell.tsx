@@ -12,18 +12,19 @@ import { Sidebar } from '@/features/explorer/Sidebar'
 import { EditorArea } from '@/features/editor/EditorArea'
 import { TerminalPanel } from '@/features/terminal/TerminalPanel'
 import { AgentPanel } from '@/features/agent-panel/AgentPanel'
+import { AgentDialogHost } from '@/features/agent-panel/AgentDialog'
 import { CenterPage } from '@/features/pages/CenterPage'
 import { cn } from '@/lib/utils'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 
-const CENTER_SCOPES: Record<CenterView, string> = { chat: tk('The chat'), editor: tk('The editor'), agents: tk('The agents board'), supervision: tk('Supervision'), settings: tk('Settings') }
+const CENTER_SCOPES: Record<CenterView, string> = { chat: tk('The chat'), editor: tk('The editor'), tasks: tk('The tasks'), supervision: tk('Supervision'), settings: tk('Settings') }
 
 const storage = typeof window !== 'undefined' ? window.localStorage : undefined
 
 export function Shell() {
   const center = useLayout((s) => s.center)
-  // The Chat view has its own conversation list: the Explorer steps aside (and comes back after).
-  const sidebar = usePanelSync(useLayout((s) => s.sidebarOpen && s.center !== 'chat'), useLayout((s) => s.setSidebarOpen))
+  // The sidebar (files, search, source) belongs to the editor: other views hide it, and it comes back with the editor.
+  const sidebar = usePanelSync(useLayout((s) => s.sidebarOpen && s.center === 'editor'), useLayout((s) => s.setSidebarOpen))
   const agent = usePanelSync(useLayout((s) => s.agentPanelOpen), useLayout((s) => s.setAgentPanelOpen))
   const terminal = usePanelSync(useLayout((s) => s.terminalOpen), useLayout((s) => s.setTerminalOpen))
 
@@ -110,6 +111,7 @@ export function Shell() {
         </Group>
       </div>
       <StatusBar />
+      <AgentDialogHost />
     </div>
   )
 }

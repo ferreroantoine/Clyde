@@ -70,6 +70,9 @@ describe('tool inputs', () => {
       { content: 'Write tests', status: 'in_progress', activeForm: 'Writing tests' },
       { content: 'Ship', status: 'pending', activeForm: 'Ship' }
     ])
+    expect(todosOf({ todos: [{ id: 'a', text: 'Parse', status: 'completed', active: 'Parsing' }] })).toEqual([{ content: 'Parse', status: 'completed', activeForm: 'Parsing' }])
+    expect(toolKind('update_todos')).toBe('todo')
+    expect(toolKind('mcp__clyde__update_todos')).toBe('todo')
     expect(todosOf({ todos: 'nope' })).toBeNull()
     expect(editOf('Edit', { old_string: 'a', new_string: 'b' })).toEqual([{ before: 'a', after: 'b' }])
     expect(editOf('edit_file', { old_text: 'a', new_text: 'b' })).toEqual([{ before: 'a', after: 'b' }])

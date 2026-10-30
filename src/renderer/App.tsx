@@ -17,9 +17,12 @@ import { useEditor } from '@/stores/editor'
 import { useProfiles } from '@/stores/profiles'
 import { useAgents } from '@/stores/agents'
 import { useMcp } from '@/stores/mcp'
-import { useBoard } from '@/stores/board'
+import { useSavedAgents } from '@/stores/saved-agents'
+import { useTodos } from '@/stores/todos'
 import { useLimits } from '@/stores/limits'
 import { useChat } from '@/stores/chat'
+import { useGit } from '@/stores/git'
+import { PromptDialog } from '@/components/PromptDialog'
 import { usePalette } from '@/stores/palette'
 import { CommandPalette } from '@/features/palette/CommandPalette'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
@@ -60,7 +63,7 @@ export function App() {
         // Settings › General › Start view.
         const view = useSettings.getState().settings.general.startView
         const layout = useLayout.getState()
-        if (view === 'chat' || view === 'agents' || view === 'supervision') layout.showCenter(view)
+        if (view === 'chat' || view === 'tasks' || view === 'supervision') layout.showCenter(view)
         else layout.showCenter('editor')
       })
     // Settings › Notifications › Sounds.
@@ -82,18 +85,22 @@ export function App() {
     const offProfiles = useProfiles.getState().init()
     const offAgents = useAgents.getState().init()
     const offMcp = useMcp.getState().init()
-    const offBoard = useBoard.getState().init()
+    const offSavedAgents = useSavedAgents.getState().init()
+    const offTodos = useTodos.getState().init()
     const offLimits = useLimits.getState().init()
     const offChat = useChat.getState().init()
     const offVoice = useVoice.getState().init()
     const offMemory = useMemory.getState().init()
+    const offGit = useGit.getState().init()
     void invoke('app:notices')
       .then((notices) => {
         for (const n of notices) useNotifications.getState().push({ level: 'info', persistent: true, ...describeNotice(n) })
       })
       .catch(() => undefined)
     return () => {
-      offBoard()
+      offSavedAgents()
+      offTodos()
+      offGit()
       offMemory()
       offLimits()
       offChat()
@@ -127,6 +134,7 @@ export function App() {
       'view.chat': () => layout().showCenter('chat'),
       'view.explorer': () => layout().showSidebarTab('files'),
       'view.search': () => layout().showSidebarTab('search'),
+      'view.source': () => layout().showSidebarTab('git'),
       'view.settings': () => layout().showSettings(),
       'layout.sidebar': () => layout().toggleSidebar(),
       'layout.terminal': () => layout().toggleTerminal(),
@@ -154,6 +162,7 @@ export function App() {
           <Shell />
         </ErrorBoundary>
         <CommandPalette />
+        <PromptDialog />
         <Toaster />
       </TooltipProvider>
     </MotionConfig>

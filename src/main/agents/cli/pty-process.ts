@@ -30,7 +30,10 @@ export type SpawnPty = (opts: PtySpawnOptions) => PtyProcess
 export const PTY_COLS = 4000
 
 export const spawnPty: SpawnPty = ({ file, args, env, cwd }) => {
-  const pty = loadPty().spawn(file, args, { name: 'xterm-256color', cols: PTY_COLS, rows: 50, cwd, env })
+  // The conpty.dll shipped with node-pty, not Windows' own: with Windows', `agy -p` starts a
+  // helper whose console Windows hands to the default terminal, and a Windows Terminal window
+  // flashes on screen (reproduced with `agy -p /usage` on Windows 11).
+  const pty = loadPty().spawn(file, args, { name: 'xterm-256color', cols: PTY_COLS, rows: 50, cwd, env, useConptyDll: true })
   return {
     onData: (l) => void pty.onData(l),
     onExit: (l) => void pty.onExit(({ exitCode }) => l(exitCode)),

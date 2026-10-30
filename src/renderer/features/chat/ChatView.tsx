@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Toggle } from '@/features/settings/controls'
 import { SessionLimitLine } from '@/features/limits/LimitGauge'
 import { tokens, usd } from '@/features/agent-panel/SessionPane'
-import { useBoard } from '@/stores/board'
+import { useSavedAgents } from '@/stores/saved-agents'
 import { useChat, type ChatTarget } from '@/stores/chat'
 import { useProfiles } from '@/stores/profiles'
 import { useWorkspace } from '@/stores/workspace'
@@ -79,7 +79,7 @@ export function ChatView() {
   const messages = useChat((s) => (s.activeId ? s.messages[s.activeId] : undefined))
   const busy = useChat((s) => (s.activeId ? !!s.live[s.activeId]?.busy : false))
   const profiles = useProfiles((s) => s.profiles)
-  const agents = useBoard((s) => s.agents)
+  const agents = useSavedAgents((s) => s.agents)
   const workspace = useWorkspace((s) => s.info)
 
   // A new conversation starts with the last one's agent or account, else the first usable account.

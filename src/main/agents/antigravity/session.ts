@@ -23,6 +23,8 @@ export interface AntigravitySessionConfig {
   /** Clyde's instructions; agy has no flag for them, so they open the first message. */
   instructions: string
   servers: AgentMcpServer[]
+  /** Clyde's MCP server, for update_todos. */
+  clyde?: AgentMcpServer
   cliVersion: string
   /** A conversation to continue (`--conversation`); its first message already carried the instructions. */
   conversationId?: string
@@ -103,7 +105,7 @@ export class AntigravitySession {
       return
     }
     try {
-      ;(this.deps.writeConfig ?? writeAgyConfig)(this.cfg.home, { level: this.cfg.permissionLevel, servers: this.cfg.servers })
+      ;(this.deps.writeConfig ?? writeAgyConfig)(this.cfg.home, { level: this.cfg.permissionLevel, servers: this.cfg.servers, ...(this.cfg.clyde ? { clyde: this.cfg.clyde } : {}) })
     } catch (err) {
       this.fail(t("Could not write Antigravity's settings: {message}", { message: (err as Error).message }))
       return

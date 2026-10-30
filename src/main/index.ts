@@ -1,11 +1,13 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, dialog, net, Notification } from 'electron'
+import { app, BrowserWindow, dialog, net, Notification, protocol, shell } from 'electron'
 import { isEnded, type AgentEventEnvelope } from '@shared/agent'
+import { isApiKind } from '@shared/profiles'
 import { resolveLocale, setLocale, t } from '@shared/i18n'
 import { handleClose, refreshTray, syncTray } from './tray'
 import { openDatabase, migrate, type Db } from './services/db/database'
 import { SqliteSettingsRepository } from './services/db/settings-repo'
 import { createMainWindow } from './window'
+import { FILE_SCHEME, fileHandler } from './services/file-protocol'
 import { createLogger } from './logger'
 import { registerAppHandlers } from './ipc/app'
 import { registerWorkspaceHandlers } from './ipc/workspace'
@@ -27,7 +29,8 @@ import { createAdapter } from './agents/api/clients'
 import { McpStore } from './mcp/store'
 import { McpHub } from './mcp/hub'
 import { registerMcpHandlers } from './ipc/mcp'
-import { registerTaskHandlers } from './ipc/tasks'
+import { registerAgentDefinitionHandlers } from './ipc/agent-definitions'
+import { registerTodoHandlers } from './ipc/todos'
 import { registerMetricsHandlers } from './ipc/metrics'
 import { MetricsService } from './metrics/metrics'
 import { setupLimits } from './limits/setup'
@@ -35,8 +38,8 @@ import { DataService } from './services/data'
 import { registerDataHandlers } from './ipc/data'
 import { registerLimitsHandlers } from './ipc/limits'
 import { AgentDefinitionsService } from './services/agent-definitions'
-import { WorktreeService } from './services/worktrees'
-import { TaskService } from './agents/tasks'
+import { TodoService } from './agents/todo-service'
+import { ClydeMcpServer } from './mcp/clyde-server'
 import { ChatStore } from './chat/store'
 import { ChatService } from './chat/service'
 import { ChatSearch, ollamaEmbed } from './chat/search'
@@ -49,6 +52,9 @@ import { registerMemoryHandlers } from './ipc/memory'
 import { registerVoiceHandlers } from './ipc/voice'
 import { loadQuery, type QueryFn } from './agents/claude-code/provider'
 import { DISTRIBUTION } from './build-flags'
+import { GitService } from './git/service'
+import { CheckpointService } from './git/checkpoints'
+import { registerGitHandlers } from './ipc/git'
 
 const log = createLogger('main')
 
@@ -59,6 +65,8 @@ app.setAppUserModelId('dev.clyde.app')
 const portableDir = process.env['PORTABLE_EXECUTABLE_DIR']
 const userDataOverride = process.env['CLYDE_USER_DATA'] || (portableDir ? join(portableDir, 'Clyde-data') : undefined)
 if (userDataOverride) app.setPath('userData', userDataOverride)
+// The file viewers read the open folder's files through clyde-file:// (images, PDF, media).
+protocol.registerSchemesAsPrivileged([{ scheme: FILE_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true, corsEnabled: true } }])
 
 let queryFn: Promise<QueryFn> | null = null
 let mainWindow: BrowserWindow | null = null
@@ -82,13 +90,6 @@ function openAppDatabase(): Db | null {
     )
     return null
   }
-}
-
-/** %LOCALAPPDATA%\\Clyde\\worktrees on Windows (not roaming), the app data folder elsewhere. */
-function worktreesRoot(): string {
-  const local = process.env['LOCALAPPDATA']
-  if (process.platform === 'win32' && local && !userDataOverride) return join(local, 'Clyde', 'worktrees')
-  return join(app.getPath('userData'), 'worktrees')
 }
 
 function memoryDatabase(): Db {
@@ -123,9 +124,12 @@ if (!app.requestSingleInstanceLock()) {
     // Created once the services it reads exist; callbacks before that skip it.
     // eslint-disable-next-line prefer-const -- assigned below, after the services it needs
     let memory: MemoryService | undefined
+    const trash = (abs: string) => shell.trashItem(abs)
+    const gitService = new GitService({ onChanged: () => broadcast('git:changed', null), trash })
     const workspace = new WorkspaceService(settings, {
       onChanged: (info) => {
         broadcast('workspace:changed', info)
+        void gitService.open(info?.root ?? null).catch((err) => log.warn('could not read the repository', err))
         // The open project's memory reaches its CLAUDE.md / AGENTS.md.
         try {
           memory?.sync()
@@ -144,6 +148,7 @@ if (!app.requestSingleInstanceLock()) {
     )
     registerAppHandlers(settings, db ? new NoticesService(db) : null)
     registerWorkspaceHandlers(workspace, () => settings.getAll().general.projectsFolder)
+    protocol.handle(FILE_SCHEME, fileHandler(() => workspace.current()?.root ?? null))
     registerTerminalHandlers(ptys, workspace)
 
     const clientApp = `clyde/${app.getVersion()}`
@@ -186,9 +191,23 @@ if (!app.requestSingleInstanceLock()) {
       apiKey: (id) => profiles.apiKey(id),
       createAdapter: (target) => createAdapter(target, fetch)
     })
+    const checkpoints = new CheckpointService(profileDb)
+    // The Tasks view: the user's tasks and the lists project sessions keep.
+    const todos = new TodoService(profileDb, {
+      root: () => workspace.current()?.root ?? null,
+      sessionRoot: (id) => {
+        const info = agents.get(id)
+        return info && !info.chatId ? info.cwd : null
+      },
+      onChanged: () => broadcast('todos:changed', null)
+    })
+    // update_todos for agents without a task-list tool (Antigravity).
+    const clydeMcp = new ClydeMcpServer((sessionId, items) => agents.note(sessionId, { type: 'todos', items }))
+    void clydeMcp.start().catch((err) => log.warn('could not start the clyde MCP server', err))
     const media = new MediaStore(join(app.getPath('userData'), 'session-media'))
     const agents = new AgentManager({
       media,
+      clydeMcp,
       memory: () => memory?.forPrompt() ?? '',
       summarizeAt: () => settings.getAll().memory.summarizeAt,
       summarize: (transcript, fallback, signal) =>
@@ -209,7 +228,7 @@ if (!app.requestSingleInstanceLock()) {
       onEvent: (envelope) => {
         broadcast('agent:event', envelope)
         metrics.onEvent(envelope)
-        tasks.onAgentEvent(envelope)
+        todos.onAgentEvent(envelope)
         chat.onAgentEvent(envelope)
         limitsSetup.onAgentEvent(envelope)
         guard.onEvent(envelope)
@@ -218,12 +237,16 @@ if (!app.requestSingleInstanceLock()) {
       onLimits: (profileId, sessionId, readings) => limitsSetup.ingest(profileId, readings, sessionId),
       onSession: (info) => {
         broadcast('agent:session', info)
+        // Settings › Agents: a restore point of the project before the session changes anything.
+        if (info.status === 'starting' && !info.taskId && !info.chatId && settings.getAll().agents.gitCheckpoints) {
+          void checkpoints.create(info.id, info.cwd).catch((err) => log.warn('could not make a restore point', err))
+        }
         // End of a project session: the agent may propose memory changes, to review in Settings.
         if (info.status === 'stopped' && !shuttingDown && !info.chatId && settings.getAll().memory.proposeAtSessionEnd && internal.target()) {
           void memory?.proposeFromSession(info.id).catch((err) => log.warn('memory proposal failed', err))
         }
         metrics.onSession(info)
-        tasks.onSession(info)
+        if (isEnded(info.status)) clydeMcp.release(info.id)
         if (mainWindow) refreshTray(mainWindow, background)
       },
       store: {
@@ -271,16 +294,8 @@ if (!app.requestSingleInstanceLock()) {
     mcp.start()
 
     const definitions = new AgentDefinitionsService(profileDb, (list) => broadcast('agents:changed', list))
-    const tasks: TaskService = new TaskService(profileDb, {
-      worktrees: new WorktreeService(() => settings.getAll().agents.worktreesFolder.trim() || worktreesRoot()),
-      deleteMergedWorktrees: () => settings.getAll().agents.deleteMergedWorktrees,
-      agents: definitions,
-      sessions: agents,
-      workspaceRoot: () => workspace.current()?.root ?? null,
-      onChanged: (list) => broadcast('tasks:changed', list)
-    })
-    tasks.recover()
-    registerTaskHandlers(definitions, tasks)
+    registerAgentDefinitionHandlers(definitions)
+    registerTodoHandlers(todos)
 
     // "Use my past conversations": embeddings from the first Ollama account (Settings › Memory & context).
     const chatSearch = new ChatSearch(
@@ -322,6 +337,16 @@ if (!app.requestSingleInstanceLock()) {
       onChanged: (state) => broadcast('memory:changed', state)
     })
     registerMemoryHandlers(memory)
+    registerGitHandlers({
+      git: gitService,
+      checkpoints,
+      trash,
+      complete: (system, prompt) => {
+        // Clyde's internal model; without one, the first usable API account.
+        const api = profiles.list().find((p) => p.usable && isApiKind(p.kind))
+        return internal.complete({ system, prompt, ...(api ? { fallback: { profileId: api.id, model: api.defaultModel } } : {}) })
+      }
+    })
     registerVoiceHandlers(
       new VoiceService({
         root: join(app.getPath('userData'), 'whisper'),
@@ -367,6 +392,7 @@ if (!app.requestSingleInstanceLock()) {
       void mcp.dispose()
       ptys.killAll()
       void workspace.dispose()
+      void gitService.dispose()
       db?.close()
     })
 

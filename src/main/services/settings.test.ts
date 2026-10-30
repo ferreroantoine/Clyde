@@ -115,4 +115,10 @@ describe('SettingsService', () => {
   it('refuses to migrate from an unknown version', () => {
     expect(() => migrateSettings({}, 0)).toThrow(/No settings migration/)
   })
+
+  it('drops the worktree settings of the old task board', () => {
+    const doc = migrateSettings({ general: { startView: 'agents' }, agents: { maxParallel: 3, worktreesFolder: 'D:/wt', deleteMergedWorktrees: false } }, 3)
+    expect(doc['agents']).toEqual({ maxParallel: 3 })
+    expect(doc['general']).toEqual({ startView: 'tasks' })
+  })
 })

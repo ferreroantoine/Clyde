@@ -4,7 +4,6 @@ import { PERMISSION_LEVELS, type PermissionLevel } from './agent'
 import { profileIdSchema, REASONING_EFFORTS, type ReasoningEffort } from './profiles'
 
 export const agentIdSchema = z.uuid()
-export const taskIdSchema = z.uuid()
 
 const mcpTools = z
   .array(z.string().regex(/^mcp__[a-z0-9_-]+__.+$/).max(300))
@@ -39,62 +38,3 @@ export interface AgentDefinition {
   createdAt: number
   updatedAt: number
 }
-
-export const TASK_STATUSES = ['todo', 'in_progress', 'review', 'done'] as const
-export type TaskStatus = (typeof TASK_STATUSES)[number]
-export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
-  todo: tk('To do'),
-  in_progress: tk('In progress'),
-  review: tk('To review'),
-  done: tk('Done')
-}
-export type TaskOutcome = 'merged' | 'abandoned'
-
-export const taskInputSchema = z.object({
-  title: z.string().trim().min(1, tk('Title is required')).max(120),
-  /** The first message the agent receives. */
-  description: z.string().trim().min(1, tk('Describe the task')).max(50_000),
-  agentId: agentIdSchema
-})
-export type TaskInput = z.input<typeof taskInputSchema>
-
-export interface Task {
-  id: string
-  title: string
-  description: string
-  agentId: string | null
-  repoRoot: string
-  /** The branch checked out when the task was created; merges go there. */
-  baseBranch: string
-  branch: string
-  worktreePath: string
-  status: TaskStatus
-  outcome: TaskOutcome | null
-  /** The live agent session working on it, if any. */
-  sessionId: string | null
-  /** Last thing worth telling the user, e.g. merge conflicts. */
-  note: string | null
-  mergeCommit: string | null
-  createdAt: number
-  updatedAt: number
-}
-
-export type ChangeStatus = 'added' | 'modified' | 'deleted' | 'renamed'
-
-export interface TaskChange {
-  path: string
-  oldPath: string | null
-  status: ChangeStatus
-}
-
-export interface TaskFileDiff {
-  path: string
-  original: string
-  modified: string
-  /** Binary or too large: the review shows a placeholder instead. */
-  unsupported: boolean
-}
-
-export type MergeResult =
-  | { ok: true; commit: string }
-  | { ok: false; reason: string; conflicts: string[] }

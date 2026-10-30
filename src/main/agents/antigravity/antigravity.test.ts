@@ -236,6 +236,15 @@ describe('Antigravity runtime', () => {
     expect(auto.deny).toContain('command(git push)')
   })
 
+  it('allows Clyde’s update_todos at every level, and still denies the other MCP tools below autonomous', () => {
+    const low = agyPermissions('validate-all', ['gh/list'], ['clyde/update_todos'])
+    expect(low.allow).toEqual(['mcp(clyde/update_todos)'])
+    expect(low.deny).toContain('mcp(gh/list)')
+    expect(low.deny).not.toContain('mcp(*)')
+    expect(agyPermissions('files-auto', [], ['clyde/update_todos']).allow).toEqual(['mcp(clyde/update_todos)'])
+    expect(agyPermissions('autonomous', ['gh/list'], ['clyde/update_todos']).allow).toEqual(['command(*)', 'mcp(gh/list)', 'mcp(clyde/update_todos)'])
+  })
+
   it('writes rules and MCP servers into the profile home, keeping other settings', () => {
     const home = mkdtempSync(join(tmpdir(), 'agy-home-'))
     const paths = agyPaths(home)

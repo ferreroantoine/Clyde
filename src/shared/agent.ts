@@ -264,9 +264,23 @@ export type AgentEvent =
       limitType: string | null
     }
   | { type: 'error'; message: string }
+  /** The agent's whole task list, each time it changes (TodoWrite, Codex's plan, update_todos). */
+  | { type: 'todos'; items: TodoItem[] }
   /** Older turns were replaced by a summary (Clyde's loop), or the CLI compacted its context. */
   | { type: 'context_summarized'; turns: number }
   | { type: 'context_compacted' }
+
+export type TodoItemStatus = 'pending' | 'in_progress' | 'completed'
+
+/** One entry of an agent's task list, as the providers give it. */
+export interface TodoItem {
+  /** The provider's id for it, when it has one; items are matched by text otherwise. */
+  key?: string
+  text: string
+  status: TodoItemStatus
+  /** What the agent is doing for it, e.g. "Running the tests" (Claude Code's activeForm). */
+  active?: string
+}
 
 export interface AgentEventEnvelope {
   sessionId: string

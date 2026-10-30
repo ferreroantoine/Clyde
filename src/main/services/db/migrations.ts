@@ -1,5 +1,6 @@
 import type { Db } from './database'
 import { removeMistral } from './remove-mistral'
+import { tasksToTodos } from './tasks-to-todos'
 
 export interface Migration {
   version: number
@@ -459,5 +460,46 @@ export const migrations: Migration[] = [
         created_at INTEGER NOT NULL
       );
     `
+  },
+  {
+    version: 17,
+    name: 'git restore points',
+    sql: `
+      -- The working tree before an agent session worked in a repository (a commit under refs/clyde/checkpoints).
+      CREATE TABLE git_checkpoints (
+        session_id  TEXT PRIMARY KEY,
+        repo_root   TEXT NOT NULL,
+        commit_hash TEXT NOT NULL,
+        created_at  INTEGER NOT NULL
+      );
+      CREATE INDEX git_checkpoints_repo ON git_checkpoints(repo_root, created_at);
+    `
+  },
+  {
+    version: 18,
+    name: 'tasks become a shared task list',
+    sql: `
+      -- The Tasks view: the user's tasks and the lists agents keep, per project folder.
+      CREATE TABLE todos (
+        id         TEXT PRIMARY KEY,
+        root       TEXT NOT NULL,
+        text       TEXT NOT NULL,
+        status     TEXT NOT NULL,
+        -- The session whose list it is in; NULL for the user's own tasks.
+        session_id TEXT,
+        -- 'user' tasks stay when an agent's list drops them; 'agent' ones go with it.
+        origin     TEXT NOT NULL DEFAULT 'user',
+        -- The provider's id for the item, when it gives one (matched by text otherwise).
+        item_key   TEXT,
+        active     TEXT,
+        position   REAL NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        done_at    INTEGER
+      );
+      CREATE INDEX todos_root ON todos(root, status);
+      CREATE INDEX todos_session ON todos(session_id);
+    `,
+    up: tasksToTodos
   }
 ]
