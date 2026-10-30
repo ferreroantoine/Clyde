@@ -1,7 +1,7 @@
 {
   "name": "atelier",
   "productName": "Atelier",
-  "version": "0.1.0",
+  "version": "0.2.0-beta.1",
   "description": "Agent-centric desktop IDE, multi-account and multi-provider",
   "private": true,
   "main": "./out/main/index.js",
