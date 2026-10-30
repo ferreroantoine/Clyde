@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
@@ -282,6 +282,28 @@ describe('AgentManager', () => {
     expect(calls[1]).not.toHaveProperty('resume')
     expect((calls[1]?.systemPrompt as { append?: string }).append).toMatch(/interrupted and resumed[\s\S]*User: remember the plan/)
     expect(events.map((e) => e.event)).toContainEqual({ type: 'session_resumed', fresh: true })
+  })
+
+  it('moves a session to another Claude Code account with its whole conversation', async () => {
+    const { manager, profile, profiles, calls, events, metrics } = setup(idle as never)
+    const work = profiles.create({ name: 'Work', color: '#22c55e', auth: 'subscription' })
+    const info = await manager.start({ profileId: profile.id, systemPrompt: 'Be brief.' })
+    manager.send(info.id, 'fix the bug')
+    await vi.waitFor(() => expect(events.some((e) => e.event.type === 'turn_end')).toBe(true))
+    const project = join(profiles.configDir(profile.id), 'projects', 'repo')
+    mkdirSync(project, { recursive: true })
+    writeFileSync(join(project, 'sdk-session.jsonl'), '{"type":"user"}\n')
+
+    const moved = await manager.switchTo(info.id, { profileId: work.id, model: 'opus' })
+    expect(moved).toMatchObject({ id: info.id, profileId: work.id })
+    // The session file now lives in the other account's folder too, and the CLI reopens it there.
+    expect(readFileSync(join(profiles.configDir(work.id), 'projects', 'repo', 'sdk-session.jsonl'), 'utf8')).toBe('{"type":"user"}\n')
+    expect(calls[1]).toMatchObject({ resume: 'sdk-session', model: 'opus', env: { CLAUDE_CONFIG_DIR: profiles.configDir(work.id) }, systemPrompt: { append: 'Be brief.' } })
+    expect(events.map((e) => e.event)).toContainEqual(expect.objectContaining({ type: 'account_switched', profileId: work.id, profileName: 'Work', full: true }))
+    expect(manager.list()).toHaveLength(1)
+    // A later resume starts on the new account.
+    expect(metrics.resumable(info.id)?.request).toMatchObject({ profileId: work.id, systemPrompt: 'Be brief.' })
+    manager.stop(info.id)
   })
 
   it('rebuilds the history of an API session it resumes', async () => {

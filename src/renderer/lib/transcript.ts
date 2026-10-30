@@ -66,6 +66,8 @@ export interface SessionView {
   context: { tokens: number; window: number | null } | null
   /** Whether "Resume" can bring it back once it ended. */
   resumable: boolean
+  /** The account hit a usage limit and nothing was sent since; `resetsAt` in ms when known. */
+  limit: { resetsAt: number | null } | null
 }
 
 export function emptyView(info: AgentSessionInfo): SessionView {
@@ -77,7 +79,8 @@ export function emptyView(info: AgentSessionInfo): SessionView {
     rateLimit: null,
     totals: { costUsd: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 },
     context: null,
-    resumable: true
+    resumable: true,
+    limit: null
   }
 }
 
@@ -113,7 +116,7 @@ function reduce(view: SessionView, event: AgentEvent, seq: number): SessionView 
         info: { ...view.info, model: event.model || view.info.model }
       }
     case 'user':
-      return { ...view, items: [...items, { kind: 'user', id: event.id, text: event.text }] }
+      return { ...view, limit: null, items: [...items, { kind: 'user', id: event.id, text: event.text }] }
     case 'text_delta':
     case 'text': {
       const index = items.findIndex((i) => i.kind === 'text' && i.key === event.key)
@@ -217,6 +220,26 @@ function reduce(view: SessionView, event: AgentEvent, seq: number): SessionView 
       }
     case 'context_compacted':
       return { ...view, items: [...items, { kind: 'note', id: `note-${seq}`, text: t('The conversation was compacted.') }], context: view.context ? { ...view.context, tokens: 0 } : null }
+    case 'limit_reached':
+      return { ...view, limit: { resetsAt: event.resetsAt } }
+    case 'account_switched':
+      return {
+        ...view,
+        // The new account has its own limits.
+        limit: null,
+        rateLimit: null,
+        info: { ...view.info, profileId: event.profileId, model: event.model || view.info.model },
+        items: [
+          ...items,
+          {
+            kind: 'note',
+            id: `note-${seq}`,
+            text: event.full
+              ? t('Continued on {name} ({model}), with the whole conversation.', { name: event.profileName, model: event.model || t('default model') })
+              : t('Continued on {name} ({model}). The agent got the end of this conversation.', { name: event.profileName, model: event.model || t('default model') })
+          }
+        ]
+      }
     case 'session_resumed':
       return {
         ...view,

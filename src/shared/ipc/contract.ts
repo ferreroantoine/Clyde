@@ -38,6 +38,7 @@ import { mcpIdSchema, mcpServerInputSchema, mcpServerUpdateSchema, type McpImpor
 import { presetInstallSchema, userPresetInputSchema, type McpPreset, type McpProbe } from '../mcp-catalog'
 import {
   agentStartSchema,
+  agentSwitchSchema,
   approvalAnswerSchema,
   questionAnswerSchema,
   sessionIdSchema,
@@ -116,6 +117,11 @@ export const requestSchemas = {
   'agent:load': z.object({ sessionId: sessionIdSchema }),
   /** Brings an ended session back; `continue` also tells it to finish what it was doing. */
   'agent:resume': z.object({ sessionId: sessionIdSchema, continue: z.boolean().default(false) }),
+  'agent:switch': agentSwitchSchema,
+  /** Tells the session to carry on at `at` (ms); absent uses its account's reset time. */
+  'agent:scheduleResume': z.object({ sessionId: sessionIdSchema, at: z.number().int().positive().optional() }),
+  'agent:cancelResume': z.object({ sessionId: sessionIdSchema }),
+  'agent:scheduled': z.undefined(),
   /** An image a tool returned, stored with the session. */
   'agent:media': z.object({ sessionId: sessionIdSchema, id: z.string().regex(/^[a-f0-9]{24}\.[a-z]+$/) }),
   'memory:state': z.undefined(),
@@ -241,6 +247,11 @@ export interface InvokeResponses {
   'agent:resume': AgentSessionInfo
   /** Base64 bytes. */
   'agent:media': { mime: string; data: string }
+  'agent:switch': AgentSessionInfo
+  /** When the session will be told to carry on (ms). */
+  'agent:scheduleResume': number
+  'agent:cancelResume': null
+  'agent:scheduled': Array<{ sessionId: string; at: number }>
   'memory:state': MemoryState
   'memory:saveCore': MemoryState
   'memory:saveDoc': MemoryState
@@ -323,6 +334,8 @@ export interface EventPayloads {
   'profiles:changed': Profile[]
   'agent:session': AgentSessionInfo
   'agent:event': AgentEventEnvelope
+  /** A session will be told to carry on at `at` (ms), or no longer (null). */
+  'agent:resumeScheduled': { sessionId: string; at: number | null }
   'mcp:changed': McpServer[]
   'agents:changed': AgentDefinition[]
   'tasks:changed': Task[]

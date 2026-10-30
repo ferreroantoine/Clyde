@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import {
+  ArrowDown,
+  ArrowUp,
   Bell,
   Bot,
   Brain,
@@ -21,6 +23,8 @@ import { t, tk } from '@shared/i18n'
 import { ACCENTS, VOICE_LANGUAGES, type SettingPath, type Settings, type SettingValue } from '@shared/settings'
 import type { ProfileKind } from '@shared/profiles'
 import { useProfiles } from '@/stores/profiles'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { HesitationsField, MicrophoneSelect, WhisperBinaryBlock, WhisperModelsBlock } from './VoiceBlocks'
 import type { SettingsSection } from '@/stores/layout'
 import { NumberField, PathField, Segmented, Select, TextField, Toggle } from './controls'
@@ -125,6 +129,43 @@ function ApiProfileSelect({ value, onChange, kinds, empty }: { value: string; on
       options={[{ value: '', label: empty ?? t('None') }, ...profiles.map((p) => ({ value: p.id, label: p.name }))]}
       onChange={onChange}
     />
+  )
+}
+
+/** Accounts a session may move to at a usage limit: checked ones, in the order they are tried. */
+function FallbackProfilesField({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const profiles = useProfiles((s) => s.profiles)
+  const chosen = value.map((id) => profiles.find((p) => p.id === id)).filter((p) => p !== undefined)
+  const others = profiles.filter((p) => !value.includes(p.id))
+  if (profiles.length === 0) return <p className="text-xs text-muted-foreground">{t('No account yet')}</p>
+  const move = (index: number, by: number) => {
+    const next = chosen.map((p) => p.id)
+    const [id] = next.splice(index, 1)
+    if (id) next.splice(index + by, 0, id)
+    onChange(next)
+  }
+  return (
+    <ul className="grid w-64 gap-1 text-xs" aria-label={t('Fallback accounts')}>
+      {chosen.map((p, i) => (
+        <li key={p.id} className="flex items-center gap-1.5 rounded-md border px-2 py-1">
+          <input type="checkbox" checked onChange={() => onChange(value.filter((id) => id !== p.id))} aria-label={t('Use {name}', { name: p.name })} />
+          <span className="tabular-nums text-muted-foreground">{i + 1}.</span>
+          <span className={cn('flex-1 truncate', !p.usable && 'text-muted-foreground line-through')}>{p.name}</span>
+          <Button size="icon-xs" variant="ghost" aria-label={t('Move up')} disabled={i === 0} onClick={() => move(i, -1)}>
+            <ArrowUp />
+          </Button>
+          <Button size="icon-xs" variant="ghost" aria-label={t('Move down')} disabled={i === chosen.length - 1} onClick={() => move(i, 1)}>
+            <ArrowDown />
+          </Button>
+        </li>
+      ))}
+      {others.map((p) => (
+        <li key={p.id} className="flex items-center gap-1.5 px-2 py-1 text-muted-foreground">
+          <input type="checkbox" checked={false} disabled={!p.usable} onChange={() => onChange([...chosen.map((c) => c.id), p.id])} aria-label={t('Use {name}', { name: p.name })} />
+          <span className="flex-1 truncate">{p.name}</span>
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -411,6 +452,31 @@ export const SECTIONS: SectionSpec[] = [
         control: ({ s, set }) => (
           <Toggle label={t('Resume interrupted sessions at startup')} checked={s.agents.resumeOnStart} onChange={(v) => set('agents.resumeOnStart', v)} />
         )
+      },
+      {
+        id: 'agents.onLimit',
+        label: t('When an account hits its usage limit'),
+        hint: t('In the middle of a task. Waiting resumes the session a minute after the limit resets, even after Clyde restarts.'),
+        keywords: 'rate limit quota fallback switch account resume',
+        control: ({ s, set }) => (
+          <Select
+            label={t('When an account hits its usage limit')}
+            value={s.agents.onLimit}
+            options={[
+              { value: 'ask', label: t('Ask me') },
+              { value: 'wait', label: t('Wait for the reset and resume') },
+              { value: 'switch', label: t('Switch to a fallback account') }
+            ]}
+            onChange={(v) => set('agents.onLimit', v)}
+          />
+        )
+      },
+      {
+        id: 'agents.fallbackProfiles',
+        label: t('Fallback accounts'),
+        hint: t('In order. Clyde takes the first one under 95% of its limits; with none, it waits for the reset.'),
+        keywords: 'rate limit quota fallback switch account',
+        control: ({ s, set }) => <FallbackProfilesField value={s.agents.fallbackProfiles} onChange={(v) => set('agents.fallbackProfiles', v)} />
       }
     ]
   },

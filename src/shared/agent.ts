@@ -66,6 +66,21 @@ export const approvalAnswerSchema = z.object({
   message: z.string().max(2000).optional()
 })
 export type ApprovalAnswer = z.input<typeof approvalAnswerSchema>
+
+/** Moves a session to another account (and model): the agent goes on with what it was doing. */
+export const agentSwitchSchema = z.object({
+  sessionId: sessionIdSchema,
+  profileId: profileIdSchema,
+  model: z.string().trim().max(200).default(''),
+  effort: z.enum(REASONING_EFFORTS).or(z.literal('')).default(''),
+  /** Also tells the agent to carry on with its task. */
+  carryOn: z.boolean().default(false)
+})
+export type AgentSwitch = z.input<typeof agentSwitchSchema>
+
+/** What Clyde does when an account hits its usage limit in the middle of a task. */
+export const LIMIT_ACTIONS = ['ask', 'wait', 'switch'] as const
+export type LimitAction = (typeof LIMIT_ACTIONS)[number]
 export type ApprovalDecision = ApprovalAnswer['decision']
 
 /** One question an agent asks with choices: Claude Code's AskUserQuestion, or ask_user in Clyde's loop. */
@@ -190,6 +205,10 @@ export type AgentEvent =
     }
   /** The session came back after it ended; `fresh` when the agent only got a summary of what came before. */
   | { type: 'session_resumed'; fresh: boolean }
+  /** The session goes on with another account or model; `full` when the agent kept its whole conversation. */
+  | { type: 'account_switched'; profileId: string; profileName: string; model: string; full: boolean }
+  /** The account hit a usage limit; `resetsAt` (ms) when known. The panel offers to switch or wait. */
+  | { type: 'limit_reached'; resetsAt: number | null }
   | { type: 'user'; id: string; text: string }
   /** Streaming text; `key` identifies one text block of one assistant message. */
   | { type: 'text_delta'; key: string; text: string }

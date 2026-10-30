@@ -22,6 +22,7 @@ import { SecretsService, safeStorageCipher } from './services/secrets'
 import { ProfilesService } from './services/profiles'
 import { AgentManager, CONTINUE_MESSAGE } from './agents/manager'
 import { MediaStore } from './agents/media'
+import { LimitGuard } from './agents/limit-guard'
 import { createAdapter } from './agents/api/clients'
 import { McpStore } from './mcp/store'
 import { McpHub } from './mcp/hub'
@@ -211,6 +212,7 @@ if (!app.requestSingleInstanceLock()) {
         tasks.onAgentEvent(envelope)
         chat.onAgentEvent(envelope)
         limitsSetup.onAgentEvent(envelope)
+        guard.onEvent(envelope)
         notifyAgent(envelope)
       },
       onLimits: (profileId, sessionId, readings) => limitsSetup.ingest(profileId, readings, sessionId),
@@ -245,9 +247,20 @@ if (!app.requestSingleInstanceLock()) {
       log: createLogger('limits')
     })
     registerProfileHandlers({ profiles, ptys, claudeCodePath, codexPath, antigravityPath, cli, query, clientApp, fetch })
+    // Usage limits mid-task: ask, wait for the reset, or move to a fallback account (Settings › Agents).
+    const guard: LimitGuard = new LimitGuard({
+      db: profileDb,
+      settings: () => settings.getAll().agents,
+      profiles: () => profiles.list(),
+      limits: (id) => limitsSetup.limits.profileLimits(id),
+      sessions: agents,
+      onScheduled: (sessionId, at) => broadcast('agent:resumeScheduled', { sessionId, at }),
+      log: createLogger('limits')
+    })
     registerAgentHandlers(agents, {
       metrics: { history: (cwd) => metrics.history(cwd), stored: (id) => metrics.stored(id) },
       media,
+      guard,
       workspaceRoot: () => workspace.current()?.root ?? null
     })
     registerMcpHandlers(mcp, {
@@ -348,6 +361,7 @@ if (!app.requestSingleInstanceLock()) {
     app.on('will-quit', () => {
       // Working sessions are marked interrupted, so they can be resumed at the next start.
       shuttingDown = true
+      guard.dispose()
       agents.shutdown()
       void limitsSetup.dispose()
       void mcp.dispose()
@@ -373,6 +387,8 @@ if (!app.requestSingleInstanceLock()) {
       if (next.general.closeBehavior !== previous.general.closeBehavior) syncTray(win, background)
     })
 
+    // Resumes planned before the last shutdown (a usage limit that resets later).
+    guard.restore()
     // Settings › Agents: sessions the last shutdown cut (within a day) carry on by themselves.
     if (settings.getAll().agents.resumeOnStart) {
       for (const id of metrics.interruptedSince(Date.now() - 24 * 60 * 60 * 1000)) {

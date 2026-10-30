@@ -59,7 +59,11 @@ export const settingsSchema = z.object({
     worktreesFolder: path.default(''),
     deleteMergedWorktrees: z.boolean().default(true),
     /** At startup, sessions cut by the last shutdown are resumed and told to carry on. */
-    resumeOnStart: z.boolean().default(false)
+    resumeOnStart: z.boolean().default(false),
+    /** An account hits its usage limit mid-task: ask, wait for the reset and resume, or switch account. */
+    onLimit: z.enum(['ask', 'wait', 'switch']).default('ask'),
+    /** Accounts to switch to, in order; the first one under its limits is used. */
+    fallbackProfiles: z.array(z.string().max(64)).max(20).default([])
   }),
   editor: section({
     fontFamily: z.string().trim().max(300).default(DEFAULT_MONO),

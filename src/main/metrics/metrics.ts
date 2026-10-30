@@ -166,12 +166,14 @@ export class MetricsService {
   onSession(info: AgentSessionInfo): void {
     const profile = this.deps.profiles().find((p) => p.id === info.profileId)
     const ended = isEnded(info.status) ? this.now() : null
-    // A resumed session runs again: its end is cleared until it ends once more.
+    // A resumed session runs again: its end is cleared until it ends once more. A switched one
+  // moves to its new account; each turn's usage stays with the account that ran it.
     this.db
       .prepare(
         `INSERT INTO sessions (id, profile_id, profile_name, kind, model, agent_id, task_id, cwd, status, started_at, ended_at, billing, chat_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET model = excluded.model, status = excluded.status,
+           profile_id = excluded.profile_id, profile_name = excluded.profile_name, kind = excluded.kind, billing = excluded.billing,
            ended_at = CASE WHEN excluded.ended_at IS NULL THEN NULL ELSE COALESCE(sessions.ended_at, excluded.ended_at) END`
       )
       .run(

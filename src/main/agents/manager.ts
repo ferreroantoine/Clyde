@@ -20,7 +20,7 @@ import { ApprovalBroker, type QuestionAnswers } from '../permissions/broker'
 import { decide, type PermissionDecision, type ToolRequest } from '../permissions/engine'
 import type { McpHub } from '../mcp/hub'
 import { ClaudeCodeSession, type QueryFn } from './claude-code/provider'
-import { buildProfileEnv, findClaudeSessionFile, resolveClaudeBinary, withoutAccountVars } from './claude-code/runtime'
+import { buildProfileEnv, copyClaudeSession, findClaudeSessionFile, resolveClaudeBinary, withoutAccountVars } from './claude-code/runtime'
 import type { ChatAdapter, ChatMessage, ImageInput } from './api/chat'
 import { historyFromEvents } from '../context/history'
 import type { MediaStore } from './media'
@@ -244,6 +244,52 @@ export class AgentManager {
     const info = await this.launch(request, sessionId, { resumeId, events: stored.events }, { seq: stored.lastSeq, createdAt: stored.info.createdAt })
     this.emit(sessionId, { type: 'session_resumed', fresh })
     return info
+  }
+
+  /**
+   * Moves a session to another account, model or reasoning effort, under the same id. The agent
+   * keeps its whole conversation when it can: same account (its CLI reopens it), Claude Code to
+   * Claude Code (the session file is copied to the other account's folder), or an API account
+   * (history rebuilt from the transcript). Otherwise it gets the end of the transcript.
+   */
+  async switchTo(sessionId: string, target: { profileId: string; model?: string; effort?: AgentStart['effort'] }): Promise<AgentSessionInfo> {
+    const stored = this.deps.store?.resumable(sessionId)
+    if (!stored) throw new AppError('not_found', t('This session cannot be resumed: Clyde did not keep how it was started.'))
+    const profile = this.deps.profiles.requireUsable(target.profileId)
+    const live = this.sessions.get(sessionId)
+    const source = live?.info ?? stored.info
+    let resumeId: string | null = null
+    if (stored.resumeId) {
+      if (profile.id === source.profileId) resumeId = stored.resumeId
+      else if (profile.kind === 'claude-code' && source.kind === 'claude-code') {
+        resumeId = copyClaudeSession(this.deps.profiles.configDir(source.profileId), this.deps.profiles.configDir(profile.id), stored.resumeId)
+      }
+    }
+    const full = resumeId !== null || isApiKind(profile.kind)
+    const req = agentStartSchema.parse(stored.request)
+    const request = {
+      ...req,
+      profileId: profile.id,
+      model: target.model ?? '',
+      effort: target.effort ?? '',
+      systemPrompt: full ? req.systemPrompt : [req.systemPrompt, transcriptContext(stored.events, 30_000)].filter(Boolean).join('\n\n')
+    }
+    // The old run goes quietly: its id lives on in the new one.
+    const seq = live ? live.seq : stored.lastSeq
+    if (live) {
+      this.sessions.delete(sessionId)
+      this.broker.forgetSession(sessionId)
+      live.session?.stop()
+    }
+    const info = await this.launch(request, sessionId, { resumeId, events: stored.events }, { seq, createdAt: source.createdAt })
+    this.deps.store?.saveRequest(sessionId, { ...request, systemPrompt: req.systemPrompt })
+    this.emit(sessionId, { type: 'account_switched', profileId: profile.id, profileName: profile.name, model: info.model, full })
+    return info
+  }
+
+  /** An event Clyde adds to a live session's transcript (e.g. a usage limit was reached). */
+  note(sessionId: string, event: AgentEvent): void {
+    this.emit(sessionId, event)
   }
 
   private async launch(req: z.output<typeof agentStartSchema>, id: string, resume: Resume | null, previous?: { seq: number; createdAt: number }): Promise<AgentSessionInfo> {
