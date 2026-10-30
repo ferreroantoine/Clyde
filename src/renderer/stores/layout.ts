@@ -77,7 +77,8 @@ export const useLayout = create<LayoutState>()(
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
       setAgentPanelOpen: (open) => set({ agentPanelOpen: open }),
       setTerminalOpen: (open) => set({ terminalOpen: open }),
-      toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+      // Away from the editor the sidebar is hidden: toggling it brings the editor back with it.
+      toggleSidebar: () => set((s) => (s.center === 'editor' ? { sidebarOpen: !s.sidebarOpen } : { center: 'editor', sidebarOpen: true })),
       toggleAgentPanel: () => set((s) => ({ agentPanelOpen: !s.agentPanelOpen })),
       toggleTerminal: () => set((s) => ({ terminalOpen: !s.terminalOpen })),
       intent: null,
