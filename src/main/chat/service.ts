@@ -103,6 +103,7 @@ export class ChatService {
     if (
       before.profileId !== conversation.profileId ||
       before.model !== conversation.model ||
+      before.effort !== conversation.effort ||
       before.agentId !== conversation.agentId ||
       before.toolsEnabled !== conversation.toolsEnabled
     ) {
@@ -218,6 +219,7 @@ export class ChatService {
     return this.deps.sessions.start({
       profileId: conversation.profileId,
       model: conversation.model,
+      effort: conversation.effort,
       permissionLevel: agent?.permissionLevel ?? this.deps.defaultPermission(),
       cwd,
       systemPrompt: [agent?.systemPrompt ?? '', context].filter(Boolean).join('\n\n'),
@@ -281,6 +283,7 @@ export class ChatService {
       const info = await this.deps.sessions.start({
         profileId: conversation.profileId,
         model: conversation.model,
+        effort: conversation.effort,
         permissionLevel: 'validate-all',
         cwd: this.folder(conversation.id),
         systemPrompt: agent?.systemPrompt ?? '',

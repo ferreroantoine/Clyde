@@ -6,6 +6,7 @@ const info: AgentSessionInfo = {
   id: 'as-1',
   profileId: 'p1',
   kind: 'claude-code',
+  effort: '',
   model: '',
   permissionLevel: 'validate-all',
   cwd: 'C:\\repo',

@@ -3,7 +3,6 @@ import { t, tk } from '@shared/i18n'
 import { ChevronRight, FolderGit2, KeyRound, Play, Plug, TriangleAlert } from 'lucide-react'
 import { ANTIGRAVITY_LEVEL_HINTS, PERMISSION_LEVELS, PERMISSION_LEVEL_LABELS, type PermissionLevel } from '@shared/agent'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/EmptyState'
 import { ProfileBadge } from '@/components/ProfileBadge'
 import { useAgents } from '@/stores/agents'
@@ -15,6 +14,7 @@ import { useWorkspace } from '@/stores/workspace'
 import { cn } from '@/lib/utils'
 import { estimateTokens, TOOL_COUNT_WARNING, TOOL_TOKENS_WARNING } from '@shared/mcp-catalog'
 import { PROFILE_KIND_LABELS } from '@shared/profiles'
+import { ModelPicker, type ModelChoice } from '@/components/ModelPicker'
 
 export const LEVEL_HINTS: Record<PermissionLevel, string> = {
   'validate-all': tk('Every file change and command asks first.'),
@@ -115,21 +115,18 @@ export function McpPicker({ value, onChange }: { value: Set<string>; onChange: (
 
 export function NewSession() {
   const profiles = useProfiles((s) => s.profiles).filter((p) => p.usable)
-  const tests = useProfiles((s) => s.tests)
   const workspace = useWorkspace((s) => s.info)
   const start = useAgents((s) => s.start)
   const starting = useAgents((s) => s.starting)
   const showSettings = useLayout((s) => s.showSettings)
 
   const [profileId, setProfileId] = useState<string | null>(null)
-  const [model, setModel] = useState('')
+  const [choice, setChoice] = useState<ModelChoice>({ model: '', effort: '' })
   const [level, setLevel] = useState<PermissionLevel>(() => useSettings.getState().settings.agents.defaultPermission)
   const [mcpTools, setMcpTools] = useState<Set<string>>(new Set())
   const [systemPrompt, setSystemPrompt] = useState('')
   const [showPrompt, setShowPrompt] = useState(false)
   const selected = profiles.find((p) => p.id === profileId) ?? profiles[0]
-  const test = selected ? tests[selected.id] : undefined
-  const models = test && test !== 'testing' ? test.models : []
 
   if (profiles.length === 0) {
     return (
@@ -151,7 +148,7 @@ export function NewSession() {
       onSubmit={(e) => {
         e.preventDefault()
         if (selected) {
-          void start({ profileId: selected.id, model, permissionLevel: level, mcpTools: [...mcpTools], systemPrompt })
+          void start({ profileId: selected.id, model: choice.model, effort: choice.effort, permissionLevel: level, mcpTools: [...mcpTools], systemPrompt })
         }
       }}
     >
@@ -169,7 +166,7 @@ export function NewSession() {
             aria-pressed={selected?.id === p.id}
             onClick={() => {
               setProfileId(p.id)
-              setModel('')
+              setChoice({ model: '', effort: '' })
             }}
             className={cn(
               'flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-xs transition-colors',
@@ -184,23 +181,15 @@ export function NewSession() {
         ))}
       </fieldset>
 
-      <label className="grid gap-1.5">
-        <span className="text-xs font-medium">{t('Model')}</span>
-        <Input
-          list="agent-models"
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          placeholder={selected?.defaultModel || 'default'}
-          className="h-8 font-mono text-xs"
+      <div className="grid gap-1.5">
+        <span className="text-xs font-medium">{t('Model and reasoning')}</span>
+        <ModelPicker
+          profileId={selected?.id}
+          value={choice}
+          onChange={setChoice}
+          {...(selected?.defaultModel ? { defaultLabel: selected.defaultModel } : {})}
         />
-        <datalist id="agent-models">
-          {models.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.displayName}
-            </option>
-          ))}
-        </datalist>
-      </label>
+      </div>
 
       <fieldset className="space-y-1.5">
         <legend className="mb-1.5 text-xs font-medium">{t('Permissions')}</legend>

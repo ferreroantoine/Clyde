@@ -44,6 +44,7 @@ export const configExportSchema = z.object({
         name: z.string(),
         profileName: z.string(),
         model: z.string().default(''),
+        effort: z.string().default(''),
         systemPrompt: z.string().default(''),
         permissionLevel: z.string(),
         mcpTools: z.array(z.string()).default([])

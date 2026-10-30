@@ -58,7 +58,14 @@ export async function probeClaudeCode(query: QueryFn, target: ProbeTarget, timeo
   try {
     const [models, account] = await Promise.all([q.supportedModels(), q.accountInfo()])
     return {
-      models: models.map((m): ModelOption => ({ value: m.value, displayName: m.displayName, description: m.description })),
+      models: models.map(
+        (m): ModelOption => ({
+          value: m.value,
+          displayName: m.displayName,
+          description: m.description,
+          ...(m.supportsEffort && m.supportedEffortLevels?.length ? { efforts: [...m.supportedEffortLevels] } : {})
+        })
+      ),
       account
     }
   } finally {
@@ -165,8 +172,13 @@ export async function testConnection(
   return result
 }
 
+const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
+const isClaudeEffort = (e: string | undefined): e is (typeof CLAUDE_EFFORTS)[number] => (CLAUDE_EFFORTS as readonly (string | undefined)[]).includes(e)
+
 export interface SessionConfig extends ProbeTarget {
   model: string
+  /** Claude's effort level (low to max); empty leaves Claude Code's default. */
+  effort?: string
   /** Appended to Claude Code's system prompt. */
   appendSystemPrompt?: string
   mcpServers?: Record<string, McpServerConfig>
@@ -305,6 +317,7 @@ export class ClaudeCodeSession {
       env: this.cfg.env,
       pathToClaudeCodeExecutable: this.cfg.binary,
       ...(this.cfg.model ? { model: this.cfg.model } : {}),
+      ...(isClaudeEffort(this.cfg.effort) ? { effort: this.cfg.effort } : {}),
       systemPrompt: {
         type: 'preset',
         preset: 'claude_code',

@@ -1,5 +1,6 @@
 import { t } from '@shared/i18n'
 import type { AgentEvent } from '@shared/agent'
+import type { ReasoningEffort } from '@shared/profiles'
 import type { PermissionDecision, ToolRequest } from '../../permissions/engine'
 import type { ApprovalOutcome, ApprovalQuestion } from '../../permissions/broker'
 import type { AdapterEvent, ChatAdapter, ChatMessage, ImageInput, ToolCall, ToolResult, ToolSpec } from './chat'
@@ -20,6 +21,8 @@ export const MAX_STEPS = 50
 
 export interface ApiSessionConfig {
   model: string
+  /** Reasoning effort; empty is the model's default. */
+  effort?: ReasoningEffort | ''
   system: string
   /** The memory core, after the system prompt: same order every request, so it stays in the prompt cache. */
   memory?: string
@@ -182,7 +185,8 @@ export class ApiSession {
           system: request.system,
           messages: request.history,
           tools: request.tools,
-          signal
+          signal,
+          ...(this.cfg.effort ? { effort: this.cfg.effort } : {})
         })) {
           if (event.type === 'text_delta') this.deps.emit({ type: 'text_delta', key, text: event.text })
           else done = event

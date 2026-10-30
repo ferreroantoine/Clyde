@@ -463,6 +463,7 @@ function AgentCard({ agent, onEdit }: { agent: AgentDefinition; onEdit: () => vo
             void start({
               profileId: agent.profileId,
               model: agent.model,
+              effort: agent.effort,
               permissionLevel: agent.permissionLevel,
               systemPrompt: agent.systemPrompt,
               mcpTools: agent.mcpTools,
