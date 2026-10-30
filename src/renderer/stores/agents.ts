@@ -27,6 +27,8 @@ interface AgentsState {
   sendOrDraft: (text: string) => Promise<void>
   init: () => () => void
   start: (request: AgentStart) => Promise<boolean>
+  /** Starts a session and sends it its first message (the agent panel's empty thread). */
+  startWith: (request: AgentStart, text: string) => Promise<boolean>
   send: (text: string) => Promise<boolean>
   interrupt: () => Promise<void>
   /** Asks the agent to compact its own conversation (Claude Code /compact, Codex, Clyde's summary). */
@@ -242,6 +244,17 @@ export const useAgents = create<AgentsState>()((set, get) => {
       } finally {
         set({ starting: false })
       }
+    },
+
+    startWith: async (request, text) => {
+      // The message goes as the first turn, not into the new session's composer.
+      const { ['']: _sent, ...drafts } = get().drafts
+      set({ drafts })
+      if (!(await get().start(request))) return false
+      const id = get().activeId
+      // Started but the message did not go: it waits in the session's composer.
+      if (id && !(await get().send(text))) get().setDraft(id, text)
+      return true
     },
 
     send: async (text) => {

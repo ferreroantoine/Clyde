@@ -23,13 +23,12 @@ export const SETTINGS_SECTIONS = [
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]
 export type SidebarTab = 'files' | 'search' | 'git'
 /** A dialog another part of the UI (the command palette) asked a page to open. */
-export type Intent = 'new-account' | 'new-mcp' | 'new-task' | 'new-agent'
+export type Intent = 'new-account' | 'new-mcp' | 'new-task'
 
 const INTENT_VIEW: Record<Intent, { view: CenterView; section?: SettingsSection }> = {
   'new-account': { view: 'settings', section: 'accounts' },
   'new-mcp': { view: 'settings', section: 'mcp' },
-  'new-task': { view: 'agents' },
-  'new-agent': { view: 'agents' }
+  'new-task': { view: 'agents' }
 }
 
 interface LayoutState {

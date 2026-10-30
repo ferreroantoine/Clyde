@@ -33,6 +33,7 @@ import { McpPage } from '@/features/mcp/McpPage'
 import { PricesSection } from './PricesSection'
 import { ShortcutsEditor } from './ShortcutsEditor'
 import { DataBlock } from './DataBlock'
+import { SavedAgentsBlock } from './SavedAgentsBlock'
 import { MemoryCoreBlock, MemoryDocsBlock, MemoryProposalsBlock } from './MemoryBlocks'
 import { AboutBlock } from './AboutBlock'
 
@@ -399,6 +400,7 @@ export const SECTIONS: SectionSpec[] = [
     icon: Bot,
     resets: 'agents',
     entries: () => [
+      { id: 'agents.saved', label: t('Saved agents'), keywords: 'agent create edit delete new', block: () => <SavedAgentsBlock /> },
       {
         id: 'agents.defaultPermission',
         label: t('Default permission level'),

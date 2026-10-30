@@ -1371,6 +1371,11 @@ export const fr: Record<string, string> = {
   'Edits': 'Modifie',
   'Image from the agent': 'Image de l’agent',
   'Image': 'Image',
+  'New session with {name}': 'Nouvelle session avec {name}',
+  'Ask {name}… (Enter to send)': 'Demandez à {name}… (Entrée pour envoyer)',
+  'Session settings': 'Réglages de la session',
+  'An account, a model, instructions, a permission level and MCP tools. Choose one at the top of the agent panel.':
+    'Un compte, un modèle, des consignes, un niveau de permission et des outils MCP. Choisissez-en un en haut du panneau agent.',
   'Looks at an image': 'Regarde une image',
   'Open the image': 'Ouvrir l’image',
   'Opens': 'Ouvre',
