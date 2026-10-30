@@ -5,6 +5,7 @@ import { t, tn } from '@shared/i18n'
 import type { ChatAttachment, ChatMessage } from '@shared/chat'
 import { Button } from '@/components/ui/button'
 import { Appear } from '@/components/Appear'
+import { ImageViewer } from '@/components/ImageViewer'
 import { invoke } from '@/lib/ipc'
 import type { SessionView } from '@/lib/transcript'
 import { useChat } from '@/stores/chat'
@@ -15,6 +16,7 @@ import { CopyButton, Markdown } from './Markdown'
 /** An image attachment, loaded from main when it scrolls into the list. */
 function AttachmentChip({ conversationId, attachment }: { conversationId: string; attachment: ChatAttachment }) {
   const [src, setSrc] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)
   useEffect(() => {
     if (attachment.kind !== 'image') return
     let alive = true
@@ -27,7 +29,17 @@ function AttachmentChip({ conversationId, attachment }: { conversationId: string
   }, [conversationId, attachment])
   if (attachment.kind === 'image') {
     return src ? (
-      <img src={src} alt={attachment.name} title={attachment.name} className="max-h-48 max-w-64 rounded-lg border object-contain" />
+      <>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="press rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={t('Open the image')}
+        >
+          <img src={src} alt={attachment.name} title={attachment.name} className="max-h-48 max-w-64 cursor-zoom-in rounded-lg border object-contain" draggable={false} />
+        </button>
+        <ImageViewer src={open ? src : null} alt={attachment.name} onClose={() => setOpen(false)} />
+      </>
     ) : (
       <div className="skeleton size-24 rounded-lg" aria-label={attachment.name} />
     )
