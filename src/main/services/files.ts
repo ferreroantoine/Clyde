@@ -1,6 +1,6 @@
 import { t } from '@shared/i18n'
-import { open, readdir, readFile, stat, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { cp, lstat, mkdir, open, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { basename, dirname, extname, join } from 'node:path'
 import { AppError } from '@shared/errors'
 import type { DirEntry, FileContent } from '@shared/types'
 import { resolveInside, toRel } from './paths'
@@ -13,6 +13,7 @@ const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'bas
 
 function ioError(err: unknown, rel: string): AppError {
   const code = (err as NodeJS.ErrnoException)?.code
+  if (code === 'EEXIST') return new AppError('already_exists', t('Already exists: {rel}', { rel }))
   if (code === 'ENOENT') return new AppError('not_found', t('Not found: {path}', { path: rel || '/' }))
   if (code === 'EACCES' || code === 'EPERM') return new AppError('io_error', t('Permission denied: {rel}', { rel }))
   return new AppError('io_error', (err as Error)?.message ?? t('I/O error on {rel}', { rel }))
@@ -65,6 +66,81 @@ export async function writeText(root: string, rel: string, content: string): Pro
   try {
     await writeFile(abs, content, 'utf8')
     return { mtimeMs: (await stat(abs)).mtimeMs }
+  } catch (err) {
+    throw ioError(err, rel)
+  }
+}
+
+/** Like `resolveInside`, but also refuses the workspace root itself. */
+function resolveEntry(root: string, rel: string): string {
+  const abs = resolveInside(root, rel)
+  if (abs === resolveInside(root, '')) throw new AppError('outside_workspace', t('Invalid path'))
+  return abs
+}
+
+async function exists(abs: string): Promise<boolean> {
+  return lstat(abs).then(
+    () => true,
+    () => false
+  )
+}
+
+async function entryOf(root: string, abs: string): Promise<DirEntry> {
+  const info = await stat(abs)
+  return { name: basename(abs), path: toRel(root, abs), kind: info.isDirectory() ? 'dir' : 'file' }
+}
+
+/** Creates an empty file, and its missing parent directories; never overwrites. */
+export async function createFile(root: string, rel: string): Promise<DirEntry> {
+  const abs = resolveEntry(root, rel)
+  try {
+    await mkdir(dirname(abs), { recursive: true })
+    await writeFile(abs, '', { flag: 'wx' })
+    return await entryOf(root, abs)
+  } catch (err) {
+    throw ioError(err, rel)
+  }
+}
+
+export async function createDir(root: string, rel: string): Promise<DirEntry> {
+  const abs = resolveEntry(root, rel)
+  if (await exists(abs)) throw ioError(Object.assign(new Error(), { code: 'EEXIST' }), rel)
+  try {
+    await mkdir(abs, { recursive: true })
+    return await entryOf(root, abs)
+  } catch (err) {
+    throw ioError(err, rel)
+  }
+}
+
+/** Moves a file or directory; refuses to replace another entry, but allows a change of case. */
+export async function renamePath(root: string, from: string, to: string): Promise<DirEntry> {
+  const src = resolveEntry(root, from)
+  const dest = resolveEntry(root, to)
+  const sameEntry = src.toLowerCase() === dest.toLowerCase()
+  if (!sameEntry && (await exists(dest))) throw ioError(Object.assign(new Error(), { code: 'EEXIST' }), to)
+  try {
+    await mkdir(dirname(dest), { recursive: true })
+    await rename(src, dest)
+    return await entryOf(root, dest)
+  } catch (err) {
+    throw ioError(err, from)
+  }
+}
+
+/** Copies a file or directory next to itself: `name copy.ext`, then `name copy 2.ext`… */
+export async function duplicate(root: string, rel: string): Promise<DirEntry> {
+  const src = resolveEntry(root, rel)
+  try {
+    const isDir = (await stat(src)).isDirectory()
+    const name = basename(src)
+    // `extname('.env')` is empty, so dotfiles stay whole.
+    const ext = isDir ? '' : extname(name)
+    const stem = name.slice(0, name.length - ext.length)
+    let dest = join(dirname(src), `${stem} copy${ext}`)
+    for (let n = 2; await exists(dest); n++) dest = join(dirname(src), `${stem} copy ${n}${ext}`)
+    await cp(src, dest, { recursive: true, errorOnExist: true, force: false })
+    return await entryOf(root, dest)
   } catch (err) {
     throw ioError(err, rel)
   }

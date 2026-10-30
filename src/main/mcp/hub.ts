@@ -12,6 +12,7 @@ import { mcpServerInputSchema, qualifiedToolName, slugify, type McpServer, type 
 import type { McpProbe } from '@shared/mcp-catalog'
 import type { ToolSpec } from '../agents/api/chat'
 import { clip, type ToolOutput } from '../agents/api/tools'
+import { mcpImages } from '../agents/media'
 import type { Logger } from '../logger'
 import type { McpServerRecord, McpStore } from './store'
 
@@ -125,7 +126,8 @@ export const connectWithSdk: ConnectFn = async (server) => {
       })
       const text = 'content' in result ? contentText(result.content) : JSON.stringify(result)
       const structured = 'structuredContent' in result && result.structuredContent ? JSON.stringify(result.structuredContent) : ''
-      return { content: clip(text || structured || '(no output)'), isError: result.isError === true }
+      const images = 'content' in result && Array.isArray(result.content) ? mcpImages(result.content) : []
+      return { content: clip(text || structured || '(no output)'), isError: result.isError === true, ...(images.length ? { images } : {}) }
     },
     close: () => client.close(),
     onClose(listener) {

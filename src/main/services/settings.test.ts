@@ -81,14 +81,14 @@ describe('SettingsService', () => {
   it('resets one section, keeps recent folders, and tells listeners', () => {
     const service = new SettingsService(new MemorySettingsRepository())
     service.set('general.recentWorkspaces', ['/a'])
-    service.set('general.closeBehavior', 'tray')
+    service.set('general.closeBehavior', 'quit')
     service.set('editor.tabSize', 4)
     const seen: string[] = []
     service.onChange((next, previous) => seen.push(`${previous.general.closeBehavior}->${next.general.closeBehavior}`))
     service.resetSection('general')
-    expect(service.getAll().general).toMatchObject({ closeBehavior: 'quit', recentWorkspaces: ['/a'] })
+    expect(service.getAll().general).toMatchObject({ closeBehavior: 'tray', recentWorkspaces: ['/a'] })
     expect(service.getAll().editor.tabSize).toBe(4)
-    expect(seen).toEqual(['tray->quit'])
+    expect(seen).toEqual(['quit->tray'])
     expect(() => service.resetSection('nope')).toThrow(/Unknown settings section/)
   })
 
@@ -99,6 +99,17 @@ describe('SettingsService', () => {
     expect(service.getAll().appearance).toMatchObject({ theme: 'dark', accent: 'indigo' })
     expect(service.getAll().editor.tabSize).toBe(8)
     expect(service.getAll().general.recentWorkspaces).toEqual(['/mine'])
+  })
+
+  it('keeps Clyde in the tray from version 3 on, the old default not being a choice', () => {
+    const repo = new MemorySettingsRepository()
+    repo.save(DOCUMENT_KEY, { schemaVersion: 2, general: { closeBehavior: 'quit', startView: 'editor' } })
+    const service = new SettingsService(repo)
+    expect(service.getAll().general).toMatchObject({ closeBehavior: 'tray', startView: 'editor' })
+    expect(repo.loadAll()[DOCUMENT_KEY]).toMatchObject({ schemaVersion: SETTINGS_VERSION })
+    // Chosen after the migration, "quit" stays.
+    service.set('general.closeBehavior', 'quit')
+    expect(new SettingsService(repo).getAll().general.closeBehavior).toBe('quit')
   })
 
   it('refuses to migrate from an unknown version', () => {

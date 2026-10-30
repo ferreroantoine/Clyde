@@ -38,10 +38,14 @@ import { mcpIdSchema, mcpServerInputSchema, mcpServerUpdateSchema, type McpImpor
 import { presetInstallSchema, userPresetInputSchema, type McpPreset, type McpProbe } from '../mcp-catalog'
 import {
   agentStartSchema,
+  agentSwitchSchema,
   approvalAnswerSchema,
+  questionAnswerSchema,
   sessionIdSchema,
   type AgentEventEnvelope,
-  type AgentSessionInfo
+  type AgentSessionInfo,
+  type SessionSummary,
+  type StoredSession
 } from '../agent'
 import type {
   AppInfo,
@@ -67,6 +71,12 @@ export const requestSchemas = {
   'fs:list': z.object({ path: relPath }),
   'fs:read': z.object({ path: relPath }),
   'fs:write': z.object({ path: relPath, content: z.string() }),
+  'fs:createFile': z.object({ path: relPath }),
+  'fs:createDir': z.object({ path: relPath }),
+  'fs:rename': z.object({ from: relPath, to: relPath }),
+  'fs:duplicate': z.object({ path: relPath }),
+  'fs:trash': z.object({ path: relPath }),
+  'fs:reveal': z.object({ path: relPath }),
   'search:text': z.object({
     query: z.string().min(1).max(500),
     caseSensitive: z.boolean().default(false),
@@ -102,6 +112,18 @@ export const requestSchemas = {
   'agent:stop': z.object({ sessionId: sessionIdSchema }),
   'agent:compact': z.object({ sessionId: sessionIdSchema }),
   'agent:continueWithSummary': z.object({ sessionId: sessionIdSchema }),
+  /** Recent sessions started in this folder (the open project when absent). */
+  'agent:history': z.object({ cwd: z.string().max(4096).optional() }),
+  'agent:load': z.object({ sessionId: sessionIdSchema }),
+  /** Brings an ended session back; `continue` also tells it to finish what it was doing. */
+  'agent:resume': z.object({ sessionId: sessionIdSchema, continue: z.boolean().default(false) }),
+  'agent:switch': agentSwitchSchema,
+  /** Tells the session to carry on at `at` (ms); absent uses its account's reset time. */
+  'agent:scheduleResume': z.object({ sessionId: sessionIdSchema, at: z.number().int().positive().optional() }),
+  'agent:cancelResume': z.object({ sessionId: sessionIdSchema }),
+  'agent:scheduled': z.undefined(),
+  /** An image a tool returned, stored with the session. */
+  'agent:media': z.object({ sessionId: sessionIdSchema, id: z.string().regex(/^[a-f0-9]{24}\.[a-z]+$/) }),
   'memory:state': z.undefined(),
   'memory:saveCore': memorySaveCoreSchema,
   'memory:saveDoc': memorySaveDocSchema,
@@ -112,6 +134,7 @@ export const requestSchemas = {
   'memory:reject': z.object({ id: z.uuid() }),
   'memory:open': z.object({ scope: z.enum(['user', 'project']) }),
   'agent:approve': approvalAnswerSchema,
+  'agent:answerQuestion': questionAnswerSchema,
   'mcp:list': z.undefined(),
   'mcp:create': mcpServerInputSchema,
   'mcp:update': mcpServerUpdateSchema,
@@ -183,6 +206,12 @@ export interface InvokeResponses {
   'fs:list': DirEntry[]
   'fs:read': FileContent
   'fs:write': { mtimeMs: number }
+  'fs:createFile': DirEntry
+  'fs:createDir': DirEntry
+  'fs:rename': DirEntry
+  'fs:duplicate': DirEntry
+  'fs:trash': null
+  'fs:reveal': null
   'search:text': SearchResult
   'pty:create': PtyInfo
   'pty:write': null
@@ -213,6 +242,16 @@ export interface InvokeResponses {
   'agent:stop': null
   'agent:compact': null
   'agent:continueWithSummary': AgentSessionInfo
+  'agent:history': SessionSummary[]
+  'agent:load': StoredSession
+  'agent:resume': AgentSessionInfo
+  /** Base64 bytes. */
+  'agent:media': { mime: string; data: string }
+  'agent:switch': AgentSessionInfo
+  /** When the session will be told to carry on (ms). */
+  'agent:scheduleResume': number
+  'agent:cancelResume': null
+  'agent:scheduled': Array<{ sessionId: string; at: number }>
   'memory:state': MemoryState
   'memory:saveCore': MemoryState
   'memory:saveDoc': MemoryState
@@ -224,6 +263,7 @@ export interface InvokeResponses {
   'memory:reject': MemoryState
   'memory:open': null
   'agent:approve': null
+  'agent:answerQuestion': null
   'mcp:list': McpServer[]
   'mcp:create': McpServer[]
   'mcp:update': McpServer[]
@@ -294,6 +334,8 @@ export interface EventPayloads {
   'profiles:changed': Profile[]
   'agent:session': AgentSessionInfo
   'agent:event': AgentEventEnvelope
+  /** A session will be told to carry on at `at` (ms), or no longer (null). */
+  'agent:resumeScheduled': { sessionId: string; at: number | null }
   'mcp:changed': McpServer[]
   'agents:changed': AgentDefinition[]
   'tasks:changed': Task[]

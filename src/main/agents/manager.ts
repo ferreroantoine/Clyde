@@ -1,9 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
+import type { z } from 'zod'
 import {
   agentStartSchema,
+  ENDED_STATUSES,
+  isBusy,
   type AgentEvent,
   type AgentEventEnvelope,
+  type AgentQuestion,
   type AgentSessionInfo,
   type AgentStart,
   type AgentStatus,
@@ -12,12 +16,14 @@ import {
 import { AppError } from '@shared/errors'
 import { isApiKind, type Profile } from '@shared/profiles'
 import type { ProfilesService } from '../services/profiles'
-import { ApprovalBroker } from '../permissions/broker'
+import { ApprovalBroker, type QuestionAnswers } from '../permissions/broker'
 import { decide, type PermissionDecision, type ToolRequest } from '../permissions/engine'
 import type { McpHub } from '../mcp/hub'
 import { ClaudeCodeSession, type QueryFn } from './claude-code/provider'
-import { buildProfileEnv, resolveClaudeBinary, withoutAccountVars } from './claude-code/runtime'
-import type { ChatAdapter, ImageInput } from './api/chat'
+import { buildProfileEnv, copyClaudeSession, findClaudeSessionFile, resolveClaudeBinary, withoutAccountVars } from './claude-code/runtime'
+import type { ChatAdapter, ChatMessage, ImageInput } from './api/chat'
+import { historyFromEvents } from '../context/history'
+import type { MediaStore } from './media'
 import { describeApiError, type ApiTarget } from './api/clients'
 import { ApiSession } from './api/loop'
 import { BASE_TOOLS, BaseToolExecutor, defaultShell, toEngineRequest } from './api/tools'
@@ -76,6 +82,10 @@ export interface AgentManagerDeps {
   baseEnv?: NodeJS.ProcessEnv
   platform?: NodeJS.Platform
   log: Logger
+  /** Keeps sessions between runs, to resume them. */
+  store?: SessionStore
+  /** Keeps the images tools return (screenshots); without it they are dropped. */
+  media?: Pick<MediaStore, 'save'>
 }
 
 /** What the manager drives: a Claude Code session or Clyde's own loop. */
@@ -94,9 +104,38 @@ interface Entry {
   seq: number
   /** What started it, to start it again with a summary. */
   request: AgentStart
+  /**
+   * Set on a resumed session: text keys and tool ids get it in front, so they cannot clash with
+   * the ones the first run used (Clyde's loop and agy number them from 1 again).
+   */
+  prefix: string
 }
 
-const ENDED: AgentStatus[] = ['stopped', 'error']
+/** A stored session, as the manager needs it to bring it back. */
+export interface ResumeSource {
+  info: AgentSessionInfo
+  request: AgentStart
+  resumeId: string | null
+  lastSeq: number
+  events: AgentEvent[]
+}
+
+/** Where sessions are kept between runs of the app (the metrics database). */
+export interface SessionStore {
+  saveRequest(sessionId: string, request: AgentStart): void
+  resumable(sessionId: string): ResumeSource | null
+}
+
+/** How a resumed session continues: the CLI's own conversation, or a transcript in its prompt. */
+interface Resume {
+  resumeId: string | null
+  events: AgentEvent[]
+}
+
+/** Sent to a session that comes back to finish what it was doing. */
+export const CONTINUE_MESSAGE = 'Clyde was closed while you were working. Continue the task where you left off.'
+
+const ENDED = ENDED_STATUSES
 
 /** The API agents' system prompt. The user's own text, if any, follows it. */
 export function apiSystemPrompt(cwd: string, platform: NodeJS.Platform, extra: string): string {
@@ -131,6 +170,38 @@ export function chatSystemPrompt(extra: string): string {
     .join('\n\n')
 }
 
+/** Text keys and tool ids of a resumed run, renamed so they cannot clash with the first run's. */
+export function withPrefix(event: AgentEvent, prefix: string): AgentEvent {
+  switch (event.type) {
+    case 'text_delta':
+    case 'text':
+    case 'thinking_delta':
+    case 'thinking':
+      return { ...event, key: prefix + event.key }
+    case 'tool_call':
+      return { ...event, toolUseId: prefix + event.toolUseId, parentToolUseId: event.parentToolUseId && prefix + event.parentToolUseId }
+    case 'tool_result':
+    case 'tool_output':
+    case 'permission_denied':
+      return { ...event, toolUseId: prefix + event.toolUseId }
+    default:
+      return event
+  }
+}
+
+/** The end of a stored session as text, for an agent that cannot reopen its own conversation. */
+export function transcriptContext(events: readonly AgentEvent[], max = 12_000): string {
+  const lines: string[] = []
+  for (const event of events) {
+    if (event.type === 'user') lines.push(`User: ${event.text}`)
+    else if (event.type === 'text') lines.push(`Assistant: ${event.text}`)
+    else if (event.type === 'tool_call' && !event.parentToolUseId) lines.push(`[tool ${event.name} ${JSON.stringify(event.input).slice(0, 200)}]`)
+  }
+  const text = lines.join('\n')
+  if (!text) return ''
+  return `This session was interrupted and resumed. End of the conversation so far, to continue from:\n${text.slice(-max)}`
+}
+
 export class AgentManager {
   private readonly sessions = new Map<string, Entry>()
   private readonly broker = new ApprovalBroker((sessionId, event) => this.emit(sessionId, event))
@@ -147,7 +218,82 @@ export class AgentManager {
 
   async start(request: AgentStart): Promise<AgentSessionInfo> {
     const req = agentStartSchema.parse(request)
-    const active = this.list().filter((s) => !ENDED.includes(s.status)).length
+    const info = await this.launch(req, `as-${randomUUID()}`, null)
+    this.deps.store?.saveRequest(info.id, request)
+    return info
+  }
+
+  /**
+   * Brings an ended session back under the same id, so its transcript goes on in one thread.
+   * CLI agents reopen their own conversation (Claude Code session, Codex thread, agy
+   * conversation); Clyde's loop rebuilds its history from the stored events. Without the CLI's
+   * id the agent gets the end of the transcript in its prompt instead.
+   */
+  async resume(sessionId: string): Promise<AgentSessionInfo> {
+    const live = this.sessions.get(sessionId)
+    if (live && !ENDED.has(live.info.status)) return live.info
+    const stored = this.deps.store?.resumable(sessionId)
+    if (!stored) throw new AppError('not_found', t('This session cannot be resumed: Clyde did not keep how it was started.'))
+    const req = agentStartSchema.parse(stored.request)
+    let resumeId = stored.resumeId
+    // Claude Code keeps sessions as files in the profile's folder; a missing one cannot be reopened.
+    if (resumeId && stored.info.kind === 'claude-code' && !findClaudeSessionFile(this.deps.profiles.configDir(stored.info.profileId), resumeId)) resumeId = null
+    const fresh = !resumeId && !isApiKind(stored.info.kind)
+    const fromTranscript = fresh ? transcriptContext(stored.events) : ''
+    const request = fromTranscript ? { ...req, systemPrompt: [req.systemPrompt, fromTranscript].filter(Boolean).join('\n\n') } : req
+    const info = await this.launch(request, sessionId, { resumeId, events: stored.events }, { seq: stored.lastSeq, createdAt: stored.info.createdAt })
+    this.emit(sessionId, { type: 'session_resumed', fresh })
+    return info
+  }
+
+  /**
+   * Moves a session to another account, model or reasoning effort, under the same id. The agent
+   * keeps its whole conversation when it can: same account (its CLI reopens it), Claude Code to
+   * Claude Code (the session file is copied to the other account's folder), or an API account
+   * (history rebuilt from the transcript). Otherwise it gets the end of the transcript.
+   */
+  async switchTo(sessionId: string, target: { profileId: string; model?: string; effort?: AgentStart['effort'] }): Promise<AgentSessionInfo> {
+    const stored = this.deps.store?.resumable(sessionId)
+    if (!stored) throw new AppError('not_found', t('This session cannot be resumed: Clyde did not keep how it was started.'))
+    const profile = this.deps.profiles.requireUsable(target.profileId)
+    const live = this.sessions.get(sessionId)
+    const source = live?.info ?? stored.info
+    let resumeId: string | null = null
+    if (stored.resumeId) {
+      if (profile.id === source.profileId) resumeId = stored.resumeId
+      else if (profile.kind === 'claude-code' && source.kind === 'claude-code') {
+        resumeId = copyClaudeSession(this.deps.profiles.configDir(source.profileId), this.deps.profiles.configDir(profile.id), stored.resumeId)
+      }
+    }
+    const full = resumeId !== null || isApiKind(profile.kind)
+    const req = agentStartSchema.parse(stored.request)
+    const request = {
+      ...req,
+      profileId: profile.id,
+      model: target.model ?? '',
+      effort: target.effort ?? '',
+      systemPrompt: full ? req.systemPrompt : [req.systemPrompt, transcriptContext(stored.events, 30_000)].filter(Boolean).join('\n\n')
+    }
+    // The old run goes quietly: its id lives on in the new one.
+    const seq = live ? live.seq : stored.lastSeq
+    if (live) {
+      this.sessions.delete(sessionId)
+      this.broker.forgetSession(sessionId)
+      live.session?.stop()
+    }
+    const info = await this.launch(request, sessionId, { resumeId, events: stored.events }, { seq, createdAt: source.createdAt })
+    this.deps.store?.saveRequest(sessionId, { ...request, systemPrompt: req.systemPrompt })
+    this.emit(sessionId, { type: 'account_switched', profileId: profile.id, profileName: profile.name, model: info.model, full })
+    return info
+  }
+
+  /** An event Clyde adds to a live session's transcript (e.g. a usage limit was reached). */
+  note(sessionId: string, event: AgentEvent): void {
+    this.emit(sessionId, event)
+  }
+
+  private async launch(req: z.output<typeof agentStartSchema>, id: string, resume: Resume | null, previous?: { seq: number; createdAt: number }): Promise<AgentSessionInfo> {
+    const active = this.list().filter((s) => !ENDED.has(s.status)).length
     const max = this.deps.maxParallel?.() ?? MAX_ACTIVE_SESSIONS
     if (active >= max) {
       throw new AppError('not_allowed', t('{count} agents are already running. Stop one first, or raise the limit in Settings › Agents.', { count: max }))
@@ -159,7 +305,6 @@ export class AgentManager {
     const apiKey = profile.auth === 'api-key' ? this.deps.profiles.apiKey(profile.id) : null
     if (profile.auth === 'api-key' && !apiKey) throw new AppError('invalid_request', t('This profile has no API key'))
 
-    const id = `as-${randomUUID()}`
     const platform = this.deps.platform ?? process.platform
     const allowed = new Set(req.mcpTools)
     const info: AgentSessionInfo = {
@@ -175,8 +320,11 @@ export class AgentManager {
       taskId: req.taskId ?? null,
       chatId: req.chatId ?? null,
       status: 'starting',
-      createdAt: Date.now()
+      createdAt: previous?.createdAt ?? Date.now()
     }
+    // The entry exists before its session, so events and status changes of an older run of the
+    // same id (a session being resumed) never reach this one.
+    const entry: Entry = { info, session: null, seq: previous?.seq ?? 0, request: req, prefix: previous ? `r${previous.seq}-` : '' }
     // MCP tools outside the allow-list are refused, whatever the permission level says.
     const chat = !!req.chatId
     const gate = (tool: ToolRequest): PermissionDecision => {
@@ -190,37 +338,42 @@ export class AgentManager {
       return verdict.decision === 'ask' ? { decision: 'deny', reason: CHAT_REFUSAL() } : verdict
     }
     const common = {
-      emit: (event: AgentEvent) => this.emit(id, event),
+      emit: (event: AgentEvent) => this.emitFor(entry, event),
       decide: gate,
-      ask: (question: Parameters<ApprovalBroker['ask']>[1], signal: AbortSignal) => this.broker.ask(id, question, signal)
+      ask: (question: Parameters<ApprovalBroker['ask']>[1], signal: AbortSignal) =>
+        this.broker.ask(id, { ...question, toolUseId: entry.prefix + question.toolUseId }, signal),
+      // The chat never waits for the user: no questions there.
+      ...(chat
+        ? {}
+        : { question: (toolUseId: string, questions: AgentQuestion[], signal: AbortSignal) => this.broker.question(id, entry.prefix + toolUseId, questions, signal) })
     }
 
     // CLI agents keep their own system prompt; in chat they get the chat guidance on top of it.
     const cliPrompt = chat ? chatSystemPrompt(req.systemPrompt) : req.systemPrompt
     let session: AgentSession
     if (isApiKind(profile.kind)) {
-      session = await this.apiSession(profile, apiKey, info, req.systemPrompt, allowed, platform, common)
+      session = await this.apiSession(profile, apiKey, info, req.systemPrompt, allowed, platform, common, resume ? historyFromEvents(resume.events) : [])
     } else if (profile.kind === 'claude-code') {
-      session = await this.claudeCodeSession(profile, apiKey, info, cliPrompt, allowed, common, chat ? CHAT_CLAUDE_DISALLOWED : [])
+      session = await this.claudeCodeSession(profile, apiKey, info, cliPrompt, allowed, common, chat ? CHAT_CLAUDE_DISALLOWED : [], resume?.resumeId ?? null)
     } else if (profile.kind === 'codex') {
-      session = this.codexSession(profile, info, cliPrompt, allowed, platform, common)
+      session = this.codexSession(profile, info, cliPrompt, allowed, platform, common, resume?.resumeId ?? null)
     } else {
       this.checkAntigravityConflict(profile.id, info)
-      session = this.antigravitySession(profile, info, cliPrompt, allowed, platform, common.emit)
+      session = this.antigravitySession(profile, info, cliPrompt, allowed, platform, common.emit, resume?.resumeId ?? null)
     }
 
-    const entry: Entry = { info, session, seq: 0, request }
+    entry.session = session
     this.sessions.set(id, entry)
     this.deps.onSession(info)
     const log = this.deps.log
     session.start().then(
-      () => this.setStatus(id, 'stopped'),
+      () => this.setStatusOf(entry, 'stopped'),
       (err) => {
         log.warn(`session ${id} ended with an error`, err)
-        this.setStatus(id, 'error')
+        this.setStatusOf(entry, 'error')
       }
     )
-    this.setStatus(id, 'idle')
+    this.setStatusOf(entry, 'idle')
     return entry.info
   }
 
@@ -230,8 +383,9 @@ export class AgentManager {
     info: AgentSessionInfo,
     systemPrompt: string,
     allowed: ReadonlySet<string>,
-    common: Pick<ConstructorParameters<typeof ClaudeCodeSession>[1], 'emit' | 'decide' | 'ask'>,
-    disallowed: string[] = []
+    common: Pick<ConstructorParameters<typeof ClaudeCodeSession>[1], 'emit' | 'decide' | 'ask' | 'question'>,
+    disallowed: string[],
+    resumeId: string | null
   ): Promise<AgentSession> {
     const binary = resolveClaudeBinary(this.deps.claudeCodePath())
     const env = buildProfileEnv(
@@ -251,7 +405,8 @@ export class AgentManager {
         effort: info.effort,
         appendSystemPrompt: systemPrompt,
         mcpServers: mcp.servers,
-        disallowedTools: [...mcp.disallowed, ...disallowed]
+        disallowedTools: [...mcp.disallowed, ...disallowed],
+        ...(resumeId ? { resume: resumeId } : {})
       },
       {
         ...common,
@@ -270,7 +425,8 @@ export class AgentManager {
     systemPrompt: string,
     allowed: ReadonlySet<string>,
     platform: NodeJS.Platform,
-    common: Pick<ConstructorParameters<typeof CodexSession>[1], 'emit' | 'decide' | 'ask'>
+    common: Pick<ConstructorParameters<typeof CodexSession>[1], 'emit' | 'decide' | 'ask'>,
+    threadId: string | null
   ): AgentSession {
     const binary = (this.deps.resolveCodex ?? resolveCodexBinary)(this.deps.codexPath?.() ?? '')
     const log = this.deps.log
@@ -285,7 +441,8 @@ export class AgentManager {
         platform,
         instructions: systemPrompt,
         mcpServers: codexMcpServers(this.deps.mcp.agentServers(allowed)),
-        clientVersion: this.deps.clientApp.split('/')[1] ?? '0.0.0'
+        clientVersion: this.deps.clientApp.split('/')[1] ?? '0.0.0',
+        ...(threadId ? { resumeThreadId: threadId } : {})
       },
       {
         ...common,
@@ -306,7 +463,7 @@ export class AgentManager {
     const other = this.list().find(
       (s) =>
         s.profileId === profileId &&
-        !ENDED.includes(s.status) &&
+        !ENDED.has(s.status) &&
         (s.permissionLevel !== info.permissionLevel || !same(s.mcpTools, info.mcpTools))
     )
     if (other) {
@@ -323,7 +480,8 @@ export class AgentManager {
     systemPrompt: string,
     allowed: ReadonlySet<string>,
     platform: NodeJS.Platform,
-    emit: (event: AgentEvent) => void
+    emit: (event: AgentEvent) => void,
+    conversationId: string | null
   ): AgentSession {
     const binary = (this.deps.resolveAntigravity ?? resolveAntigravityBinary)(this.deps.antigravityPath?.() ?? '')
     const home = this.deps.profiles.configDir(profile.id)
@@ -339,7 +497,8 @@ export class AgentManager {
         permissionLevel: info.permissionLevel,
         instructions: systemPrompt,
         servers: this.deps.mcp.agentServers(allowed),
-        cliVersion: this.deps.cliVersion?.('antigravity') ?? ''
+        cliVersion: this.deps.cliVersion?.('antigravity') ?? '',
+        ...(conversationId ? { conversationId } : {})
       },
       { spawn: this.deps.spawnPty ?? spawnPty, emit, log: (line) => log.debug(`[${info.id}] ${line}`) }
     )
@@ -352,7 +511,8 @@ export class AgentManager {
     systemPrompt: string,
     allowed: ReadonlySet<string>,
     platform: NodeJS.Platform,
-    common: Pick<ConstructorParameters<typeof ApiSession>[1], 'emit' | 'decide' | 'ask'>
+    common: Pick<ConstructorParameters<typeof ApiSession>[1], 'emit' | 'decide' | 'ask' | 'question'>,
+    history: ChatMessage[]
   ): Promise<AgentSession> {
     if (!isApiKind(profile.kind)) throw new Error('not an API profile')
     const target: ApiTarget = { kind: profile.kind, apiKey, baseUrl: profile.baseUrl }
@@ -380,6 +540,7 @@ export class AgentManager {
         effort: info.effort,
         memory: this.deps.memory?.() ?? '',
         summarizeAt: this.deps.summarizeAt?.() ?? 0,
+        history,
         system: chat ? chatSystemPrompt(systemPrompt) : apiSystemPrompt(info.cwd, platform, systemPrompt),
         tools: [...(chat ? BASE_TOOLS.filter((tool) => CHAT_API_TOOLS.has(tool.name)) : BASE_TOOLS), ...mcpTools.map(({ qualifiedName: _q, ...spec }) => spec)]
       },
@@ -403,7 +564,7 @@ export class AgentManager {
   /** The provider's own compaction (Claude Code `/compact`, Codex compact, a summary for API agents). */
   async compact(sessionId: string): Promise<void> {
     const entry = this.require(sessionId)
-    if (ENDED.includes(entry.info.status)) throw new AppError('not_allowed', t('This session has ended. Start a new one.'))
+    if (ENDED.has(entry.info.status)) throw new AppError('not_allowed', t('This session has ended. Start a new one.'))
     if (!entry.session?.compact) throw new AppError('not_allowed', t('This agent cannot compact its conversation; start a new session with a summary instead.'))
     await entry.session.compact()
   }
@@ -427,14 +588,14 @@ export class AgentManager {
         : ''
     const request = agentStartSchema.parse(entry.request)
     // Stopped first, so the new one does not count against the limit of agents running at once.
-    if (!ENDED.includes(entry.info.status)) this.stop(sessionId)
+    if (!ENDED.has(entry.info.status)) this.stop(sessionId)
     return this.start({ ...request, systemPrompt: [request.systemPrompt, context].filter(Boolean).join('\n\n') })
   }
 
   /** `images` reach API models directly; CLI agents read attachments from their folder instead. */
   send(sessionId: string, text: string, images: ImageInput[] = []): void {
     const entry = this.require(sessionId)
-    if (ENDED.includes(entry.info.status)) throw new AppError('not_allowed', t('This session has ended. Start a new one.'))
+    if (ENDED.has(entry.info.status)) throw new AppError('not_allowed', t('This session has ended. Start a new one.'))
     this.emit(sessionId, { type: 'user', id: randomUUID(), text })
     this.setStatus(sessionId, 'running')
     if (images.length) entry.session?.send(text, images)
@@ -454,6 +615,11 @@ export class AgentManager {
     this.setStatus(sessionId, 'stopped')
   }
 
+  answerQuestion(sessionId: string, requestId: string, answers: QuestionAnswers): void {
+    this.require(sessionId)
+    this.broker.answerQuestion(sessionId, requestId, answers)
+  }
+
   answer(sessionId: string, requestId: string, decision: ApprovalDecision, message?: string): void {
     this.require(sessionId)
     this.broker.answer(sessionId, requestId, decision, message)
@@ -469,6 +635,25 @@ export class AgentManager {
     }
   }
 
+  /**
+   * Quitting the app: busy sessions are marked interrupted (resumable, and resumed at the next
+   * start when the user wants it), idle ones stopped.
+   */
+  shutdown(): void {
+    for (const entry of this.sessions.values()) {
+      if (ENDED.has(entry.info.status)) continue
+      const status = isBusy(entry.info.status) ? 'interrupted' : 'stopped'
+      this.broker.forgetSession(entry.info.id)
+      this.setStatusOf(entry, status)
+      entry.session?.stop()
+    }
+  }
+
+  /** Sessions working right now: quitting would cut them. */
+  busyCount(): number {
+    return this.list().filter((s) => isBusy(s.status)).length
+  }
+
   private require(sessionId: string): Entry {
     const entry = this.sessions.get(sessionId)
     if (!entry) throw new AppError('not_found', t('This agent session no longer exists'))
@@ -477,12 +662,33 @@ export class AgentManager {
 
   private setStatus(sessionId: string, status: AgentStatus): void {
     const entry = this.sessions.get(sessionId)
-    if (!entry || entry.info.status === status) return
-    // A stopped session never comes back to life when its process exits later.
-    if (entry.info.status === 'stopped') return
+    if (entry) this.setStatusOf(entry, status)
+  }
+
+  private setStatusOf(entry: Entry, status: AgentStatus): void {
+    // Only the current run of a session id speaks for it.
+    if (this.sessions.get(entry.info.id) !== entry || entry.info.status === status) return
+    // An ended session never comes back to life when its process exits later; resuming makes a new entry.
+    if (ENDED.has(entry.info.status)) return
     entry.info = { ...entry.info, status }
     this.deps.onSession(entry.info)
-    this.emit(sessionId, { type: 'status', status })
+    this.emit(entry.info.id, { type: 'status', status })
+  }
+
+  /**
+   * An event from a session itself: dropped if a newer run took its id, renamed if this run is a
+   * resumed one. Images tools returned are stored; the event keeps only their ids.
+   */
+  private emitFor(entry: Entry, event: AgentEvent): void {
+    if (this.sessions.get(entry.info.id) !== entry) return
+    let out = entry.prefix ? withPrefix(event, entry.prefix) : event
+    if (out.type === 'tool_result' && out.images?.length) {
+      const media = this.deps.media
+      const images = media ? out.images.flatMap((image) => media.save(entry.info.id, image) ?? []) : []
+      const { images: _raw, ...rest } = out
+      out = images.length ? { ...rest, images } : rest
+    }
+    this.emit(entry.info.id, out)
   }
 
   private emit(sessionId: string, event: AgentEvent): void {
@@ -498,9 +704,11 @@ export class AgentManager {
         }
         break
       case 'approval_request':
+      case 'question_request':
         this.setStatus(sessionId, 'awaiting-approval')
         break
       case 'approval_resolved':
+      case 'question_resolved':
         if (!this.broker.hasPending(sessionId) && entry.info.status === 'awaiting-approval') {
           this.setStatus(sessionId, 'running')
         }

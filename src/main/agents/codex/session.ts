@@ -13,6 +13,7 @@ import type {
   Notifications,
   PermissionsApprovalParams,
   SandboxMode,
+  ThreadResumeParams,
   ThreadStartParams,
   ThreadStartResponse,
   TurnStartResponse
@@ -24,7 +25,7 @@ import { parseCodexRateLimits, type LimitReading } from '@shared/limits'
 const QUIET = [
   'thread/status/changed',
   'thread/readState/changed',
-  'item/reasoning/summaryTextDelta',
+  // The reasoning summary is shown (summaryTextDelta); the raw reasoning and part markers are not.
   'item/reasoning/summaryPartAdded',
   'item/reasoning/textDelta',
   'item/plan/delta',
@@ -70,6 +71,8 @@ export interface CodexSessionConfig {
   /** `mcp_servers` table for Codex's config: only the agent's servers and tools. */
   mcpServers: Record<string, unknown>
   clientVersion: string
+  /** A thread to continue (`thread/resume`) instead of starting one. */
+  resumeThreadId?: string
 }
 
 export interface CodexSessionDeps {
@@ -122,14 +125,18 @@ export class CodexSession {
         ...(this.cfg.instructions.trim() ? { developerInstructions: this.cfg.instructions } : {}),
         ...(Object.keys(this.cfg.mcpServers).length ? { config: { mcp_servers: this.cfg.mcpServers } } : {})
       }
-      const thread = await rpc.request<ThreadStartResponse>('thread/start', params)
+      // A resumed thread is read back from Codex's own files; its turns are already in Clyde's transcript.
+      const thread = this.cfg.resumeThreadId
+        ? await rpc.request<ThreadStartResponse>('thread/resume', { ...params, threadId: this.cfg.resumeThreadId, excludeTurns: true } satisfies ThreadResumeParams)
+        : await rpc.request<ThreadStartResponse>('thread/start', params)
       this.threadId = thread.thread.id
       this.deps.emit({
         type: 'init',
         model: thread.model,
         cliVersion: versionFromUserAgent(init.userAgent),
         cwd: thread.cwd,
-        tools: []
+        tools: [],
+        resumeId: thread.thread.id
       })
       this.pump()
     } catch (err) {

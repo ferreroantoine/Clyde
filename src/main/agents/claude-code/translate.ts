@@ -1,6 +1,6 @@
 import { t } from '@shared/i18n'
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
-import type { AgentEvent } from '@shared/agent'
+import type { AgentEvent, ToolImage } from '@shared/agent'
 
 const MAX_RESULT_CHARS = 20_000
 
@@ -19,11 +19,24 @@ export function toolResultText(content: unknown): string {
   return text.length > MAX_RESULT_CHARS ? `${text.slice(0, MAX_RESULT_CHARS)}\n… [truncated]` : text
 }
 
+/** Images in a tool_result content (API image blocks), for the panel. */
+export function toolResultImages(content: unknown): ToolImage[] {
+  if (!Array.isArray(content)) return []
+  return content.flatMap((part: { type?: string; source?: { type?: string; media_type?: string; data?: string } }) =>
+    part?.type === 'image' && part.source?.type === 'base64' && part.source.data && part.source.media_type
+      ? [{ mime: part.source.media_type, data: part.source.data }]
+      : []
+  )
+}
+
 interface MessageState {
   /** Keys of the text blocks streamed so far, in order. */
   streamed: string[]
   /** How many complete text blocks have arrived for this message. */
   completed: number
+  /** The same for thinking blocks. */
+  thinkingStreamed: string[]
+  thinkingCompleted: number
 }
 
 /**
@@ -44,7 +57,7 @@ export class MessageTranslator {
   private state(id: string): MessageState {
     let s = this.messages.get(id)
     if (!s) {
-      s = { streamed: [], completed: 0 }
+      s = { streamed: [], completed: 0, thinkingStreamed: [], thinkingCompleted: 0 }
       this.messages.set(id, s)
     }
     return s
@@ -96,7 +109,7 @@ export class MessageTranslator {
       case 'system':
         if (msg.subtype === 'init') {
           return [
-            { type: 'init', model: msg.model, cliVersion: msg.claude_code_version, cwd: msg.cwd, tools: msg.tools }
+            { type: 'init', model: msg.model, cliVersion: msg.claude_code_version, cwd: msg.cwd, tools: msg.tools, resumeId: msg.session_id }
           ]
         }
         if (msg.subtype === 'compact_boundary') return [{ type: 'context_compacted' }]
@@ -119,17 +132,25 @@ export class MessageTranslator {
         this.blockKeys.clear()
         return []
       case 'content_block_start': {
-        if (!this.streamingId || event.content_block.type !== 'text') return []
+        if (!this.streamingId) return []
         const s = this.state(this.streamingId)
-        const key = `${this.streamingId}:${s.streamed.length}`
-        s.streamed.push(key)
-        this.blockKeys.set(event.index, key)
+        if (event.content_block.type === 'text') {
+          const key = `${this.streamingId}:${s.streamed.length}`
+          s.streamed.push(key)
+          this.blockKeys.set(event.index, key)
+        } else if (event.content_block.type === 'thinking') {
+          const key = `${this.streamingId}:th${s.thinkingStreamed.length}`
+          s.thinkingStreamed.push(key)
+          this.blockKeys.set(event.index, key)
+        }
         return []
       }
       case 'content_block_delta': {
         const key = this.blockKeys.get(event.index)
-        if (!key || event.delta.type !== 'text_delta') return []
-        return [{ type: 'text_delta', key, text: event.delta.text }]
+        if (!key) return []
+        if (event.delta.type === 'text_delta') return [{ type: 'text_delta', key, text: event.delta.text }]
+        if (event.delta.type === 'thinking_delta' && event.delta.thinking) return [{ type: 'thinking_delta', key, text: event.delta.thinking }]
+        return []
       }
       default:
         return []
@@ -151,6 +172,11 @@ export class MessageTranslator {
         const key = s.streamed[s.completed] ?? `${id}:${s.completed}`
         s.completed++
         if (block.text) out.push({ type: 'text', key, text: block.text })
+      } else if (block.type === 'thinking' && !subagent) {
+        const s = this.state(id)
+        const key = s.thinkingStreamed[s.thinkingCompleted] ?? `${id}:th${s.thinkingCompleted}`
+        s.thinkingCompleted++
+        if (block.thinking.trim()) out.push({ type: 'thinking', key, text: block.thinking })
       } else if (block.type === 'tool_use' || block.type === 'server_tool_use' || block.type === 'mcp_tool_use') {
         out.push({
           type: 'tool_call',
@@ -161,7 +187,11 @@ export class MessageTranslator {
         })
       }
     }
-    if (msg.error && !subagent) out.push({ type: 'error', message: describeAssistantError(msg.error) })
+    if (msg.error && !subagent) {
+      // The limit itself, for the limit guard; rate_limit_event usually says it too, with the reset time.
+      if (msg.error === 'rate_limit') out.push({ type: 'rate_limit', status: 'rejected', resetsAt: null, utilization: null, limitType: null })
+      out.push({ type: 'error', message: describeAssistantError(msg.error) })
+    }
     return out
   }
 
@@ -171,11 +201,13 @@ export class MessageTranslator {
     const out: AgentEvent[] = []
     for (const block of content) {
       if (block.type === 'tool_result') {
+        const images = toolResultImages(block.content)
         out.push({
           type: 'tool_result',
           toolUseId: block.tool_use_id,
           content: toolResultText(block.content),
-          isError: block.is_error === true
+          isError: block.is_error === true,
+          ...(images.length ? { images } : {})
         })
       }
     }

@@ -436,5 +436,28 @@ export const migrations: Migration[] = [
       ALTER TABLE agents ADD COLUMN effort TEXT NOT NULL DEFAULT '';
       ALTER TABLE conversations ADD COLUMN effort TEXT NOT NULL DEFAULT '';
     `
+  },
+  {
+    version: 15,
+    name: 'resumable sessions',
+    sql: `
+      -- What started each session and the CLI's id for its conversation, to resume it after a restart.
+      ALTER TABLE sessions ADD COLUMN request_json TEXT;
+      ALTER TABLE sessions ADD COLUMN resume_id TEXT;
+      ALTER TABLE sessions ADD COLUMN chat_id TEXT;
+      CREATE INDEX sessions_cwd ON sessions(cwd, started_at);
+    `
+  },
+  {
+    version: 16,
+    name: 'scheduled resumes',
+    sql: `
+      -- Sessions to tell "continue" once their account's usage limit resets; survives a restart.
+      CREATE TABLE scheduled_resumes (
+        session_id TEXT PRIMARY KEY,
+        at         INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+    `
   }
 ]

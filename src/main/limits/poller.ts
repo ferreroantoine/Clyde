@@ -1,11 +1,10 @@
 import { watch, type FSWatcher } from 'chokidar'
 import { join } from 'node:path'
-import type { AgentSessionInfo } from '@shared/agent'
+import { isEnded, type AgentSessionInfo } from '@shared/agent'
 import type { LimitReading } from '@shared/limits'
 import type { Profile } from '@shared/profiles'
 import { BRIDGE_JSON, readBridge } from './claude-bridge'
 
-const ENDED = ['stopped', 'error']
 const TICK_MS = 60_000
 
 export interface PollerDeps {
@@ -55,7 +54,7 @@ export class LimitsPoller {
   private async tick(): Promise<void> {
     const now = this.deps.now?.() ?? Date.now()
     const interval = this.deps.intervalMinutes() * 60_000
-    const busy = new Set(this.deps.activeSessions().filter((s) => !ENDED.includes(s.status)).map((s) => s.profileId))
+    const busy = new Set(this.deps.activeSessions().filter((s) => !isEnded(s.status)).map((s) => s.profileId))
     const due = this.targets().filter((p) => {
       const last = this.lastRead.get(p.id)
       return !busy.has(p.id) && (last === undefined || now - last >= interval)

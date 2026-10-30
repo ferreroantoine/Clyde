@@ -3,7 +3,7 @@ import type { AgentEvent } from '@shared/agent'
 import type { AdapterEvent, ChatAdapter, ChatMessage } from '../agents/api/chat'
 import { ApiSession } from '../agents/api/loop'
 import { withCacheBreakpoints, toAnthropicMessages } from '../agents/api/anthropic'
-import { breakdown, compactToolResults, splitForSummary, transcriptText, withSummary, READ_TOOL_OUTPUT } from './history'
+import { breakdown, compactToolResults, historyFromEvents, splitForSummary, transcriptText, withSummary, READ_TOOL_OUTPUT } from './history'
 
 const big = (n: number, c = 'x') => c.repeat(n)
 
@@ -157,5 +157,29 @@ describe('read_tool_output and breakdown', () => {
     expect(Array.isArray(last) && last.at(-1)).toMatchObject({ text: 'c', cache_control: { type: 'ephemeral' } })
     const first = messages[0]?.content
     expect(Array.isArray(first) && 'cache_control' in (first[0] as object)).toBe(false)
+  })
+})
+
+describe('historyFromEvents', () => {
+  it('rebuilds the conversation of a stored session, cut calls included', () => {
+    const events: AgentEvent[] = [
+      { type: 'user', id: 'u1', text: 'read a' },
+      { type: 'text', key: 't1s0:0', text: 'Reading.' },
+      { type: 'tool_call', toolUseId: 'c1', name: 'read_file', input: { path: 'a' }, parentToolUseId: null },
+      { type: 'tool_result', toolUseId: 'c1', content: 'A', isError: false },
+      { type: 'text', key: 't1s1:0', text: 'It says A.' },
+      { type: 'turn_end', isError: false, subtype: 'success', errors: [], costUsd: null, inputTokens: 1, outputTokens: 1, durationMs: 1 },
+      { type: 'user', id: 'u2', text: 'now b' },
+      { type: 'tool_call', toolUseId: 'c2', name: 'read_file', input: { path: 'b' }, parentToolUseId: null }
+    ]
+    expect(historyFromEvents(events)).toEqual([
+      { role: 'user', text: 'read a' },
+      { role: 'assistant', text: 'Reading.', toolCalls: [{ id: 'c1', name: 'read_file', input: { path: 'a' } }] },
+      { role: 'tool', results: [{ toolCallId: 'c1', name: 'read_file', content: 'A', isError: false }] },
+      { role: 'assistant', text: 'It says A.', toolCalls: [] },
+      { role: 'user', text: 'now b' },
+      { role: 'assistant', text: '', toolCalls: [{ id: 'c2', name: 'read_file', input: { path: 'b' } }] },
+      { role: 'tool', results: [{ toolCallId: 'c2', name: 'read_file', content: 'No result: the session was interrupted.', isError: true }] }
+    ])
   })
 })

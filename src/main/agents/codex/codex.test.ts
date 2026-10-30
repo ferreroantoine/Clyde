@@ -209,7 +209,7 @@ describe('CodexTranslator', () => {
           error: null
         }
       }),
-      ...t.translate('item/started', { threadId: 'th', turnId: 'u', item: { type: 'reasoning', id: 'r' } })
+      ...t.translate('item/started', { threadId: 'th', turnId: 'u', item: { type: 'reasoning', id: 'r', summary: [], content: [] } })
     ]
     expect(out).toEqual([
       { type: 'text_delta', key: 'm1', text: 'Hel' },
@@ -227,6 +227,39 @@ describe('CodexTranslator', () => {
       { type: 'tool_result', toolUseId: 'mc', content: 'ok', isError: false }
     ])
     expect(t.changesOf('f1').map((c) => c.path)).toEqual(['a.ts'])
+  })
+
+  it('shows the reasoning summary, MCP screenshots and images Codex looked at', () => {
+    const t = new CodexTranslator('linux')
+    const out = [
+      ...t.translate('item/reasoning/summaryTextDelta', { threadId: 'th', turnId: 'u', itemId: 'r', delta: 'Plan', summaryIndex: 0 }),
+      ...t.translate('item/reasoning/summaryTextDelta', { threadId: 'th', turnId: 'u', itemId: 'r', delta: 'Then', summaryIndex: 1 }),
+      ...t.translate('item/completed', { threadId: 'th', turnId: 'u', item: { type: 'reasoning', id: 'r', summary: ['Plan', 'Then'], content: [] } }),
+      ...t.translate('item/completed', {
+        threadId: 'th',
+        turnId: 'u',
+        item: {
+          type: 'mcpToolCall',
+          id: 'mc',
+          server: 'pw',
+          tool: 'browser_take_screenshot',
+          status: 'completed',
+          arguments: {},
+          result: { content: [{ type: 'image', data: 'AAAA', mimeType: 'image/png' }] },
+          error: null
+        }
+      }),
+      ...t.translate('item/started', { threadId: 'th', turnId: 'u', item: { type: 'imageView', id: 'iv', path: '/r/shot.png' } }),
+      ...t.translate('item/completed', { threadId: 'th', turnId: 'u', item: { type: 'imageView', id: 'iv', path: '/r/shot.png' } })
+    ]
+    expect(out).toEqual([
+      { type: 'thinking_delta', key: 'r:reasoning', text: 'Plan' },
+      { type: 'thinking_delta', key: 'r:reasoning', text: '\n\nThen' },
+      { type: 'thinking', key: 'r:reasoning', text: 'Plan\n\nThen' },
+      { type: 'tool_result', toolUseId: 'mc', content: '[image]', isError: false, images: [{ mime: 'image/png', data: 'AAAA' }] },
+      { type: 'tool_call', toolUseId: 'iv', name: 'view_image', input: { path: '/r/shot.png' }, parentToolUseId: null },
+      { type: 'tool_result', toolUseId: 'iv', content: '/r/shot.png', isError: false, images: [{ mime: 'image/png', path: '/r/shot.png' }] }
+    ])
   })
 
   it('reports each turn’s own tokens from the thread totals', () => {

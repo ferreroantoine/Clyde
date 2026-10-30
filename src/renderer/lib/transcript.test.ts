@@ -64,6 +64,33 @@ describe('applyEvent', () => {
     expect(view.items[0]).toMatchObject({ kind: 'tool', name: 'Edit', approval: { requestId: 'r1', state: 'pending' } })
   })
 
+  it('tracks questions from request to answer, on the tool card', () => {
+    const questions = [{ question: 'Which database?', header: 'Storage', options: [{ label: 'SQLite', description: '' }], multiSelect: false }]
+    let view = play([
+      { type: 'tool_call', toolUseId: 't1', name: 'AskUserQuestion', input: { questions }, parentToolUseId: null },
+      { type: 'question_request', requestId: 'q1', toolUseId: 't1', questions }
+    ])
+    const tool = () => view.items[0] as ToolItem
+    expect(tool().questions).toEqual({ requestId: 'q1', questions, state: 'pending', answers: null })
+    expect(toolState(tool(), false)).toBe('awaiting')
+    view = play([{ type: 'question_resolved', requestId: 'q1', answers: { 'Which database?': 'SQLite' } }], view)
+    expect(tool().questions).toMatchObject({ state: 'answered', answers: { 'Which database?': 'SQLite' } })
+    expect(toolState(tool(), false)).toBe('done')
+    expect(describeTool('AskUserQuestion', { questions }, '')).toBe('Which database?')
+  })
+
+  it('marks skipped questions, and shows a question that arrives before its call', () => {
+    const questions = [{ question: 'Go on?', header: '', options: [{ label: 'Yes', description: '' }], multiSelect: false }]
+    let view = play([{ type: 'question_request', requestId: 'q1', toolUseId: 't1', questions }])
+    expect(view.items[0]).toMatchObject({ kind: 'tool', toolUseId: 't1', questions: { state: 'pending' } })
+    view = play([
+      { type: 'question_resolved', requestId: 'q1', answers: null },
+      { type: 'tool_result', toolUseId: 't1', content: 'The user did not answer.', isError: true }
+    ], view)
+    expect(view.items[0]).toMatchObject({ questions: { state: 'skipped', answers: null } })
+    expect(toolState(view.items[0] as ToolItem, false)).toBe('done')
+  })
+
   it('adds turn summaries to the totals and tracks status and rate limits', () => {
     const turn: AgentEvent = {
       type: 'turn_end',

@@ -57,7 +57,7 @@ export function fakeQuery(script: (ctx: FakeContext) => AsyncGenerator<SDKMessag
 /** Builds SDK messages with only the fields the translator reads. */
 export const sdk = {
   init: (model = 'claude-sonnet-5') =>
-    ({ type: 'system', subtype: 'init', model, claude_code_version: '2.1.312', cwd: '/repo', tools: ['Bash', 'Read'] }) as unknown as SDKMessage,
+    ({ type: 'system', subtype: 'init', model, claude_code_version: '2.1.312', cwd: '/repo', tools: ['Bash', 'Read'], session_id: 'sdk-session' }) as unknown as SDKMessage,
   stream: (event: unknown) => ({ type: 'stream_event', event, parent_tool_use_id: null }) as unknown as SDKMessage,
   assistant: (id: string, content: unknown[], extra: Record<string, unknown> = {}) =>
     ({ type: 'assistant', message: { id, content }, parent_tool_use_id: null, ...extra }) as unknown as SDKMessage,

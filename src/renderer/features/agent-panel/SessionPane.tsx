@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type SetStateAction } from 'react'
 import { intlLocale, t, tk } from '@shared/i18n'
-import { ArrowUp, CircleAlert, FoldVertical, Gauge, Square, StepForward } from 'lucide-react'
+import { ArrowLeftRight, ArrowUp, CircleAlert, FoldVertical, Gauge, History, Play, RotateCcw, Square, StepForward } from 'lucide-react'
 import { PERMISSION_LEVEL_LABELS, type AgentStatus } from '@shared/agent'
 import { EFFORT_LABELS, kindLabel } from '@shared/profiles'
 import { Button } from '@/components/ui/button'
@@ -14,8 +14,13 @@ import { RichText } from './RichText'
 import { SessionLimitLine } from '@/features/limits/LimitGauge'
 import { useLimits } from '@/stores/limits'
 import { ToolCard } from './ToolCard'
+import { ActionGroup, ThinkingBlock } from './Activity'
+import { groupRows } from '@/lib/activity'
+import { EXPLORER_PATH_TYPE } from '@/features/explorer/FileTree'
+import { mention } from '@/features/explorer/mention'
 import { Appear } from '@/components/Appear'
 import { useSettings } from '@/stores/settings'
+import { LimitBar, SwitchDialog } from './SwitchAccount'
 
 export const STATUS_LABELS: Record<AgentStatus, string> = {
   starting: tk('Starting'),
@@ -23,7 +28,8 @@ export const STATUS_LABELS: Record<AgentStatus, string> = {
   running: tk('Working'),
   'awaiting-approval': tk('Needs approval'),
   stopped: tk('Stopped'),
-  error: tk('Ended with an error')
+  error: tk('Ended with an error'),
+  interrupted: tk('Interrupted')
 }
 
 export function StatusDot({ status }: { status: AgentStatus }) {
@@ -50,12 +56,14 @@ export function Item({
   item,
   cwd,
   ended,
+  sessionId,
   subscription = false,
   streaming = false
 }: {
   item: TranscriptItem
   cwd: string
   ended: boolean
+  sessionId: string
   subscription?: boolean
   /** The last text of a running turn: shows a typing caret. */
   streaming?: boolean
@@ -69,8 +77,10 @@ export function Item({
       )
     case 'text':
       return <RichText text={item.text} streaming={streaming} />
+    case 'thinking':
+      return <ThinkingBlock text={item.text} live={!item.final && !ended} />
     case 'tool':
-      return <ToolCard tool={item} cwd={cwd} ended={ended} />
+      return <ToolCard tool={item} cwd={cwd} ended={ended} sessionId={sessionId} />
     case 'turn':
       return (
         <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground" data-turn={item.subtype}>
@@ -103,18 +113,64 @@ export function itemKey(item: TranscriptItem): string {
       return `${item.kind}-${item.id}`
     case 'text':
       return `text-${item.key}`
+    case 'thinking':
+      return `thinking-${item.key}`
     case 'tool':
       return `tool-${item.toolUseId}`
   }
 }
 
+/**
+ * The transcript as the user reads it: messages, the agent's reasoning between its actions,
+ * tool cards, and runs of actions folded under a summary.
+ */
+export function TranscriptRows({ view, live = true, subscription = false }: { view: SessionView; live?: boolean; subscription?: boolean }) {
+  const ended = !live || ENDED_STATUSES.has(view.info.status)
+  const last = view.items.at(-1)
+  return groupRows(view.items).map((row) =>
+    row.kind === 'group' ? (
+      <Appear key={row.id}>
+        <ActionGroup tools={row.tools} cwd={view.info.cwd} ended={ended} sessionId={view.info.id} />
+      </Appear>
+    ) : (
+      <Appear key={itemKey(row.item)}>
+        <Item
+          item={row.item}
+          cwd={view.info.cwd}
+          ended={ended}
+          sessionId={view.info.id}
+          subscription={subscription}
+          streaming={live && row.item === last && row.item.kind === 'text' && !row.item.final && view.info.status === 'running'}
+        />
+      </Appear>
+    )
+  )
+}
+
 function Composer({ view }: { view: SessionView }) {
   const send = useAgents((s) => s.send)
   const interrupt = useAgents((s) => s.interrupt)
-  const [text, setText] = useState('')
+  const id = view.info.id
+  const text = useAgents((s) => s.drafts[id] ?? '')
+  const storeDraft = useAgents((s) => s.setDraft)
+  const setText = useCallback((value: SetStateAction<string>) => {
+    const current = useAgents.getState().drafts[id] ?? ''
+    storeDraft(id, typeof value === 'function' ? value(current) : value)
+  }, [id, storeDraft])
+  const focusTick = useAgents((s) => s.focusTick)
   const area = useRef<HTMLTextAreaElement>(null)
   const status = view.info.status
+
+  // Text added from elsewhere (the explorer) gets the focus, the caret at its end.
+  useEffect(() => {
+    const el = area.current
+    if (!focusTick || !el) return
+    el.focus()
+    el.setSelectionRange(el.value.length, el.value.length)
+  }, [focusTick])
   const ended = ENDED_STATUSES.has(status)
+  // An ended session that can come back takes messages: sending resumes it first.
+  const closed = ended && !view.resumable
   const busy = status === 'running' || status === 'awaiting-approval'
 
   useLayoutEffect(() => {
@@ -126,19 +182,46 @@ function Composer({ view }: { view: SessionView }) {
 
   const submit = async () => {
     const value = text.trim()
-    if (!value || ended || status === 'starting') return
+    if (!value || closed || status === 'starting') return
     setText('')
     if (!(await send(value))) setText(value)
   }
 
+  const [over, setOver] = useState(false)
+
   return (
-    <div className="border-t p-2">
-      <div className="flex items-end gap-1.5 rounded-lg border bg-background px-2 py-1.5 focus-within:ring-2 focus-within:ring-ring">
+    <div
+      className="border-t p-2"
+      // Files dragged from the Explorer become @mentions, which Claude Code reads itself.
+      onDragOver={(e) => {
+        if (closed || !e.dataTransfer.types.includes(EXPLORER_PATH_TYPE)) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'copy'
+        setOver(true)
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false)
+      }}
+      onDrop={(e) => {
+        setOver(false)
+        const path = e.dataTransfer.getData(EXPLORER_PATH_TYPE)
+        if (!path) return
+        e.preventDefault()
+        setText((current) => (current && !/\s$/.test(current) ? `${current} ` : current) + mention(path))
+        area.current?.focus()
+      }}
+    >
+      <div
+        className={cn(
+          'flex items-end gap-1.5 rounded-lg border bg-background px-2 py-1.5 focus-within:ring-2 focus-within:ring-ring',
+          over && 'border-primary ring-2 ring-primary/30'
+        )}
+      >
         <textarea
           ref={area}
           rows={1}
           value={text}
-          disabled={ended}
+          disabled={closed}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -146,7 +229,15 @@ function Composer({ view }: { view: SessionView }) {
               void submit()
             }
           }}
-          placeholder={ended ? t('This session has ended') : busy ? t('Queue a follow-up…') : t('Ask the agent… (Enter to send)')}
+          placeholder={
+            closed
+              ? t('This session has ended')
+              : ended
+                ? t('Write to resume this session… (Enter to send)')
+                : busy
+                  ? t('Queue a follow-up…')
+                  : t('Ask the agent… (Enter to send)')
+          }
           aria-label={t('Message to the agent')}
           className="max-h-[200px] min-h-6 flex-1 resize-none bg-transparent py-0.5 text-[13px] outline-none placeholder:text-muted-foreground"
         />
@@ -156,11 +247,44 @@ function Composer({ view }: { view: SessionView }) {
             <Square className="fill-current" />
           </Button>
         ) : (
-          <Button type="button" size="icon-xs" aria-label={t('Send')} disabled={!text.trim() || ended} onClick={() => void submit()}>
+          <Button type="button" size="icon-xs" aria-label={t('Send')} disabled={!text.trim() || closed} onClick={() => void submit()}>
             <ArrowUp />
           </Button>
         )}
       </div>
+    </div>
+  )
+}
+
+/** An ended session that can come back: why it ended, and the way to resume it. */
+function ResumeBar({ view }: { view: SessionView }) {
+  const resume = useAgents((s) => s.resume)
+  const resuming = useAgents((s) => s.resuming === view.info.id)
+  const status = view.info.status
+  if (!ENDED_STATUSES.has(status) || !view.resumable) return null
+  const interrupted = status === 'interrupted'
+  return (
+    <div
+      className={cn('flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-1.5 text-[11px]', interrupted ? 'bg-warning/10' : 'text-muted-foreground')}
+      data-testid="resume-bar"
+    >
+      <History className="size-3.5 shrink-0" />
+      {/* Narrow panels put the buttons under the text rather than squeezing it. */}
+      <span className="min-w-[12rem] flex-1">
+        {interrupted
+          ? t('Clyde was closed while the agent was working.')
+          : status === 'error'
+            ? t('This session ended with an error. Resume it to go on.')
+            : t('This session has ended. Resume it, or just write to it.')}
+      </span>
+      {interrupted && (
+        <Button size="xs" loading={resuming} onClick={() => void resume(view.info.id, true)}>
+          <Play /> {t('Resume and carry on')}
+        </Button>
+      )}
+      <Button size="xs" variant={interrupted ? 'ghost' : 'outline'} loading={resuming && !interrupted} onClick={() => void resume(view.info.id)}>
+        <RotateCcw /> {t('Resume')}
+      </Button>
     </div>
   )
 }
@@ -235,7 +359,6 @@ export function SessionPane({ view }: { view: SessionView }) {
   const scroller = useRef<HTMLDivElement>(null)
   const stuck = useRef(true)
   const lastTop = useRef(0)
-  const ended = ENDED_STATUSES.has(view.info.status)
   const last = view.items.at(-1)
 
   // Follow the conversation unless the user scrolled up to read; glide when animations are on.
@@ -254,6 +377,8 @@ export function SessionPane({ view }: { view: SessionView }) {
   useEffect(() => {
     if (subscription) void loadPlanUse(sessionId)
   }, [subscription, sessionId, loadPlanUse])
+  const [switching, setSwitching] = useState(false)
+  const busy = view.info.status === 'running' || view.info.status === 'awaiting-approval' || view.info.status === 'starting'
   return (
     <div className="flex h-full min-h-0 flex-col" data-session={view.info.id} data-status={view.info.status}>
       <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b px-3 py-2 text-[11px] text-muted-foreground">
@@ -265,9 +390,22 @@ export function SessionPane({ view }: { view: SessionView }) {
           <StatusDot status={view.info.status} />
           {t(STATUS_LABELS[view.info.status])}
           {!subscription && view.totals.costUsd > 0 && <span>· {usd(view.totals.costUsd)}</span>}
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            aria-label={t('Switch account or model')}
+            title={busy ? t('Wait for the agent to finish its turn, or interrupt it.') : t('Switch account or model')}
+            disabled={busy || !view.resumable}
+            onClick={() => setSwitching(true)}
+          >
+            <ArrowLeftRight />
+          </Button>
         </span>
       </div>
-      {limit && limit.status !== 'allowed' && (
+      <SwitchDialog view={view} open={switching} onOpenChange={setSwitching} />
+      <LimitBar view={view} onSwitch={() => setSwitching(true)} />
+      {/* A rejection is LimitBar's once the turn ended. */}
+      {limit && limit.status !== 'allowed' && !(limit.status === 'rejected' && view.limit) && (
         <p
           className={cn(
             'flex shrink-0 items-center gap-1.5 border-b px-3 py-1.5 text-[11px]',
@@ -285,6 +423,7 @@ export function SessionPane({ view }: { view: SessionView }) {
           <SessionLimitLine usage={planUse ?? []} />
         </div>
       )}
+      <ResumeBar view={view} />
       <ContextBar view={view} />
       <div
         ref={scroller}
@@ -304,18 +443,8 @@ export function SessionPane({ view }: { view: SessionView }) {
             {view.info.status === 'starting' ? t('Starting {cli}…', { cli: kindLabel(view.info.kind) }) : t('Ask something to start.')}
           </p>
         )}
-        {view.items.map((item) => (
-          <Appear key={itemKey(item)}>
-            <Item
-              item={item}
-              cwd={view.info.cwd}
-              ended={ended}
-              subscription={subscription}
-              streaming={item === last && item.kind === 'text' && !item.final && view.info.status === 'running'}
-            />
-          </Appear>
-        ))}
-        {view.info.status === 'running' && last?.kind !== 'text' && (
+        <TranscriptRows view={view} subscription={subscription} />
+        {view.info.status === 'running' && last?.kind !== 'text' && !(last?.kind === 'thinking' && !last.final) && (
           <Appear>
             <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <StatusDot status="running" /> {t('Working…')}

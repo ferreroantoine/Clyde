@@ -1,5 +1,6 @@
 import { t } from '@shared/i18n'
 import type { AgentEvent } from '@shared/agent'
+import { imageMime, mcpImages } from '../media'
 import type { FileUpdateChange, Notifications, ThreadItem, TokenUsageBreakdown, Turn, TurnError } from './protocol'
 
 const MAX_RESULT_CHARS = 20_000
@@ -62,6 +63,8 @@ const changeKind = (c: FileUpdateChange) => (c.kind.type === 'update' && c.kind.
  */
 export class CodexTranslator {
   private readonly fileChanges = new Map<string, FileUpdateChange[]>()
+  /** The summary part each reasoning item streams, to separate parts with a blank line. */
+  private readonly reasoningPart = new Map<string, string>()
   private total: TokenUsageBreakdown | null = null
   private totalAtTurnStart: TokenUsageBreakdown | null = null
   /** The final error already shown for this turn, so turn_end does not repeat it. */
@@ -84,6 +87,15 @@ export class CodexTranslator {
       case 'item/agentMessage/delta': {
         const p = params as Notifications['item/agentMessage/delta']
         return p.delta ? [{ type: 'text_delta', key: p.itemId, text: p.delta }] : []
+      }
+      case 'item/reasoning/summaryTextDelta': {
+        const p = params as Notifications['item/reasoning/summaryTextDelta']
+        if (!p.delta) return []
+        // Parts of one summary are paragraphs of one reasoning block.
+        const part = `${p.itemId}:${p.summaryIndex}`
+        const sep = this.reasoningPart.get(p.itemId) !== undefined && this.reasoningPart.get(p.itemId) !== part ? '\n\n' : ''
+        this.reasoningPart.set(p.itemId, part)
+        return [{ type: 'thinking_delta', key: `${p.itemId}:reasoning`, text: sep + p.delta }]
       }
       case 'item/commandExecution/outputDelta': {
         const p = params as Notifications['item/commandExecution/outputDelta']
@@ -112,7 +124,9 @@ export class CodexTranslator {
         // Retries are reported as errors too ("Reconnecting... 2/5"); only the final one counts.
         if (p.willRetry) return []
         this.shownError = describeCodexError(p.error)
-        return [{ type: 'error', message: this.shownError }]
+        const limit: AgentEvent[] =
+          p.error.codexErrorInfo === 'usageLimitExceeded' ? [{ type: 'rate_limit', status: 'rejected', resetsAt: null, utilization: null, limitType: null }] : []
+        return [...limit, { type: 'error', message: this.shownError }]
       }
       default:
         return []
@@ -143,6 +157,8 @@ export class CodexTranslator {
       }
       case 'webSearch':
         return call('WebSearch', { query: (item as Extract<ThreadItem, { type: 'webSearch' }>).query })
+      case 'imageView':
+        return call('view_image', { path: (item as Extract<ThreadItem, { type: 'imageView' }>).path })
       default:
         return []
     }
@@ -173,10 +189,22 @@ export class CodexTranslator {
       case 'mcpToolCall': {
         const it = item as Extract<ThreadItem, { type: 'mcpToolCall' }>
         if (it.error) return result(it.error.message, true)
-        return result(clip(mcpResultText(it.result)), it.status === 'failed')
+        const images = mcpImages(it.result?.content ?? [])
+        return [{ type: 'tool_result', toolUseId: item.id, content: clip(mcpResultText(it.result)), isError: it.status === 'failed', ...(images.length ? { images } : {}) }]
       }
       case 'webSearch':
         return result(t('Searched: {query}', { query: (item as Extract<ThreadItem, { type: 'webSearch' }>).query }), false)
+      case 'imageView': {
+        const path = (item as Extract<ThreadItem, { type: 'imageView' }>).path
+        const mime = imageMime(path)
+        return [{ type: 'tool_result', toolUseId: item.id, content: path, isError: false, ...(mime ? { images: [{ mime, path }] } : {}) }]
+      }
+      case 'reasoning': {
+        const it = item as Extract<ThreadItem, { type: 'reasoning' }>
+        this.reasoningPart.delete(it.id)
+        const text = it.summary.join('\n\n').trim()
+        return text ? [{ type: 'thinking', key: `${it.id}:reasoning`, text }] : []
+      }
       default:
         return []
     }
