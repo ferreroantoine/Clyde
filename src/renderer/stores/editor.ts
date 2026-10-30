@@ -39,6 +39,10 @@ interface EditorState {
   save: (path?: string) => Promise<void>
   reloadFromDisk: (path: string) => Promise<void>
   applyFsChanges: (changes: FsChange[]) => void
+  /** A file or folder was renamed from the explorer: its open tabs follow, unsaved edits included. */
+  moved: (from: string, to: string) => void
+  /** A file or folder was deleted from the explorer: its tabs without unsaved edits close. */
+  removed: (path: string) => void
   consumeReveal: () => void
   setCursor: (cursor: { line: number; column: number } | null) => void
 }
@@ -184,6 +188,49 @@ export const useEditor = create<EditorState>()((set, get) => {
           if (tab.dirty) patch(tab.path, { conflict: 'modified' })
           else void load(tab.path)
         }
+      }
+    },
+
+    moved: (from, to) => {
+      const target = (path: string) => (path === from ? to : path.startsWith(from + '/') ? to + path.slice(from.length) : null)
+      const renamed: Array<[string, string]> = []
+      for (const tab of get().tabs) {
+        const next = target(tab.path)
+        if (!next) continue
+        const edits = tab.dirty ? getModel(tab.path)?.getValue() : undefined
+        release(tab.path)
+        if (edits !== undefined) {
+          upsertModel(next, edits)
+          track(next)
+          savedVersion.set(next, -1)
+        }
+        renamed.push([tab.path, next])
+      }
+      if (renamed.length === 0) return
+      const map = new Map(renamed)
+      history = history.map((p) => map.get(p) ?? p)
+      const active = get().active
+      set({
+        tabs: get().tabs.map((tab) => {
+          const next = map.get(tab.path)
+          return next ? { ...tab, path: next, name: nameOf(next), language: languageFor(next) } : tab
+        }),
+        active: active ? (map.get(active) ?? active) : null
+      })
+      // Tabs without unsaved edits reload from their new path.
+      for (const [, next] of renamed) {
+        if (getModel(next) || get().tabs.find((t) => t.path === next)?.status !== 'ready') continue
+        patch(next, { status: 'loading' })
+        void load(next)
+      }
+      if (active && map.has(active)) show(map.get(active) ?? null)
+    },
+
+    removed: (path) => {
+      for (const tab of get().tabs) {
+        if (tab.path !== path && !tab.path.startsWith(path + '/')) continue
+        if (tab.dirty) patch(tab.path, { conflict: 'deleted' })
+        else get().close(tab.path)
       }
     },
 

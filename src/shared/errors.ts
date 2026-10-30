@@ -6,6 +6,7 @@ export type ErrorCode =
   | 'not_found'
   | 'no_workspace'
   | 'outside_workspace'
+  | 'already_exists'
   | 'io_error'
   | 'pty_error'
   | 'search_error'
