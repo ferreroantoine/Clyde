@@ -21,6 +21,7 @@ import { registerAgentHandlers } from './ipc/agents'
 import { SecretsService, safeStorageCipher } from './services/secrets'
 import { ProfilesService } from './services/profiles'
 import { AgentManager, CONTINUE_MESSAGE } from './agents/manager'
+import { MediaStore } from './agents/media'
 import { createAdapter } from './agents/api/clients'
 import { McpStore } from './mcp/store'
 import { McpHub } from './mcp/hub'
@@ -184,7 +185,9 @@ if (!app.requestSingleInstanceLock()) {
       apiKey: (id) => profiles.apiKey(id),
       createAdapter: (target) => createAdapter(target, fetch)
     })
+    const media = new MediaStore(join(app.getPath('userData'), 'session-media'))
     const agents = new AgentManager({
+      media,
       memory: () => memory?.forPrompt() ?? '',
       summarizeAt: () => settings.getAll().memory.summarizeAt,
       summarize: (transcript, fallback, signal) =>
@@ -242,7 +245,11 @@ if (!app.requestSingleInstanceLock()) {
       log: createLogger('limits')
     })
     registerProfileHandlers({ profiles, ptys, claudeCodePath, codexPath, antigravityPath, cli, query, clientApp, fetch })
-    registerAgentHandlers(agents, { metrics: { history: (cwd) => metrics.history(cwd), stored: (id) => metrics.stored(id) }, workspaceRoot: () => workspace.current()?.root ?? null })
+    registerAgentHandlers(agents, {
+      metrics: { history: (cwd) => metrics.history(cwd), stored: (id) => metrics.stored(id) },
+      media,
+      workspaceRoot: () => workspace.current()?.root ?? null
+    })
     registerMcpHandlers(mcp, {
       list: () => mcpStore.presets(),
       save: (serverId, title, description) => mcpStore.savePreset(serverId, title, description),
@@ -329,7 +336,8 @@ if (!app.requestSingleInstanceLock()) {
         agents: definitions,
         mcp,
         metrics,
-        activeSessionIds: () => agents.list().filter((s) => !isEnded(s.status)).map((s) => s.id)
+        activeSessionIds: () => agents.list().filter((s) => !isEnded(s.status)).map((s) => s.id),
+        clearMedia: (keep) => media.clear(keep)
       }),
       settings
     )

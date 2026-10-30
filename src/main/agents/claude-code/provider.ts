@@ -334,6 +334,8 @@ export class ClaudeCodeSession {
       ...(this.cfg.model ? { model: this.cfg.model } : {}),
       ...(isClaudeEffort(this.cfg.effort) ? { effort: this.cfg.effort } : {}),
       ...(this.cfg.resume ? { resume: this.cfg.resume } : {}),
+      // Recent models omit their reasoning unless asked; the panel shows its summary between actions.
+      thinking: { type: 'adaptive', display: 'summarized' },
       systemPrompt: {
         type: 'preset',
         preset: 'claude_code',

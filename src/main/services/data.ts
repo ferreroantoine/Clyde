@@ -20,6 +20,8 @@ export interface DataDeps {
   mcp: Pick<McpHub, 'list' | 'create'>
   metrics: Pick<MetricsService, 'prices' | 'savePrice'>
   activeSessionIds: () => string[]
+  /** Removes the images of purged sessions (screenshots kept for the transcripts). */
+  clearMedia?: (keep: string[]) => void
   now?: () => number
 }
 
@@ -171,6 +173,7 @@ export class DataService {
       }
       this.deps.db.prepare('DELETE FROM limit_snapshots').run()
     })()
+    this.deps.clearMedia?.(keep)
     return { sessions }
   }
 }

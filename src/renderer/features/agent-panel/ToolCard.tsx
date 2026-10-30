@@ -3,15 +3,21 @@ import { AnimatePresence, motion } from "motion/react";
 import { t, tk } from "@shared/i18n";
 import {
   Ban,
+  Camera,
   Check,
   ChevronRight,
+  Circle,
   CircleAlert,
+  CircleCheck,
   FilePen,
+  FilePlus,
   FileText,
   Globe,
+  ImageIcon,
   ListTodo,
   LoaderCircle,
   MessageCircleQuestion,
+  MousePointerClick,
   Search,
   ShieldQuestion,
   SquareTerminal,
@@ -26,30 +32,23 @@ import { useAgents } from "@/stores/agents";
 import { cn } from "@/lib/utils";
 import { attention, duration, ease, iconSwap, shake } from "@/lib/motion";
 import { QuestionCard } from "./QuestionCard";
+import { ToolImages } from "./ToolImages";
+import { editOf, mcpTool, todosOf, toolKind, toolVerb, type Todo, type ToolKind } from "@/lib/activity";
 
-const ICONS: Record<string, LucideIcon> = {
-  Bash: SquareTerminal,
-  PowerShell: SquareTerminal,
-  Monitor: SquareTerminal,
-  Read: FileText,
-  Write: FilePen,
-  Edit: FilePen,
-  MultiEdit: FilePen,
-  NotebookEdit: FilePen,
-  Glob: Search,
-  Grep: Search,
-  WebFetch: Globe,
-  WebSearch: Globe,
-  Agent: Users,
-  Task: Users,
-  TodoWrite: ListTodo,
-  run_command: SquareTerminal,
-  read_file: FileText,
-  write_file: FilePen,
-  edit_file: FilePen,
-  list_files: Search,
-  AskUserQuestion: MessageCircleQuestion,
-  ask_user: MessageCircleQuestion,
+const ICONS: Record<ToolKind, LucideIcon> = {
+  read: FileText,
+  write: FilePlus,
+  edit: FilePen,
+  command: SquareTerminal,
+  search: Search,
+  web: Globe,
+  browser: MousePointerClick,
+  screenshot: Camera,
+  image: ImageIcon,
+  agent: Users,
+  todo: ListTodo,
+  question: MessageCircleQuestion,
+  other: Wrench,
 };
 
 const DECISION_LABEL = {
@@ -119,6 +118,8 @@ function Approval({ tool }: { tool: ToolItem }) {
           <Button
             size="xs"
             variant="outline"
+            // Long MCP tool names would push the card wider than the panel.
+            className="max-w-full min-w-0"
             title={
               shell
                 ? t("Allows this exact command until the session ends")
@@ -126,9 +127,11 @@ function Approval({ tool }: { tool: ToolItem }) {
             }
             onClick={() => void answer(approval.requestId, "allow-session")}
           >
-            {shell
-              ? t("Allow this command for the session")
-              : t("Allow {tool} for the session", { tool: tool.name })}
+            <span className="truncate">
+              {shell
+                ? t("Allow this command for the session")
+                : t("Allow {tool} for the session", { tool: tool.name })}
+            </span>
           </Button>
           <Button size="xs" variant="ghost" onClick={() => setDenying(true)}>
             {t("Deny…")}
@@ -139,28 +142,94 @@ function Approval({ tool }: { tool: ToolItem }) {
   );
 }
 
-/** `mcp__github__search` reads as `github › search`. */
-function displayName(name: string): string {
-  const mcp = /^mcp__([^_]+(?:[-_][^_]+)*?)__(.+)$/.exec(name);
-  return mcp ? `${mcp[1]} › ${mcp[2]}` : name;
-}
-
-type ToolCardProps = { tool: ToolItem; cwd: string; ended: boolean };
+type ToolCardProps = { tool: ToolItem; cwd: string; ended: boolean; sessionId: string };
 
 /** A tool call, or the questions it asks the user. */
 export function ToolCard(props: ToolCardProps) {
-  return props.tool.questions ? (
-    <QuestionCard tool={props.tool} />
-  ) : (
-    <ToolCallCard {...props} />
+  if (props.tool.questions) return <QuestionCard tool={props.tool} />;
+  if (props.tool.name === "TodoWrite") {
+    const todos = todosOf(props.tool.input);
+    if (todos) return <TodoCard todos={todos} />;
+  }
+  return <ToolCallCard {...props} />;
+}
+
+/** The agent's to-do list, as a checklist. */
+function TodoCard({ todos }: { todos: Todo[] }) {
+  const done = todos.filter((todo) => todo.status === "completed").length;
+  return (
+    <div className="rounded-lg border bg-card px-3 py-2 text-xs" data-tool="TodoWrite">
+      <p className="mb-1.5 flex items-center gap-1.5 font-medium">
+        <ListTodo className="size-3.5 text-muted-foreground" />
+        {t("To-do list")}
+        <span className="font-normal text-muted-foreground">
+          {t("{done} of {total} done", { done, total: todos.length })}
+        </span>
+      </p>
+      <ul className="space-y-1">
+        {todos.map((todo, i) => (
+          <li key={i} className="flex items-start gap-2">
+            {todo.status === "completed" ? (
+              <CircleCheck className="mt-px size-3.5 shrink-0 text-success" />
+            ) : todo.status === "in_progress" ? (
+              <LoaderCircle className="mt-px size-3.5 shrink-0 animate-spin text-primary" />
+            ) : (
+              <Circle className="mt-px size-3.5 shrink-0 text-muted-foreground" />
+            )}
+            <span
+              className={cn(
+                todo.status === "completed" && "text-muted-foreground line-through",
+                todo.status === "in_progress" && "font-medium",
+              )}
+            >
+              {todo.status === "in_progress" ? todo.activeForm : todo.content}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
-function ToolCallCard({ tool, cwd, ended }: ToolCardProps) {
+/** Removed lines in red, added in green: what an edit changes. */
+function EditDiff({ edits }: { edits: Array<{ before: string; after: string }> }) {
+  const lines = (text: string, sign: "-" | "+") =>
+    text.split("\n").map((line, j) => (
+      <div
+        key={`${sign}${j}`}
+        className={cn(
+          "px-2 whitespace-pre-wrap",
+          sign === "-" ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success",
+        )}
+      >
+        <span className="select-none">{sign} </span>
+        {line}
+      </div>
+    ));
+  return (
+    <div className="max-h-72 space-y-1.5 overflow-auto rounded border bg-muted/40 font-mono text-[11px] leading-snug">
+      {edits.map((edit, i) => (
+        <div key={i}>
+          {edit.before && lines(edit.before, "-")}
+          {lines(edit.after, "+")}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ToolCallCard({ tool, cwd, ended, sessionId }: ToolCardProps) {
   const state = toolState(tool, ended);
   const [open, setOpen] = useState(false);
-  const Icon = ICONS[tool.name] ?? Wrench;
+  const kind = toolKind(tool.name);
+  const Icon = ICONS[kind];
   const summary = describeTool(tool.name, tool.input, cwd);
+  const mcp = mcpTool(tool.name);
+  // MCP tools Clyde does not know read as `server › tool`.
+  const verb = kind === "other" && mcp ? `${mcp.server} › ${mcp.tool}` : kind === "other" ? tool.name : toolVerb(tool.name);
+  const edits = kind === "edit" || kind === "write" ? editOf(tool.name, tool.input) : null;
+  const command = kind === "command" && typeof tool.input["command"] === "string" ? (tool.input["command"] as string) : null;
+  const images = tool.result?.images ?? [];
 
   return (
     <motion.div
@@ -190,7 +259,7 @@ function ToolCallCard({ tool, cwd, ended }: ToolCardProps) {
           )}
         />
         <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="shrink-0 font-medium">{displayName(tool.name)}</span>
+        <span className="shrink-0 font-medium" title={tool.name}>{verb}</span>
         <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
           {summary}
         </span>
@@ -209,6 +278,8 @@ function ToolCallCard({ tool, cwd, ended }: ToolCardProps) {
           </AnimatePresence>
         </span>
       </button>
+      {/* Screenshots stay in sight: they are what the agent saw. */}
+      <ToolImages sessionId={sessionId} images={images} className="border-t px-2.5 py-2" />
       <AnimatePresence initial={false}>
         {open && (
           <motion.div
@@ -226,9 +297,18 @@ function ToolCallCard({ tool, cwd, ended }: ToolCardProps) {
             className="overflow-hidden"
           >
             <div className="space-y-2 border-t px-3 py-2">
-              <pre className="max-h-48 overflow-auto font-mono text-[11px] leading-snug whitespace-pre-wrap text-muted-foreground">
-                {JSON.stringify(tool.input, null, 2)}
-              </pre>
+              {command !== null ? (
+                <pre className="max-h-48 overflow-auto rounded bg-muted/60 px-2 py-1.5 font-mono text-[11px] leading-snug whitespace-pre-wrap">
+                  <span className="text-muted-foreground select-none">$ </span>
+                  {command}
+                </pre>
+              ) : edits ? (
+                <EditDiff edits={edits} />
+              ) : (
+                <pre className="max-h-48 overflow-auto font-mono text-[11px] leading-snug whitespace-pre-wrap text-muted-foreground">
+                  {JSON.stringify(tool.input, null, 2)}
+                </pre>
+              )}
               {tool.denied && (
                 <p className="text-[11px] text-muted-foreground">
                   {t("Refused: {reason}", { reason: tool.denied })}

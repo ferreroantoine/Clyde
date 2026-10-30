@@ -116,6 +116,8 @@ export const requestSchemas = {
   'agent:load': z.object({ sessionId: sessionIdSchema }),
   /** Brings an ended session back; `continue` also tells it to finish what it was doing. */
   'agent:resume': z.object({ sessionId: sessionIdSchema, continue: z.boolean().default(false) }),
+  /** An image a tool returned, stored with the session. */
+  'agent:media': z.object({ sessionId: sessionIdSchema, id: z.string().regex(/^[a-f0-9]{24}\.[a-z]+$/) }),
   'memory:state': z.undefined(),
   'memory:saveCore': memorySaveCoreSchema,
   'memory:saveDoc': memorySaveDocSchema,
@@ -237,6 +239,8 @@ export interface InvokeResponses {
   'agent:history': SessionSummary[]
   'agent:load': StoredSession
   'agent:resume': AgentSessionInfo
+  /** Base64 bytes. */
+  'agent:media': { mime: string; data: string }
   'memory:state': MemoryState
   'memory:saveCore': MemoryState
   'memory:saveDoc': MemoryState

@@ -1,10 +1,11 @@
 import { handle } from './router'
 import { CONTINUE_MESSAGE, type AgentManager } from '../agents/manager'
 import type { MetricsService } from '../metrics/metrics'
+import type { MediaStore } from '../agents/media'
 
 export function registerAgentHandlers(
   agents: AgentManager,
-  deps: { metrics: Pick<MetricsService, 'history' | 'stored'>; workspaceRoot: () => string | null }
+  deps: { metrics: Pick<MetricsService, 'history' | 'stored'>; media: Pick<MediaStore, 'read'>; workspaceRoot: () => string | null }
 ): void {
   handle('agent:list', () => agents.list())
   handle('agent:start', (req) => agents.start(req))
@@ -18,6 +19,7 @@ export function registerAgentHandlers(
     const live = agents.get(sessionId)
     return live ? { ...stored, info: live } : stored
   })
+  handle('agent:media', ({ sessionId, id }) => deps.media.read(sessionId, id))
   handle('agent:resume', async ({ sessionId, continue: carryOn }) => {
     const info = await agents.resume(sessionId)
     if (carryOn) agents.send(sessionId, CONTINUE_MESSAGE)

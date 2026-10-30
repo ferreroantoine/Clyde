@@ -183,6 +183,8 @@ export class ApiSession {
           break
         }
         const key = `t${turn}s${step}:0`
+        const thinkingKey = `t${turn}s${step}:th`
+        let thinking = ''
         let done: Extract<AdapterEvent, { type: 'done' }> | null = null
         this.shortenToolResults()
         const request = { system: this.system, history: this.history, tools: this.tools }
@@ -195,8 +197,12 @@ export class ApiSession {
           ...(this.cfg.effort ? { effort: this.cfg.effort } : {})
         })) {
           if (event.type === 'text_delta') this.deps.emit({ type: 'text_delta', key, text: event.text })
-          else done = event
+          else if (event.type === 'thinking_delta') {
+            thinking += event.text
+            this.deps.emit({ type: 'thinking_delta', key: thinkingKey, text: event.text })
+          } else done = event
         }
+        if (thinking.trim()) this.deps.emit({ type: 'thinking', key: thinkingKey, text: thinking })
         if (!done) throw new Error(t('The model stream ended without a reply'))
         totals.inputTokens += done.usage.inputTokens
         totals.outputTokens += done.usage.outputTokens
@@ -220,9 +226,10 @@ export class ApiSession {
         try {
           for (const call of done.toolCalls) {
             this.deps.emit({ type: 'tool_call', toolUseId: call.id, name: call.name, input: call.input, parentToolUseId: null })
-            const output = await this.runTool(call, signal)
+            const { images, ...output } = await this.runTool(call, signal)
+            // Images are for the panel; the history keeps the text, which every adapter can send.
             results.push({ toolCallId: call.id, name: call.name, ...output })
-            this.deps.emit({ type: 'tool_result', toolUseId: call.id, ...output })
+            this.deps.emit({ type: 'tool_result', toolUseId: call.id, ...output, ...(images?.length ? { images } : {}) })
           }
         } finally {
           // Every call needs a result in the history, or the next request is rejected.
@@ -264,7 +271,7 @@ export class ApiSession {
     })
   }
 
-  private async runTool(call: ToolCall, signal: AbortSignal): Promise<{ content: string; isError: boolean }> {
+  private async runTool(call: ToolCall, signal: AbortSignal): Promise<ToolOutput> {
     // Reading back a shortened output needs no permission: it is the session's own history.
     if (call.name === READ_TOOL_OUTPUT) {
       const id = String(call.input['id'] ?? '')

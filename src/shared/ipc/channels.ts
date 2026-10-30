@@ -48,6 +48,7 @@ export const INVOKE_CHANNELS = [
   'agent:history',
   'agent:load',
   'agent:resume',
+  'agent:media',
   'memory:state',
   'memory:saveCore',
   'memory:saveDoc',

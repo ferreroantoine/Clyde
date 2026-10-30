@@ -4,6 +4,7 @@ import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { ToolRequest } from '../../permissions/engine'
 import type { ToolSpec } from './chat'
+import type { ToolImage } from '@shared/agent'
 
 export const MAX_OUTPUT_CHARS = 30_000
 const MAX_READ_BYTES = 512 * 1024
@@ -132,6 +133,8 @@ export function toEngineRequest(name: string, input: Record<string, unknown>, pl
 export interface ToolOutput {
   content: string
   isError: boolean
+  /** Images the tool returned (MCP screenshots), shown in the panel. */
+  images?: ToolImage[]
 }
 
 export interface Shell {

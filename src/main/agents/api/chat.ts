@@ -46,6 +46,8 @@ export interface Usage {
 
 export type AdapterEvent =
   | { type: 'text_delta'; text: string }
+  /** Reasoning the server streams separately (`reasoning_content` / `reasoning`), when it does. */
+  | { type: 'thinking_delta'; text: string }
   | { type: 'done'; text: string; toolCalls: ToolCall[]; stopReason: StopReason; usage: Usage }
 
 export interface ChatRequest {

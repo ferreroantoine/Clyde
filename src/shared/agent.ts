@@ -153,6 +153,18 @@ export interface ToolCallInfo {
   parentToolUseId: string | null
 }
 
+/**
+ * An image a tool returned (a screenshot, an image file it read). Sessions hand the manager
+ * its bytes (`data`, base64) or a file (`path`); the manager stores it and passes on only `id`,
+ * which `agent:media` reads back.
+ */
+export interface ToolImage {
+  mime: string
+  id?: string
+  data?: string
+  path?: string
+}
+
 /** Tokens of one request by part, estimated from sizes and scaled to the reported input. */
 export interface ContextBreakdown {
   system: number
@@ -183,8 +195,11 @@ export type AgentEvent =
   | { type: 'text_delta'; key: string; text: string }
   /** The complete text of a block, replacing what the deltas built. */
   | { type: 'text'; key: string; text: string }
+  /** The model's reasoning between actions (a summary for most providers), keyed like text. */
+  | { type: 'thinking_delta'; key: string; text: string }
+  | { type: 'thinking'; key: string; text: string }
   | ({ type: 'tool_call' } & ToolCallInfo)
-  | { type: 'tool_result'; toolUseId: string; content: string; isError: boolean }
+  | { type: 'tool_result'; toolUseId: string; content: string; isError: boolean; /** Screenshots and other images the tool returned. */ images?: ToolImage[] }
   /** Live output of a command, while it runs (API agents; Claude Code reports output at the end). */
   | { type: 'tool_output'; toolUseId: string; chunk: string }
   | {

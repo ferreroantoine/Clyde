@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/EmptyState'
 import { ProfileDot } from '@/components/ProfileBadge'
-import { Item, itemKey, STATUS_LABELS, StatusDot, tokens, usd } from '@/features/agent-panel/SessionPane'
+import { STATUS_LABELS, StatusDot, tokens, TranscriptRows, usd } from '@/features/agent-panel/SessionPane'
 import { on } from '@/lib/ipc'
 import { applyEvent, emptyView } from '@/lib/transcript'
 import { useSupervision } from '@/stores/supervision'
@@ -392,9 +392,7 @@ function Transcript() {
         </DialogHeader>
         <div className="selectable min-h-0 flex-1 space-y-3 overflow-y-auto pr-1" aria-label={t('Transcript')}>
           {view?.items.length === 0 && <p className="text-xs text-muted-foreground">{t('No message in this session.')}</p>}
-          {view?.items.map((item) => (
-            <Item key={itemKey(item)} item={item} cwd={view.info.cwd} ended subscription={transcript?.session.billing === 'subscription'} />
-          ))}
+          {view && <TranscriptRows view={view} live={false} subscription={transcript?.session.billing === 'subscription'} />}
         </div>
       </DialogContent>
     </Dialog>

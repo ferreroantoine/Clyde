@@ -25,7 +25,7 @@ import { parseCodexRateLimits, type LimitReading } from '@shared/limits'
 const QUIET = [
   'thread/status/changed',
   'thread/readState/changed',
-  'item/reasoning/summaryTextDelta',
+  // The reasoning summary is shown (summaryTextDelta); the raw reasoning and part markers are not.
   'item/reasoning/summaryPartAdded',
   'item/reasoning/textDelta',
   'item/plan/delta',

@@ -23,7 +23,7 @@ import type { Db } from '../services/db/database'
 
 const DAY = 24 * 60 * 60 * 1000
 /** Streaming fragments are rebuilt from the final text, so the history skips them. */
-const NOT_STORED = new Set(['text_delta', 'tool_output'])
+const NOT_STORED = new Set(['text_delta', 'thinking_delta', 'tool_output'])
 
 /** A stored session with what the agent manager needs to bring it back. */
 export interface ResumableSession {

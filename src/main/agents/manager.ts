@@ -23,6 +23,7 @@ import { ClaudeCodeSession, type QueryFn } from './claude-code/provider'
 import { buildProfileEnv, findClaudeSessionFile, resolveClaudeBinary, withoutAccountVars } from './claude-code/runtime'
 import type { ChatAdapter, ChatMessage, ImageInput } from './api/chat'
 import { historyFromEvents } from '../context/history'
+import type { MediaStore } from './media'
 import { describeApiError, type ApiTarget } from './api/clients'
 import { ApiSession } from './api/loop'
 import { BASE_TOOLS, BaseToolExecutor, defaultShell, toEngineRequest } from './api/tools'
@@ -83,6 +84,8 @@ export interface AgentManagerDeps {
   log: Logger
   /** Keeps sessions between runs, to resume them. */
   store?: SessionStore
+  /** Keeps the images tools return (screenshots); without it they are dropped. */
+  media?: Pick<MediaStore, 'save'>
 }
 
 /** What the manager drives: a Claude Code session or Clyde's own loop. */
@@ -172,6 +175,8 @@ export function withPrefix(event: AgentEvent, prefix: string): AgentEvent {
   switch (event.type) {
     case 'text_delta':
     case 'text':
+    case 'thinking_delta':
+    case 'thinking':
       return { ...event, key: prefix + event.key }
     case 'tool_call':
       return { ...event, toolUseId: prefix + event.toolUseId, parentToolUseId: event.parentToolUseId && prefix + event.parentToolUseId }
@@ -624,10 +629,20 @@ export class AgentManager {
     this.emit(entry.info.id, { type: 'status', status })
   }
 
-  /** An event from a session itself: dropped if a newer run took its id, renamed if this run is a resumed one. */
+  /**
+   * An event from a session itself: dropped if a newer run took its id, renamed if this run is a
+   * resumed one. Images tools returned are stored; the event keeps only their ids.
+   */
   private emitFor(entry: Entry, event: AgentEvent): void {
     if (this.sessions.get(entry.info.id) !== entry) return
-    this.emit(entry.info.id, entry.prefix ? withPrefix(event, entry.prefix) : event)
+    let out = entry.prefix ? withPrefix(event, entry.prefix) : event
+    if (out.type === 'tool_result' && out.images?.length) {
+      const media = this.deps.media
+      const images = media ? out.images.flatMap((image) => media.save(entry.info.id, image) ?? []) : []
+      const { images: _raw, ...rest } = out
+      out = images.length ? { ...rest, images } : rest
+    }
+    this.emit(entry.info.id, out)
   }
 
   private emit(sessionId: string, event: AgentEvent): void {

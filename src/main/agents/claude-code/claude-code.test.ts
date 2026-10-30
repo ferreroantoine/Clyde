@@ -64,6 +64,25 @@ describe('runtime helpers', () => {
 })
 
 describe('MessageTranslator', () => {
+  it('shows the reasoning summary between actions and the images tools return', () => {
+    const t = new MessageTranslator()
+    const events = [
+      sdk.stream({ type: 'message_start', message: { id: 'm2' } }),
+      sdk.stream({ type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '' } }),
+      sdk.stream({ type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'Check the ' } }),
+      sdk.stream({ type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 'x' } }),
+      sdk.assistant('m2', [{ type: 'thinking', thinking: 'Check the page.', signature: 'x' }]),
+      sdk.assistant('m2', [{ type: 'tool_use', id: 'tu2', name: 'mcp__pw__browser_take_screenshot', input: {} }]),
+      sdk.toolResult('tu2', [{ type: 'text', text: 'Took it' }, { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'iVBORw0K' } }])
+    ].flatMap((m) => t.translate(m))
+    expect(events).toEqual([
+      { type: 'thinking_delta', key: 'm2:th0', text: 'Check the ' },
+      { type: 'thinking', key: 'm2:th0', text: 'Check the page.' },
+      { type: 'tool_call', toolUseId: 'tu2', name: 'mcp__pw__browser_take_screenshot', input: {}, parentToolUseId: null },
+      { type: 'tool_result', toolUseId: 'tu2', content: 'Took it\n[image]', isError: false, images: [{ mime: 'image/png', data: 'iVBORw0K' }] }
+    ])
+  })
+
   it('keys streamed text and the complete text the same way, even when messages are split per block', () => {
     const t = new MessageTranslator()
     const events = [
