@@ -15,6 +15,8 @@ export const INVOKE_CHANNELS = [
   'fs:duplicate',
   'fs:trash',
   'fs:reveal',
+  'fs:openDefault',
+  'fs:stat',
   'search:text',
   'pty:create',
   'pty:write',

@@ -230,6 +230,51 @@
     outline-offset: -2px;
   }
 
+  /* Under images with transparency, in the file viewer. */
+  .checkerboard {
+    background-color: var(--background);
+    background-image: conic-gradient(color-mix(in oklch, var(--foreground) 9%, transparent) 25%, transparent 0 50%, color-mix(in oklch, var(--foreground) 9%, transparent) 0 75%, transparent 0);
+    background-size: 16px 16px;
+  }
+
+  /* pdf.js text layer (from pdfjs-dist/web/pdf_viewer.css): transparent text over the page, for selection and search. */
+  .pdf-page .textLayer {
+    position: absolute;
+    inset: 0;
+    overflow: clip;
+    line-height: 1;
+    text-align: initial;
+    transform-origin: 0 0;
+    forced-color-adjust: none;
+    z-index: 0;
+    --min-font-size: 1;
+    --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+    --min-font-size-inv: calc(1 / var(--min-font-size));
+  }
+  .pdf-page .textLayer :is(span, br) {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+    user-select: text;
+  }
+  .pdf-page .textLayer > :not(.markedContent),
+  .pdf-page .textLayer .markedContent span:not(.markedContent) {
+    z-index: 1;
+    --font-height: 0;
+    font-size: calc(var(--text-scale-factor) * var(--font-height));
+    --scale-x: 1;
+    --rotate: 0deg;
+    transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+  }
+  .pdf-page .textLayer .markedContent {
+    display: contents;
+  }
+  .pdf-page .textLayer ::selection {
+    background: color-mix(in oklch, var(--primary) 35%, transparent);
+  }
+
   /* Placeholder while something loads. */
   .skeleton {
     position: relative;
@@ -406,4 +451,12 @@
     opacity: 0.55;
     animation: caret 1s steps(1) infinite;
   }
+}
+
+/* Search matches in the PDF viewer. */
+::highlight(pdf-search) {
+  background-color: rgb(250 204 21 / 0.45);
+}
+::highlight(pdf-current) {
+  background-color: rgb(249 115 22 / 0.65);
 }

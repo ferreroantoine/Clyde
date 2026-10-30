@@ -78,6 +78,8 @@ export const requestSchemas = {
   'fs:duplicate': z.object({ path: relPath }),
   'fs:trash': z.object({ path: relPath }),
   'fs:reveal': z.object({ path: relPath }),
+  'fs:openDefault': z.object({ path: relPath }),
+  'fs:stat': z.object({ path: relPath }),
   'search:text': z.object({
     query: z.string().min(1).max(500),
     caseSensitive: z.boolean().default(false),
@@ -253,6 +255,8 @@ export interface InvokeResponses {
   'fs:duplicate': DirEntry
   'fs:trash': null
   'fs:reveal': null
+  'fs:openDefault': null
+  'fs:stat': { size: number; mtimeMs: number }
   'search:text': SearchResult
   'pty:create': PtyInfo
   'pty:write': null

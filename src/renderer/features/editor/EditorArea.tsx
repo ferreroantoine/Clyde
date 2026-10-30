@@ -1,4 +1,4 @@
-import { CircleAlert, Code2, FileWarning, LoaderCircle } from 'lucide-react'
+import { CircleAlert, Code2, LoaderCircle } from 'lucide-react'
 import { t } from '@shared/i18n'
 import { effectiveBindings, formatCombo, KEY_COMMANDS } from '@shared/keybindings'
 import { useSettings } from '@/stores/settings'
@@ -10,6 +10,9 @@ import { MonacoHost } from './MonacoHost'
 import { TabBar } from './TabBar'
 import { useGit } from '@/stores/git'
 import { GitDiffPane } from '@/features/git/GitDiffPane'
+import { FileView } from '@/features/viewers/FileView'
+import { CannotShow } from '@/features/viewers/common'
+import { hasTextPreview } from '@/lib/viewers'
 
 /** Shortcuts shown on the welcome screen, with the keys currently bound to them. */
 const WELCOME_COMMANDS = ['layout.sidebar', 'view.search', 'layout.terminal', 'layout.agentPanel', 'file.save', 'view.settings']
@@ -75,7 +78,9 @@ export function EditorArea() {
   const tabs = useEditor((s) => s.tabs)
   const active = useEditor((s) => s.active)
   const tab = tabs.find((t) => t.path === active) ?? null
-  const ready = tab?.status === 'ready'
+  // Monaco shows text files, and the code side of a Markdown, SVG, table or JSON file.
+  const ready = tab?.status === 'ready' && tab.hasText && !(hasTextPreview(tab.viewer) && tab.mode === 'preview')
+  const viewing = tab?.status === 'ready' && !ready
   const gitView = useGit((s) => s.view !== null)
 
   return (
@@ -91,6 +96,11 @@ export function EditorArea() {
         <div className={ready ? 'h-full' : 'invisible h-full'}>
           <MonacoHost path={tab?.path ?? null} ready={ready} />
         </div>
+        {viewing && tab && (
+          <div className="absolute inset-0 bg-editor">
+            <FileView key={tab.path} tab={tab} />
+          </div>
+        )}
         {gitView && (
           <div className="absolute inset-0 z-10">
             <GitDiffPane />
@@ -101,24 +111,19 @@ export function EditorArea() {
             <Welcome />
           </div>
         )}
-        {tab && !ready && (
+        {tab && tab.status !== 'ready' && (
           <div className="absolute inset-0 bg-editor">
             {tab.status === 'loading' && (
               <div className="flex h-full items-center justify-center text-muted-foreground">
                 <LoaderCircle className="size-5 animate-spin" />
               </div>
             )}
-            {tab.status === 'unsupported' && (
-              <EmptyState
-                icon={FileWarning}
-                title={tab.unsupported === 'binary' ? t('Binary file') : t('File too large')}
-                description={
-                  tab.unsupported === 'binary'
-                    ? t('This file is not text, so it cannot be shown in the editor.')
-                    : t('Files over 5 MB are not opened in the editor.')
-                }
-              />
-            )}
+            {tab.status === 'unsupported' &&
+              (tab.unsupported === 'binary' ? (
+                <CannotShow path={tab.path} />
+              ) : (
+                <CannotShow path={tab.path} title={t('File too large')} description={t('Text files over 5 MB are not opened in the editor.')} />
+              ))}
             {tab.status === 'error' && (
               <EmptyState icon={CircleAlert} title={t('Could not open file')} description={tab.error} />
             )}

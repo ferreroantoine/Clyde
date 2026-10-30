@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, dialog, net, Notification, shell } from 'electron'
+import { app, BrowserWindow, dialog, net, Notification, protocol, shell } from 'electron'
 import { isEnded, type AgentEventEnvelope } from '@shared/agent'
 import { isApiKind } from '@shared/profiles'
 import { resolveLocale, setLocale, t } from '@shared/i18n'
@@ -7,6 +7,7 @@ import { handleClose, refreshTray, syncTray } from './tray'
 import { openDatabase, migrate, type Db } from './services/db/database'
 import { SqliteSettingsRepository } from './services/db/settings-repo'
 import { createMainWindow } from './window'
+import { FILE_SCHEME, fileHandler } from './services/file-protocol'
 import { createLogger } from './logger'
 import { registerAppHandlers } from './ipc/app'
 import { registerWorkspaceHandlers } from './ipc/workspace'
@@ -63,6 +64,8 @@ app.setAppUserModelId('dev.clyde.app')
 const portableDir = process.env['PORTABLE_EXECUTABLE_DIR']
 const userDataOverride = process.env['CLYDE_USER_DATA'] || (portableDir ? join(portableDir, 'Clyde-data') : undefined)
 if (userDataOverride) app.setPath('userData', userDataOverride)
+// The file viewers read the open folder's files through clyde-file:// (images, PDF, media).
+protocol.registerSchemesAsPrivileged([{ scheme: FILE_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true, corsEnabled: true } }])
 
 let queryFn: Promise<QueryFn> | null = null
 let mainWindow: BrowserWindow | null = null
@@ -151,6 +154,7 @@ if (!app.requestSingleInstanceLock()) {
     )
     registerAppHandlers(settings, db ? new NoticesService(db) : null)
     registerWorkspaceHandlers(workspace, () => settings.getAll().general.projectsFolder)
+    protocol.handle(FILE_SCHEME, fileHandler(() => workspace.current()?.root ?? null))
     registerTerminalHandlers(ptys, workspace)
 
     const clientApp = `clyde/${app.getVersion()}`

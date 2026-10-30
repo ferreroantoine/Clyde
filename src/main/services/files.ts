@@ -61,6 +61,18 @@ export async function readText(root: string, rel: string): Promise<FileContent> 
   }
 }
 
+/** Size and modification time, for the viewers that read the bytes themselves. */
+export async function statFile(root: string, rel: string): Promise<{ size: number; mtimeMs: number }> {
+  const abs = resolveInside(root, rel)
+  try {
+    const info = await stat(abs)
+    if (!info.isFile()) throw new AppError('io_error', t('Not a file: {rel}', { rel }))
+    return { size: info.size, mtimeMs: info.mtimeMs }
+  } catch (err) {
+    throw err instanceof AppError ? err : ioError(err, rel)
+  }
+}
+
 export async function writeText(root: string, rel: string, content: string): Promise<{ mtimeMs: number }> {
   const abs = resolveInside(root, rel)
   try {
