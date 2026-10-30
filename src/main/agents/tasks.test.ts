@@ -31,7 +31,7 @@ function setup() {
   db.pragma('foreign_keys = ON')
   migrate(db)
   const profiles = new ProfilesService(db, new SecretsService(db, { available: () => false, encrypt: () => Buffer.alloc(0), decrypt: () => '' }), {
-    profilesRoot: mkdtempSync(join(tmpdir(), 'clyde-p-')),
+    dataRoot: mkdtempSync(join(tmpdir(), 'clyde-p-')),
     distribution: false
   })
   const profile = profiles.create({ kind: 'ollama', name: 'Local', color: '#64748b', auth: 'none' })
@@ -170,6 +170,24 @@ describe('TaskService', () => {
     await expect(h.tasks.start(task.id)).rejects.toThrow(/To do/)
     h.turnEnd('as-1', true)
     expect(h.tasks.get(task.id)).toMatchObject({ status: 'review', note: 'boom' })
+  })
+
+  it('keeps the board order and reorders within a column', async () => {
+    const h = setup()
+    const make = (title: string) => h.tasks.create({ title, description: 'Do it.', agentId: h.agent.id })
+    const a = await make('A')
+    const b = await make('B')
+    const c = await make('C')
+    const titles = async () => (await h.tasks.list()).map((x) => x.title)
+    expect(await titles()).toEqual(['A', 'B', 'C'])
+    await h.tasks.reorder(c.id, a.id)
+    expect(await titles()).toEqual(['C', 'A', 'B'])
+    await h.tasks.reorder(c.id, b.id)
+    expect(await titles()).toEqual(['A', 'C', 'B'])
+    await h.tasks.reorder(a.id, null)
+    expect(await titles()).toEqual(['C', 'B', 'A'])
+    await h.tasks.start(b.id)
+    await expect(h.tasks.reorder(a.id, b.id)).rejects.toThrow(/within a column/)
   })
 
   it('needs a git repository', async () => {

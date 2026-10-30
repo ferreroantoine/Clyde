@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t } from '@shared/i18n'
 import type { WorkspaceInfo } from '@shared/types'
 import { invoke, on } from '@/lib/ipc'
 import { notify } from './notifications'
@@ -47,7 +48,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
       onWorkspaceChanged(info, null)
     } catch (err) {
       set({ ready: true })
-      notify.error('Could not read the current workspace', err)
+      notify.error(t('Could not read the current workspace'), err)
     }
     return () => offs.forEach((off) => off())
   },
@@ -56,7 +57,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
     try {
       await invoke('workspace:pick')
     } catch (err) {
-      notify.error('Could not open folder', err)
+      notify.error(t('Could not open folder'), err)
     }
   },
 
@@ -64,7 +65,7 @@ export const useWorkspace = create<WorkspaceState>()((set, get) => ({
     try {
       await invoke('workspace:open', { root })
     } catch (err) {
-      notify.error('Could not open folder', err)
+      notify.error(t('Could not open folder'), err)
     }
   }
 }))

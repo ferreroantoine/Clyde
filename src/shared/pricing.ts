@@ -1,8 +1,8 @@
 import { z } from 'zod'
 import type { ProfileKind } from './profiles'
 
-/** Kinds Clyde estimates a cost for. Claude Code reports its own; Ollama runs locally for free. */
-export const PRICED_KINDS = ['anthropic', 'openai', 'mistral'] as const
+/** Kinds Clyde estimates a cost for: the API kinds. Claude Code reports its own; Ollama runs locally for free. */
+export const PRICED_KINDS = ['anthropic', 'openai', 'gemini'] as const
 export type PricedKind = (typeof PRICED_KINDS)[number]
 
 export const priceInputSchema = z.object({
@@ -44,7 +44,8 @@ export function estimateCost(
   inputTokens: number,
   outputTokens: number
 ): number | null {
-  if (kind === 'ollama') return 0
+  // Local models are free; Codex and Antigravity run on a subscription, which has no per-turn price.
+  if (kind === 'ollama' || kind === 'codex' || kind === 'antigravity') return 0
   const price = findPrice(rows, kind, model)
   if (!price) return null
   return (inputTokens * price.inputPerMTok + outputTokens * price.outputPerMTok) / 1_000_000

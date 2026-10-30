@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import type {
   CanUseTool,
   HookCallback,
@@ -12,6 +13,7 @@ import type { ConnectionResult, ModelOption } from '@shared/profiles'
 import type { PermissionDecision, ToolRequest } from '../../permissions/engine'
 import type { ApprovalOutcome, ApprovalQuestion } from '../../permissions/broker'
 import { MessageTranslator } from './translate'
+import { parseClaudeUsage, type LimitReading } from '@shared/limits'
 import { authStatus as runAuthStatus, type AuthStatus } from './runtime'
 
 export type QueryFn = typeof sdkQuery
@@ -66,6 +68,30 @@ export async function probeClaudeCode(query: QueryFn, target: ProbeTarget, timeo
   }
 }
 
+/** Plan limits through the SDK's experimental /usage call, isolated here because its name will change. */
+export async function readClaudeUsage(q: Pick<Query, 'usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET'>): Promise<LimitReading[]> {
+  const usage = await q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true })
+  return parseClaudeUsage(usage)
+}
+
+/** Starts Claude Code for one profile without a prompt, reads its plan limits, and stops it. */
+export async function probeClaudeLimits(query: QueryFn, target: ProbeTarget, timeoutMs = 60_000): Promise<{ readings: LimitReading[]; raw: unknown }> {
+  const abort = new AbortController()
+  const q = query({
+    prompt: idlePrompt(abort.signal),
+    options: { cwd: target.cwd, env: target.env, pathToClaudeCodeExecutable: target.binary, settingSources: [], abortController: abort }
+  })
+  const timer = setTimeout(() => abort.abort(), timeoutMs)
+  try {
+    const raw = await q.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors: true })
+    return { readings: parseClaudeUsage(raw), raw }
+  } finally {
+    clearTimeout(timer)
+    q.close()
+    abort.abort()
+  }
+}
+
 export type FetchFn = (url: string, init: { headers: Record<string, string> }) => Promise<{ status: number }>
 
 /** Checks a key against the Anthropic API (models endpoint, no tokens used). */
@@ -76,12 +102,12 @@ export async function checkApiKey(fetchFn: FetchFn, apiKey: string): Promise<{ o
       headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }
     }))
   } catch (err) {
-    return { ok: false, detail: `Could not reach the Anthropic API: ${(err as Error).message}` }
+    return { ok: false, detail: t('Could not reach the Anthropic API: {message}', { message: (err as Error).message }) }
   }
   if (status === 200) return { ok: true, detail: null }
-  if (status === 401) return { ok: false, detail: 'The API key was rejected (401).' }
-  if (status === 403) return { ok: false, detail: 'The API key is not allowed to use the API (403).' }
-  return { ok: false, detail: `The Anthropic API answered ${status}.` }
+  if (status === 401) return { ok: false, detail: t('The API key was rejected (401).') }
+  if (status === 403) return { ok: false, detail: t('The API key is not allowed to use the API (403).') }
+  return { ok: false, detail: t('The Anthropic API answered {status}.', { status }) }
 }
 
 export interface ConnectionDeps {
@@ -111,14 +137,14 @@ export async function testConnection(
   result.subscriptionType = auth.subscriptionType
   if (!auth.loggedIn) {
     result.detail = target.apiKey
-      ? 'Claude Code did not accept the stored key.'
-      : 'Open the sign-in terminal and log in with the account this profile should use.'
+      ? t('Claude Code did not accept the stored key.')
+      : t('Open the sign-in terminal and log in with the account this profile should use.')
     return result
   }
   if (target.apiKey) {
     const key = await checkApiKey(deps.fetch, target.apiKey)
     if (!key.ok) {
-      result.status = 'Key rejected'
+      result.status = t('Key rejected')
       result.detail = key.detail
       return result
     }
@@ -130,12 +156,12 @@ export async function testConnection(
     result.organization ??= probe.account.organization ?? null
     result.subscriptionType ??= probe.account.subscriptionType ?? null
   } catch (err) {
-    result.status = 'Signed in'
-    result.detail = `Claude Code started but did not list its models: ${(err as Error).message}`
+    result.status = t('Signed in')
+    result.detail = t('Claude Code started but did not list its models: {message}', { message: (err as Error).message })
     return result
   }
   result.ok = true
-  result.status = 'Signed in'
+  result.status = t('Signed in')
   return result
 }
 
@@ -151,6 +177,8 @@ export interface SessionConfig extends ProbeTarget {
 export interface SessionDeps {
   query: QueryFn
   emit: (event: AgentEvent) => void
+  /** Plan limits read after each turn (subscription profiles). */
+  onLimits?: (readings: LimitReading[]) => void
   decide: (tool: ToolRequest) => PermissionDecision
   ask: (question: ApprovalQuestion, signal: AbortSignal) => Promise<ApprovalOutcome>
   log?: (line: string) => void
@@ -192,12 +220,33 @@ export class ClaudeCodeSession {
     await this.q?.interrupt()
   }
 
+  /** Claude Code's own `/compact`: it summarizes the conversation and reports a compact boundary. */
+  async compact(): Promise<void> {
+    if (this.closed) return
+    this.queue.push({ type: 'user', message: { role: 'user', content: '/compact' }, parent_tool_use_id: null })
+    this.wake?.()
+  }
+
   stop(): void {
     if (this.closed) return
     this.closed = true
     this.wake?.()
     this.q?.close()
     this.abort.abort()
+  }
+
+  private limitsReading = false
+
+  /** Claude Code's structured /usage (experimental SDK call); one at a time, failures ignored. */
+  private readLimits(q: Query): void {
+    if (this.limitsReading) return
+    this.limitsReading = true
+    readClaudeUsage(q)
+      .then((readings) => {
+        if (readings.length) this.deps.onLimits?.(readings)
+      })
+      .catch((err: Error) => this.deps.log?.(`could not read usage limits: ${err.message}`))
+      .finally(() => (this.limitsReading = false))
   }
 
   private async *input(): AsyncGenerator<SDKUserMessage> {
@@ -231,7 +280,7 @@ export class ClaudeCodeSession {
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: outcome.behavior,
-          permissionDecisionReason: outcome.behavior === 'allow' ? 'Allowed by Clyde' : outcome.message
+          permissionDecisionReason: outcome.behavior === 'allow' ? t('Allowed by Clyde') : outcome.message
         }
       }
     }
@@ -244,7 +293,7 @@ export class ClaudeCodeSession {
           toolUseId: opts.toolUseID,
           toolName,
           input,
-          reason: opts.title ?? opts.decisionReason ?? 'Claude Code asks for approval'
+          reason: opts.title ?? opts.decisionReason ?? t('Claude Code asks for approval')
         },
         opts.signal
       )
@@ -278,6 +327,8 @@ export class ClaudeCodeSession {
     try {
       for await (const message of q) {
         for (const event of this.translator.translate(message)) this.deps.emit(event)
+        // After each answer, and when Claude Code says a limit changed, read the plan's windows.
+        if (this.deps.onLimits && (message.type === 'result' || message.type === 'rate_limit_event')) this.readLimits(q)
       }
     } catch (err) {
       if (!this.closed) this.deps.emit({ type: 'error', message: (err as Error).message })

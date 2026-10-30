@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { safeStorage } from 'electron'
 import { AppError } from '@shared/errors'
 import type { Db } from './db/database'
@@ -36,7 +37,7 @@ export class SecretsService {
     if (!this.cipher.available()) {
       throw new AppError(
         'secrets_unavailable',
-        'This system has no secure storage for secrets, so the key was not saved. On Linux, install and unlock a keyring (GNOME Keyring or KWallet).'
+        t('This system has no secure storage for secrets, so the key was not saved. On Linux, install and unlock a keyring (GNOME Keyring or KWallet).')
       )
     }
     this.db
@@ -61,7 +62,7 @@ export class SecretsService {
     } catch {
       throw new AppError(
         'secrets_unavailable',
-        'A stored key could not be decrypted. It may have been saved under another Windows account; enter it again.'
+        t('A stored key could not be decrypted. It may have been saved under another Windows account; enter it again.')
       )
     }
   }

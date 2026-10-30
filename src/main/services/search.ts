@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { spawn } from 'node:child_process'
 import { rgPath as bundledRgPath } from '@vscode/ripgrep'
 import { AppError } from '@shared/errors'
@@ -94,11 +95,11 @@ export function searchText(root: string, opts: SearchOptions): Promise<SearchRes
     child.stderr.on('data', (chunk: Buffer) => {
       stderr += chunk.toString()
     })
-    child.on('error', (err) => reject(new AppError('search_error', `ripgrep failed to start: ${err.message}`)))
+    child.on('error', (err) => reject(new AppError('search_error', t('ripgrep failed to start: {message}', { message: err.message }))))
     child.on('close', (code) => {
       // 0 = matches, 1 = no match, null = killed after hitting the limit.
       if (code === 0 || code === 1 || truncated) resolve({ matches, truncated })
-      else reject(new AppError('search_error', stderr.trim().split('\n')[0] || `ripgrep exited with ${code}`))
+      else reject(new AppError('search_error', stderr.trim().split('\n')[0] || t('ripgrep exited with {code}', { code })))
     })
   })
 }
@@ -125,7 +126,7 @@ export function listFiles(root: string, max = MAX_FILES): Promise<{ files: strin
         if (line) files.push(line.replace(/\\/g, '/'))
       }
     })
-    child.on('error', (err) => reject(new AppError('search_error', `Could not list files: ${err.message}`)))
+    child.on('error', (err) => reject(new AppError('search_error', t('Could not list files: {message}', { message: err.message }))))
     child.on('close', () => {
       if (rest && files.length < max) files.push(rest.replace(/\\/g, '/'))
       resolve({ files: files.sort(), truncated })

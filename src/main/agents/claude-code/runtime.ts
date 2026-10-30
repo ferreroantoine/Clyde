@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { execFile } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -14,11 +15,13 @@ export interface ProfileRuntime {
 }
 
 /**
- * Variables that would make Claude Code use another account or backend than the profile's:
- * inherited keys and tokens, base URLs, Bedrock/Vertex switches, another CLAUDE_CONFIG_DIR,
- * and the markers a parent Claude Code session sets.
+ * Variables that would make a CLI or a command use another account or backend than the
+ * profile's: inherited keys and tokens, base URLs, Bedrock/Vertex switches, another
+ * CLAUDE_CONFIG_DIR or CODEX_HOME, Google credentials, and the markers a parent Claude Code
+ * session sets.
  */
-const INHERITED_AUTH = /^(ANTHROPIC_|CLAUDE_|CLAUDECODE$|OPENAI_|MISTRAL_)/
+const INHERITED_AUTH =
+  /^(ANTHROPIC_|CLAUDE_|CLAUDECODE$|OPENAI_|MISTRAL_|CODEX_|GEMINI_|AGY_|GOOGLE_API_KEY$|GOOGLE_APPLICATION_CREDENTIALS$|GOOGLE_CLOUD_|GOOGLE_GEMINI_)/
 
 /** The app's environment without any provider account: what agent processes and their commands get. */
 export function withoutAccountVars(base: NodeJS.ProcessEnv): Record<string, string> {
@@ -56,7 +59,7 @@ export function binaryPackages(platform: NodeJS.Platform, arch: string): string[
 /** The Claude Code executable: the user's override when set, else the one bundled with the Agent SDK. */
 export function resolveClaudeBinary(override: string): string {
   if (override.trim()) {
-    if (!existsSync(override)) throw new AppError('claude_code_missing', `Claude Code was not found at ${override}`)
+    if (!existsSync(override)) throw new AppError('claude_code_missing', t('Claude Code was not found at {override}', { override }))
     return override
   }
   const exe = process.platform === 'win32' ? 'claude.exe' : 'claude'
@@ -70,7 +73,7 @@ export function resolveClaudeBinary(override: string): string {
   }
   throw new AppError(
     'claude_code_missing',
-    'The Claude Code binary bundled with the Agent SDK is missing. Run npm install again, or set its path in Settings.'
+    t('The Claude Code binary bundled with the Agent SDK is missing. Run npm install again, or set its path in Settings.')
   )
 }
 
@@ -109,7 +112,7 @@ export function authStatus(binary: string, env: Record<string, string>, timeoutM
         try {
           resolve(parseAuthStatus(stdout))
         } catch {
-          reject(new AppError('agent_error', `Claude Code did not report its sign-in state: ${err?.message ?? 'no output'}`))
+          reject(new AppError('agent_error', t('Claude Code did not report its sign-in state: {message}', { message: err?.message ?? t('no output') })))
         }
       }
     )

@@ -16,7 +16,13 @@ export function toAnthropicMessages(messages: ChatMessage[]): MessageParam[] {
     else out.push({ role, content: blocks })
   }
   for (const m of messages) {
-    if (m.role === 'user') push('user', [{ type: 'text', text: m.text }])
+    if (m.role === 'user') {
+      const images: ContentBlockParam[] = (m.images ?? []).map((img) => ({
+        type: 'image',
+        source: { type: 'base64', media_type: img.mime as 'image/png', data: img.data }
+      }))
+      push('user', [...images, { type: 'text', text: m.text }])
+    }
     else if (m.role === 'assistant') {
       const blocks: ContentBlockParam[] = []
       if (m.text) blocks.push({ type: 'text', text: m.text })
@@ -30,6 +36,24 @@ export function toAnthropicMessages(messages: ChatMessage[]): MessageParam[] {
     }
   }
   return out
+}
+
+/**
+ * Prompt caching: one breakpoint after the system prompt (it covers the tools, which come
+ * first, and the system with its memory), one on the last block of the history, so each step
+ * reads everything before it from the cache. Prefixes under the model's minimum are simply
+ * not cached.
+ */
+export function withCacheBreakpoints(system: string, messages: MessageParam[]): { system: Anthropic.TextBlockParam[]; messages: MessageParam[] } {
+  const cached = messages.map((m) => ({ ...m }))
+  const last = cached.at(-1)
+  if (last && Array.isArray(last.content) && last.content.length) {
+    const blocks = [...last.content]
+    const tail = blocks.at(-1) as ContentBlockParam & { cache_control?: unknown }
+    blocks[blocks.length - 1] = { ...tail, cache_control: { type: 'ephemeral' } } as ContentBlockParam
+    last.content = blocks
+  }
+  return { system: system ? [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }] : [], messages: cached }
 }
 
 function stopReason(reason: string | null | undefined): StopReason {
@@ -47,8 +71,7 @@ export class AnthropicAdapter implements ChatAdapter {
       {
         model: req.model,
         max_tokens: MAX_TOKENS,
-        system: req.system,
-        messages: toAnthropicMessages(req.messages),
+        ...withCacheBreakpoints(req.system, toAnthropicMessages(req.messages)),
         tools: req.tools.map((t) => ({
           name: t.name,
           description: t.description,
@@ -60,7 +83,7 @@ export class AnthropicAdapter implements ChatAdapter {
     )
     let text = ''
     let reason: StopReason = 'other'
-    const usage = { inputTokens: 0, outputTokens: 0 }
+    const usage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }
     const tools = new Map<number, { id: string; name: string; json: string }>()
     for await (const event of stream) {
       switch (event.type) {
@@ -70,6 +93,8 @@ export class AnthropicAdapter implements ChatAdapter {
             (event.message.usage.cache_read_input_tokens ?? 0) +
             (event.message.usage.cache_creation_input_tokens ?? 0)
           usage.outputTokens = event.message.usage.output_tokens
+          usage.cacheReadTokens = event.message.usage.cache_read_input_tokens ?? 0
+          usage.cacheWriteTokens = event.message.usage.cache_creation_input_tokens ?? 0
           break
         case 'content_block_start':
           if (event.content_block.type === 'tool_use') {

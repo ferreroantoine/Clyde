@@ -104,11 +104,11 @@ describe('AnthropicAdapter', () => {
         text: 'Look',
         toolCalls: [{ id: 'tu1', name: 'read_file', input: { path: 'a.ts' } }],
         stopReason: 'tool_use',
-        usage: { inputTokens: 15, outputTokens: 20 }
+        usage: { inputTokens: 15, outputTokens: 20, cacheReadTokens: 5, cacheWriteTokens: 0 }
       }
     ])
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'm', system: 'sys', stream: true, tools: [expect.objectContaining({ name: 'read_file' })] }),
+      expect.objectContaining({ model: 'm', system: [{ type: 'text', text: 'sys', cache_control: { type: 'ephemeral' } }], stream: true, tools: [expect.objectContaining({ name: 'read_file' })] }),
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     )
   })
@@ -139,16 +139,9 @@ describe('OpenAICompatAdapter', () => {
       text: 'Hi',
       toolCalls: [{ id: 'call_1', name: 'run_command', input: { command: 'ls' } }],
       stopReason: 'tool_use',
-      usage: { inputTokens: 30, outputTokens: 7 }
+      usage: { inputTokens: 30, outputTokens: 7, cacheReadTokens: 0 }
     })
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ stream_options: { include_usage: true } }), expect.anything())
-  })
-
-  it('does not send stream_options to Mistral', async () => {
-    const create = vi.fn(async () => items(chunks))
-    const adapter = new OpenAICompatAdapter({ chat: { completions: { create } } } as unknown as OpenAI, 'mistral')
-    await collect(adapter.stream(request()))
-    expect((create.mock.calls[0] as unknown[] | undefined)?.[0]).not.toHaveProperty('stream_options')
   })
 
   it('keeps chat models, newest first', () => {
@@ -161,14 +154,57 @@ describe('OpenAICompatAdapter', () => {
         { id: 'whisper-1', created: 5 }
       ]).map((m) => m.value)
     ).toEqual(['gpt-5', 'gpt-4o'])
-    expect(
-      filterModels('mistral', [
-        { id: 'mistral-large-latest', capabilities: { function_calling: true } },
-        { id: 'mistral-embed' },
-        { id: 'old-model', capabilities: { function_calling: false } }
-      ]).map((m) => m.value)
-    ).toEqual(['mistral-large-latest'])
     expect(filterModels('ollama', [{ id: 'llama3.2' }, { id: 'qwen3' }]).map((m) => m.value)).toEqual(['llama3.2', 'qwen3'])
+    expect(
+      filterModels('gemini', [
+        { id: 'models/gemini-3.8-flash' },
+        { id: 'models/gemini-embedding-001' },
+        { id: 'gemini-3.1-pro-preview' },
+        { id: 'models/gemini-3.8-live' },
+        { id: 'models/imagen-4.0-generate-001' },
+        { id: 'models/gemini-2.5-flash-preview-tts' }
+      ]).map((m) => m.value)
+    ).toEqual(['gemini-3.8-flash', 'gemini-3.1-pro-preview'])
+  })
+
+  it('keeps vendor data on tool calls and sends it back (Gemini thought signatures)', async () => {
+    const signed = [
+      {
+        choices: [
+          {
+            index: 0,
+            delta: {
+              tool_calls: [
+                {
+                  index: 0,
+                  id: 'fc_1',
+                  function: { name: 'list_files', arguments: '{}' },
+                  extra_content: { google: { thought_signature: 'sig==' } }
+                }
+              ]
+            },
+            finish_reason: 'tool_calls'
+          }
+        ]
+      }
+    ]
+    const create = vi.fn(async () => items(signed))
+    const adapter = new OpenAICompatAdapter({ chat: { completions: { create } } } as unknown as OpenAI, 'gemini')
+    const done = (await collect(adapter.stream(request()))).at(-1)
+    const call = { id: 'fc_1', name: 'list_files', input: {}, extra: { google: { thought_signature: 'sig==' } } }
+    expect(done).toMatchObject({ toolCalls: [call] })
+    expect(toOpenAIMessages('sys', [{ role: 'assistant', text: '', toolCalls: [call] }])[1]).toEqual({
+      role: 'assistant',
+      content: null,
+      tool_calls: [
+        {
+          id: 'fc_1',
+          type: 'function',
+          function: { name: 'list_files', arguments: '{}' },
+          extra_content: { google: { thought_signature: 'sig==' } }
+        }
+      ]
+    })
   })
 })
 

@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { AppError } from '@shared/errors'
 
@@ -16,8 +17,8 @@ export function isInside(root: string, abs: string): boolean {
  * that escapes the root (`..`, absolute paths, other drives).
  */
 export function resolveInside(root: string, relPath: string): string {
-  if (relPath.includes('\0')) throw new AppError('outside_workspace', 'Invalid path')
+  if (relPath.includes('\0')) throw new AppError('outside_workspace', t('Invalid path'))
   const abs = resolve(root, relPath)
-  if (!isInside(root, abs)) throw new AppError('outside_workspace', `Path is outside the workspace: ${relPath}`)
+  if (!isInside(root, abs)) throw new AppError('outside_workspace', t('Path is outside the workspace: {relPath}', { relPath }))
   return abs
 }

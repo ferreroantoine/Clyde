@@ -1,4 +1,5 @@
 import type { AgentEvent, AgentEventEnvelope, AgentSessionInfo, ApprovalDecision } from '@shared/agent'
+import { t, tn } from '@shared/i18n'
 
 export interface Approval {
   requestId: string
@@ -31,6 +32,8 @@ export type TranscriptItem =
       durationMs: number
     }
   | { kind: 'error'; id: string; message: string }
+  /** A quiet line in the transcript, e.g. "earlier turns summarized". */
+  | { kind: 'note'; id: string; text: string }
 
 export type ToolItem = Extract<TranscriptItem, { kind: 'tool' }>
 
@@ -45,9 +48,11 @@ export interface SessionView {
   info: AgentSessionInfo
   items: TranscriptItem[]
   lastSeq: number
-  claudeCodeVersion: string | null
+  cliVersion: string | null
   rateLimit: RateLimit | null
-  totals: { costUsd: number; inputTokens: number; outputTokens: number }
+  totals: { costUsd: number; inputTokens: number; outputTokens: number; cacheReadTokens: number }
+  /** Size of the conversation after the last turn, and the model's window when known. */
+  context: { tokens: number; window: number | null } | null
 }
 
 export function emptyView(info: AgentSessionInfo): SessionView {
@@ -55,9 +60,10 @@ export function emptyView(info: AgentSessionInfo): SessionView {
     info,
     items: [],
     lastSeq: 0,
-    claudeCodeVersion: null,
+    cliVersion: null,
     rateLimit: null,
-    totals: { costUsd: 0, inputTokens: 0, outputTokens: 0 }
+    totals: { costUsd: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 },
+    context: null
   }
 }
 
@@ -86,7 +92,12 @@ function reduce(view: SessionView, event: AgentEvent, seq: number): SessionView 
     case 'status':
       return { ...view, info: { ...view.info, status: event.status } }
     case 'init':
-      return { ...view, claudeCodeVersion: event.claudeCodeVersion, info: { ...view.info, model: event.model || view.info.model } }
+      // Sessions recorded before the rename carry `claudeCodeVersion`.
+      return {
+        ...view,
+        cliVersion: event.cliVersion ?? (event as { claudeCodeVersion?: string }).claudeCodeVersion ?? null,
+        info: { ...view.info, model: event.model || view.info.model }
+      }
     case 'user':
       return { ...view, items: [...items, { kind: 'user', id: event.id, text: event.text }] }
     case 'text_delta':
@@ -147,13 +158,22 @@ function reduce(view: SessionView, event: AgentEvent, seq: number): SessionView 
         totals: {
           costUsd: view.totals.costUsd + (event.costUsd ?? 0),
           inputTokens: view.totals.inputTokens + event.inputTokens,
-          outputTokens: view.totals.outputTokens + event.outputTokens
-        }
+          outputTokens: view.totals.outputTokens + event.outputTokens,
+          cacheReadTokens: view.totals.cacheReadTokens + (event.cacheReadTokens ?? 0)
+        },
+        context: event.contextTokens ? { tokens: event.contextTokens, window: event.contextWindow ?? view.context?.window ?? null } : view.context
       }
     case 'rate_limit':
       return { ...view, rateLimit: withoutType(event) }
     case 'error':
       return { ...view, items: [...items, { kind: 'error', id: `error-${seq}`, message: event.message }] }
+    case 'context_summarized':
+      return {
+        ...view,
+        items: [...items, { kind: 'note', id: `note-${seq}`, text: tn('{count} earlier turn summarized to save context.', '{count} earlier turns summarized to save context.', event.turns) }]
+      }
+    case 'context_compacted':
+      return { ...view, items: [...items, { kind: 'note', id: `note-${seq}`, text: t('The conversation was compacted.') }], context: view.context ? { ...view.context, tokens: 0 } : null }
   }
 }
 
@@ -208,7 +228,7 @@ export function describeTool(name: string, input: Record<string, unknown>, cwd: 
     case 'Task':
       return str('description') || str('prompt')
     case 'TodoWrite':
-      return 'Update the to-do list'
+      return t('Update the to-do list')
     default: {
       const first = Object.values(input).find((v) => typeof v === 'string')
       return typeof first === 'string' ? first : ''

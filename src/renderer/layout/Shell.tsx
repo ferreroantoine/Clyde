@@ -1,4 +1,8 @@
 import { Group, Panel, useDefaultLayout } from 'react-resizable-panels'
+import { AnimatePresence, motion } from 'motion/react'
+import { swap } from '@/lib/motion'
+import { t, tk } from '@shared/i18n'
+import type { CenterView } from '@/stores/layout'
 import { useLayout } from '@/stores/layout'
 import { ActivityBar } from './ActivityBar'
 import { StatusBar } from './StatusBar'
@@ -12,11 +16,14 @@ import { CenterPage } from '@/features/pages/CenterPage'
 import { cn } from '@/lib/utils'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 
+const CENTER_SCOPES: Record<CenterView, string> = { chat: tk('The chat'), editor: tk('The editor'), agents: tk('The agents board'), supervision: tk('Supervision'), settings: tk('Settings') }
+
 const storage = typeof window !== 'undefined' ? window.localStorage : undefined
 
 export function Shell() {
   const center = useLayout((s) => s.center)
-  const sidebar = usePanelSync(useLayout((s) => s.sidebarOpen), useLayout((s) => s.setSidebarOpen))
+  // The Chat view has its own conversation list: the Explorer steps aside (and comes back after).
+  const sidebar = usePanelSync(useLayout((s) => s.sidebarOpen && s.center !== 'chat'), useLayout((s) => s.setSidebarOpen))
   const agent = usePanelSync(useLayout((s) => s.agentPanelOpen), useLayout((s) => s.setAgentPanelOpen))
   const terminal = usePanelSync(useLayout((s) => s.terminalOpen), useLayout((s) => s.setTerminalOpen))
 
@@ -58,13 +65,15 @@ export function Shell() {
                   <div className={cn('h-full', center !== 'editor' && 'invisible')}>
                     <EditorArea />
                   </div>
-                  {center !== 'editor' && (
-                    <div className="absolute inset-0 bg-background">
-                      <ErrorBoundary key={center} scope={center[0]?.toUpperCase() + center.slice(1)}>
-                        <CenterPage view={center} />
-                      </ErrorBoundary>
-                    </div>
-                  )}
+                  <AnimatePresence initial={false}>
+                    {center !== 'editor' && (
+                      <motion.div key={center} variants={swap} initial="hidden" animate="shown" exit="gone" className="absolute inset-0 bg-background">
+                        <ErrorBoundary scope={t(CENTER_SCOPES[center])}>
+                          <CenterPage view={center} />
+                        </ErrorBoundary>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               </Panel>
               <ResizeHandle orientation="vertical" />
@@ -94,7 +103,7 @@ export function Shell() {
             maxSize="50"
             className="bg-chrome"
           >
-            <ErrorBoundary scope="The agent panel">
+            <ErrorBoundary scope={t('The agent panel')}>
               <AgentPanel />
             </ErrorBoundary>
           </Panel>

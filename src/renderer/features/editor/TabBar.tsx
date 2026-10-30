@@ -1,4 +1,5 @@
 import { X } from 'lucide-react'
+import { t } from '@shared/i18n'
 import { useEditor, type EditorTab } from '@/stores/editor'
 import { FileIcon } from '@/features/explorer/FileIcon'
 import { cn } from '@/lib/utils'
@@ -29,10 +30,10 @@ function Tab({ tab, active }: { tab: EditorTab; active: boolean }) {
           e.stopPropagation()
           close(tab.path)
         }}
-        className="relative flex size-5 shrink-0 items-center justify-center rounded hover:bg-accent"
+        className="press relative flex size-5 shrink-0 items-center justify-center rounded hover:bg-accent"
       >
         {tab.dirty && (
-          <span className="absolute size-2 rounded-full bg-foreground/70 group-hover:opacity-0" aria-label="Unsaved" />
+          <span className="absolute size-2 rounded-full bg-foreground/70 group-hover:opacity-0" aria-label={t('Unsaved')} />
         )}
         <X className={cn('size-3.5', tab.dirty ? 'opacity-0 group-hover:opacity-100' : 'opacity-0 group-hover:opacity-70', active && !tab.dirty && 'opacity-70')} />
       </button>

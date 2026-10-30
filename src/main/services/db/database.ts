@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import Database from 'better-sqlite3'
 import { migrations as defaultMigrations, type Migration } from './migrations'
 
@@ -17,11 +18,12 @@ export function migrate(db: Db, migrations: Migration[] = defaultMigrations): nu
   const pending = [...migrations].sort((a, b) => a.version - b.version).filter((m) => m.version > current)
   const latest = migrations.reduce((max, m) => Math.max(max, m.version), 0)
   if (current > latest) {
-    throw new Error(`Database version ${current} is newer than this build (${latest}). Update Clyde.`)
+    throw new Error(t('Database version {current} is newer than this build ({latest}). Update Clyde.', { current, latest }))
   }
   for (const m of pending) {
     db.transaction(() => {
       db.exec(m.sql)
+      m.up?.(db)
       db.pragma(`user_version = ${m.version}`)
     })()
   }

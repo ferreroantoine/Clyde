@@ -4,12 +4,24 @@ import { parseToolInput, type AdapterEvent, type ChatAdapter, type ChatMessage, 
 
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam
 
-export type OpenAICompatKind = 'openai' | 'mistral' | 'ollama'
+export type OpenAICompatKind = 'openai' | 'gemini' | 'ollama'
 
 export function toOpenAIMessages(system: string, messages: ChatMessage[]): Message[] {
   const out: Message[] = [{ role: 'system', content: system }]
   for (const m of messages) {
-    if (m.role === 'user') out.push({ role: 'user', content: m.text })
+    if (m.role === 'user') {
+      out.push(
+        m.images?.length
+          ? {
+              role: 'user',
+              content: [
+                ...m.images.map((img) => ({ type: 'image_url' as const, image_url: { url: `data:${img.mime};base64,${img.data}` } })),
+                { type: 'text' as const, text: m.text }
+              ]
+            }
+          : { role: 'user', content: m.text }
+      )
+    }
     else if (m.role === 'assistant') {
       out.push({
         role: 'assistant',
@@ -19,7 +31,9 @@ export function toOpenAIMessages(system: string, messages: ChatMessage[]): Messa
               tool_calls: m.toolCalls.map((c) => ({
                 id: c.id,
                 type: 'function' as const,
-                function: { name: c.name, arguments: JSON.stringify(c.input) }
+                function: { name: c.name, arguments: JSON.stringify(c.input) },
+                // Vendor data the model needs back, e.g. Gemini 3 thought signatures.
+                ...(c.extra ? { extra_content: c.extra } : {})
               }))
             }
           : {})
@@ -42,24 +56,22 @@ function stopReason(reason: string | null | undefined): StopReason {
 
 const OPENAI_CHAT = /^(gpt-|o\d|chatgpt-)/i
 const OPENAI_NOT_CHAT = /(audio|realtime|transcribe|tts|image|search|instruct|embedding|moderation)/i
-const MISTRAL_NOT_CHAT = /(embed|moderation|ocr|transcribe)/i
+const GEMINI_NOT_CHAT = /(embedding|tts|image|imagen|veo|live|transcribe|native-audio|robotics|aqa|translate)/i
 
 interface RawModel {
   id: string
   created?: number
   name?: string | null
   description?: string | null
-  capabilities?: { function_calling?: boolean; completion_chat?: boolean }
 }
 
 /** Keeps the models that can chat with tools, newest first. */
 export function filterModels(kind: OpenAICompatKind, models: RawModel[]): ModelOption[] {
-  const usable = models.filter((m) => {
+  // Gemini may list ids as `models/<id>`; requests take the bare id.
+  const named = kind === 'gemini' ? models.map((m) => ({ ...m, id: m.id.replace(/^models\//, '') })) : models
+  const usable = named.filter((m) => {
     if (kind === 'openai') return OPENAI_CHAT.test(m.id) && !OPENAI_NOT_CHAT.test(m.id)
-    if (kind === 'mistral') {
-      if (m.capabilities?.function_calling === false || m.capabilities?.completion_chat === false) return false
-      return !MISTRAL_NOT_CHAT.test(m.id)
-    }
+    if (kind === 'gemini') return m.id.startsWith('gemini-') && !GEMINI_NOT_CHAT.test(m.id)
     return true
   })
   const seen = new Set<string>()
@@ -69,7 +81,7 @@ export function filterModels(kind: OpenAICompatKind, models: RawModel[]): ModelO
     .map((m) => ({ value: m.id, displayName: m.name || m.id, description: m.description ?? '' }))
 }
 
-/** OpenAI Chat Completions, which Mistral and Ollama (`/v1`) also speak. */
+/** OpenAI Chat Completions, which Gemini's compatibility endpoint and Ollama (`/v1`) also speak. */
 export class OpenAICompatAdapter implements ChatAdapter {
   constructor(
     private readonly client: OpenAI,
@@ -90,19 +102,20 @@ export class OpenAICompatAdapter implements ChatAdapter {
             }
           : {}),
         stream: true,
-        // Mistral rejects stream_options and sends usage on its last chunk anyway.
-        ...(this.kind === 'mistral' ? {} : { stream_options: { include_usage: true } })
+        stream_options: { include_usage: true }
       },
       { signal: req.signal }
     )
     let text = ''
     let reason: StopReason = 'other'
-    const usage = { inputTokens: 0, outputTokens: 0 }
-    const calls = new Map<number, { id: string; name: string; args: string }>()
+    const usage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 }
+    const calls = new Map<number, { id: string; name: string; args: string; extra?: Record<string, unknown> }>()
     for await (const chunk of stream) {
       if (chunk.usage) {
         usage.inputTokens = chunk.usage.prompt_tokens ?? 0
         usage.outputTokens = chunk.usage.completion_tokens ?? 0
+        // OpenAI caches long prefixes by itself; Gemini's compatible endpoint reports its implicit cache the same way.
+        usage.cacheReadTokens = chunk.usage.prompt_tokens_details?.cached_tokens ?? 0
       }
       const choice = chunk.choices[0]
       if (!choice) continue
@@ -116,13 +129,20 @@ export class OpenAICompatAdapter implements ChatAdapter {
         if (tc.id) current.id = tc.id
         if (tc.function?.name) current.name += tc.function.name
         if (tc.function?.arguments) current.args += tc.function.arguments
+        const extra = (tc as { extra_content?: unknown }).extra_content
+        if (extra && typeof extra === 'object') current.extra = { ...current.extra, ...(extra as Record<string, unknown>) }
         calls.set(tc.index, current)
       }
       if (choice.finish_reason) reason = stopReason(choice.finish_reason)
     }
     const toolCalls = [...calls.entries()]
       .sort(([a], [b]) => a - b)
-      .map(([index, c]) => ({ id: c.id || `call_${index}`, name: c.name, input: parseToolInput(c.args) }))
+      .map(([index, c]) => ({
+        id: c.id || `call_${index}`,
+        name: c.name,
+        input: parseToolInput(c.args),
+        ...(c.extra ? { extra: c.extra } : {})
+      }))
     // Some servers end a tool-calling turn with "stop"; the calls decide.
     if (toolCalls.length && reason === 'end') reason = 'tool_use'
     yield { type: 'done', text, toolCalls, stopReason: reason, usage }

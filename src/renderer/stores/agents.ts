@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t } from '@shared/i18n'
 import type { AgentSessionInfo, AgentStart, ApprovalDecision } from '@shared/agent'
 import { invoke, on } from '@/lib/ipc'
 import { applyEvent, emptyView, type SessionView } from '@/lib/transcript'
@@ -17,6 +18,10 @@ interface AgentsState {
   start: (request: AgentStart) => Promise<boolean>
   send: (text: string) => Promise<boolean>
   interrupt: () => Promise<void>
+  /** Asks the agent to compact its own conversation (Claude Code /compact, Codex, Clyde's summary). */
+  compact: (id: string) => Promise<void>
+  /** Ends a session and starts the same agent again with a summary of it. */
+  continueWithSummary: (id: string) => Promise<void>
   stop: (id?: string) => Promise<void>
   answer: (requestId: string, decision: ApprovalDecision, message?: string) => Promise<void>
   select: (id: string | null) => void
@@ -35,6 +40,8 @@ export const useAgents = create<AgentsState>()((set, get) => {
   })
 
   const upsertSession = (info: AgentSessionInfo) => {
+    // Chat sessions belong to the Chat view, not to the agent panel.
+    if (info.chatId) return
     const { sessions, order } = get()
     const current = sessions[info.id]
     set({
@@ -73,7 +80,7 @@ export const useAgents = create<AgentsState>()((set, get) => {
         set({ activeId: info.id })
         return true
       } catch (err) {
-        notify.error('Could not start the agent', err)
+        notify.error(t('Could not start the agent'), err)
         return false
       } finally {
         set({ starting: false })
@@ -87,7 +94,7 @@ export const useAgents = create<AgentsState>()((set, get) => {
         await invoke('agent:send', { sessionId: id, text })
         return true
       } catch (err) {
-        notify.error('Could not send the message', err)
+        notify.error(t('Could not send the message'), err)
         return false
       }
     },
@@ -95,19 +102,36 @@ export const useAgents = create<AgentsState>()((set, get) => {
     interrupt: async () => {
       const id = get().activeId
       if (!id) return
-      await invoke('agent:interrupt', { sessionId: id }).catch((err) => notify.error('Could not interrupt the agent', err))
+      await invoke('agent:interrupt', { sessionId: id }).catch((err) => notify.error(t('Could not interrupt the agent'), err))
+    },
+
+    compact: async (id) => {
+      await invoke('agent:compact', { sessionId: id }).catch((err) => notify.error(t('Could not compact the conversation'), err))
+    },
+
+    continueWithSummary: async (id) => {
+      set({ starting: true })
+      try {
+        const info = await invoke('agent:continueWithSummary', { sessionId: id })
+        upsertSession(info)
+        set({ activeId: info.id })
+      } catch (err) {
+        notify.error(t('Could not start the new session'), err)
+      } finally {
+        set({ starting: false })
+      }
     },
 
     stop: async (id = get().activeId ?? undefined) => {
       if (!id) return
-      await invoke('agent:stop', { sessionId: id }).catch((err) => notify.error('Could not stop the agent', err))
+      await invoke('agent:stop', { sessionId: id }).catch((err) => notify.error(t('Could not stop the agent'), err))
     },
 
     answer: async (requestId, decision, message) => {
       const id = get().activeId
       if (!id) return
       await invoke('agent:approve', { sessionId: id, requestId, decision, ...(message ? { message } : {}) }).catch((err) =>
-        notify.error('Could not answer the request', err)
+        notify.error(t('Could not answer the request'), err)
       )
     },
 

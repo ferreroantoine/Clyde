@@ -1,5 +1,7 @@
+import type { ContextBreakdown } from './agent'
 import type { AgentEventEnvelope, AgentStatus } from './agent'
 import type { ProfileKind } from './profiles'
+import type { Billing, SessionLimitUsage } from './limits'
 
 export type MetricsRange = '24h' | '7d' | '30d'
 export const RANGE_DAYS: Record<MetricsRange, number> = { '24h': 1, '7d': 7, '30d': 30 }
@@ -25,22 +27,19 @@ export interface ProfileUsage {
   name: string
   color: string
   kind: ProfileKind
+  /** Subscriptions show plan limits, API accounts a cost, local models nothing. */
+  billing: Billing
   activeSessions: number
   sessions: number
   inputTokens: number
   outputTokens: number
-  /** Reported (Claude Code) plus estimated (API) cost. */
+  /** Cost of API sessions: reported (Claude Code with a key) plus estimated (API). Zero for subscriptions. */
   costUsd: number
   /** True when part of the cost is an estimate, or some turns had no known price. */
   costEstimated: boolean
+  /** Input tokens read from the prompt cache, of `inputTokens`. */
+  cacheReadTokens: number
   unpricedTurns: number
-  rateLimit: {
-    status: 'allowed' | 'allowed_warning' | 'rejected'
-    utilization: number | null
-    resetsAt: number | null
-    limitType: string | null
-    at: number
-  } | null
 }
 
 export interface DailyUsage {
@@ -68,8 +67,18 @@ export interface SessionRecord {
   turns: number
   inputTokens: number
   outputTokens: number
+  /** Of `inputTokens`, read from the prompt cache. */
+  cacheReadTokens: number
+  /** Size of the conversation after its last turn, and the model's window, when known. */
+  contextTokens: number | null
+  contextWindow: number | null
+  /** Where its tokens went, summed over turns; null for CLIs, which only report totals. */
+  breakdown: ContextBreakdown | null
   costUsd: number
   costEstimated: boolean
+  billing: Billing
+  /** Points of each plan window the session used (subscription sessions). */
+  limits: SessionLimitUsage[]
 }
 
 export interface Dashboard {

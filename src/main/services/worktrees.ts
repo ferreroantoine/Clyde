@@ -1,3 +1,4 @@
+import { t, tn } from '@shared/i18n'
 import { createHash } from 'node:crypto'
 import { existsSync, realpathSync } from 'node:fs'
 import { mkdir, readFile, rm, stat } from 'node:fs/promises'
@@ -66,7 +67,12 @@ export function parseNameStatus(out: string): TaskChange[] {
  * repository so watchers and tooling never see them.
  */
 export class WorktreeService {
-  constructor(private readonly root: string) {}
+  /** `root` is read each time, so a new folder in Settings applies to the next task. */
+  constructor(private readonly rootOf: string | (() => string)) {}
+
+  private get root(): string {
+    return typeof this.rootOf === 'string' ? this.rootOf : this.rootOf()
+  }
 
   async isRepo(dir: string): Promise<boolean> {
     try {
@@ -83,7 +89,7 @@ export class WorktreeService {
 
   async currentBranch(dir: string): Promise<string> {
     const name = (await git(dir).raw(['rev-parse', '--abbrev-ref', 'HEAD'])).trim()
-    if (name === 'HEAD') throw new AppError('invalid_request', 'The repository is on a detached HEAD. Check out a branch first.')
+    if (name === 'HEAD') throw new AppError('invalid_request', t('The repository is on a detached HEAD. Check out a branch first.'))
     return name
   }
 
@@ -100,7 +106,7 @@ export class WorktreeService {
     try {
       await git(repoRoot).raw(['worktree', 'add', '-b', branch, worktreePath, baseBranch])
     } catch (err) {
-      throw new AppError('io_error', `Could not create the worktree: ${(err as Error).message.trim()}`)
+      throw new AppError('io_error', t('Could not create the worktree: {message}', { message: (err as Error).message.trim() }))
     }
     return { repoRoot, baseBranch, branch, worktreePath }
   }
@@ -167,19 +173,19 @@ export class WorktreeService {
    * Merges the task branch into its base with --no-ff, in the main folder. On a conflict the
    * merge is aborted, nothing changes, and the conflicting files are returned.
    */
-  async merge(ref: WorktreeRef, title: string): Promise<MergeResult> {
+  async merge(ref: WorktreeRef, title: string, { cleanup = true }: { cleanup?: boolean } = {}): Promise<MergeResult> {
     await this.commitAll(ref, title)
     const current = await this.currentBranch(ref.repoRoot)
     if (current !== ref.baseBranch) {
       return {
         ok: false,
-        reason: `The main folder is on ${current}. Check out ${ref.baseBranch} there, then merge again.`,
+        reason: t('The main folder is on {current}. Check out {baseBranch} there, then merge again.', { current, baseBranch: ref.baseBranch }),
         conflicts: []
       }
     }
     const g = git(ref.repoRoot)
     const ahead = (await g.raw(['rev-list', '--count', `${ref.baseBranch}..${ref.branch}`])).trim()
-    if (ahead === '0') return { ok: false, reason: 'The agent changed nothing, so there is nothing to merge.', conflicts: [] }
+    if (ahead === '0') return { ok: false, reason: t('The agent changed nothing, so there is nothing to merge.'), conflicts: [] }
     let failure: string | null = null
     try {
       await g.raw([
@@ -205,15 +211,15 @@ export class WorktreeService {
       return {
         ok: false,
         reason: conflicts.length
-          ? `The merge has conflicts in ${conflicts.length} file${conflicts.length > 1 ? 's' : ''}. It was undone; resolve them by asking the agent or by hand.`
+          ? tn('The merge has conflicts in {count} file. It was undone; resolve them by asking the agent or by hand.', 'The merge has conflicts in {count} files. It was undone; resolve them by asking the agent or by hand.', conflicts.length)
           : /overwritten|uncommitted|local changes/i.test(failure ?? '')
-            ? 'Uncommitted changes in the main folder would be overwritten. Commit or stash them, then merge again.'
-            : `git merge failed: ${(failure ?? 'unknown error').trim().split('\n')[0]}`,
+            ? t('Uncommitted changes in the main folder would be overwritten. Commit or stash them, then merge again.')
+            : t('git merge failed: {message}', { message: (failure ?? t('unknown error')).trim().split('\n')[0] }),
         conflicts
       }
     }
     const commit = (await g.raw(['rev-parse', 'HEAD'])).trim()
-    await this.remove(ref, { deleteBranch: true })
+    if (cleanup) await this.remove(ref, { deleteBranch: true })
     return { ok: true, commit }
   }
 

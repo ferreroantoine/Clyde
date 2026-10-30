@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CircleCheck, LoaderCircle, ShieldCheck } from 'lucide-react'
-import type { Profile } from '@shared/profiles'
+import type { Profile, ProfileKind } from '@shared/profiles'
+import { t } from '@shared/i18n'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -16,9 +17,21 @@ import { terminals } from '@/lib/terminal/registry'
 import { notify } from '@/stores/notifications'
 import { useProfiles } from '@/stores/profiles'
 
+const CLI_NAMES: Partial<Record<ProfileKind, string>> = { 'claude-code': 'Claude Code', codex: 'Codex', antigravity: 'Antigravity' }
+
+function signInHelp(kind: ProfileKind, cli: string): string {
+  if (kind === 'antigravity') {
+    return t(
+      'Antigravity starts below and opens your browser to sign in. It keeps the sign-in in the Windows credential store; Clyde never sees it. Close this window once Antigravity shows its prompt.'
+    )
+  }
+  return t('{cli}’s own login runs below and opens your browser. Clyde never sees your credentials; they stay in this account’s folder.', { cli })
+}
+
 /**
- * Runs `claude auth login` for one profile in an embedded terminal. Claude Code handles the
- * whole flow and writes the credentials into the profile's own folder; Clyde only relays keystrokes.
+ * Runs the CLI's own login for one profile in an embedded terminal (`claude auth login`,
+ * `codex login`, or `agy` itself). The CLI handles the whole flow and stores the credentials;
+ * Clyde only relays keystrokes.
  */
 export function LoginDialog({ profile, onClose }: { profile: Profile | null; onClose: () => void }) {
   const test = useProfiles((s) => s.test)
@@ -36,6 +49,7 @@ export function LoginDialog({ profile, onClose }: { profile: Profile | null; onC
 }
 
 function LoginSession({ profile, onFailed, onDone }: { profile: Profile; onFailed: () => void; onDone: () => void }) {
+  const cli = CLI_NAMES[profile.kind] ?? t('The CLI')
   const [ptyId, setPtyId] = useState<string | null>(null)
   const [exitCode, setExitCode] = useState<number | null>(null)
 
@@ -63,7 +77,7 @@ function LoginSession({ profile, onFailed, onDone }: { profile: Profile; onFaile
         setPtyId(info.id)
       })
       .catch((err) => {
-        notify.error('Could not start Claude Code', err)
+        notify.error(t('Could not start {cli}', { cli }), err)
         onFailed()
       })
     return () => {
@@ -74,16 +88,15 @@ function LoginSession({ profile, onFailed, onDone }: { profile: Profile; onFaile
         terminals.dispose(id)
       }
     }
-  }, [profile, onFailed])
+  }, [profile, onFailed, cli])
 
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Sign in: {profile.name}</DialogTitle>
+        <DialogTitle>{t('Sign in: {name}', { name: profile.name })}</DialogTitle>
         <DialogDescription className="flex items-start gap-1.5">
           <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
-          Claude Code’s own login runs below and opens your browser. Clyde never sees your credentials; they stay in
-          this account’s folder.
+          {signInHelp(profile.kind, cli)}
         </DialogDescription>
       </DialogHeader>
       <div className="h-80 overflow-hidden rounded-lg border bg-terminal py-1">
@@ -98,13 +111,13 @@ function LoginSession({ profile, onFailed, onDone }: { profile: Profile; onFaile
       <DialogFooter className="items-center sm:justify-between">
         <span className="text-xs text-muted-foreground">
           {exitCode === null ? (
-            'Follow the steps in the terminal. Links open in your browser.'
+            t('Follow the steps in the terminal. Links open in your browser.')
           ) : exitCode === 0 ? (
             <span className="flex items-center gap-1.5 text-success">
-              <CircleCheck className="size-3.5" /> Claude Code finished. Close to test the connection.
+              <CircleCheck className="size-3.5" /> {t('{cli} finished. Close to test the connection.', { cli })}
             </span>
           ) : (
-            `Claude Code exited with code ${exitCode}.`
+            t('{cli} exited with code {code}.', { cli, code: exitCode })
           )}
         </span>
         <Button onClick={onDone}>{exitCode === null ? 'Close' : 'Done'}</Button>

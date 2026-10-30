@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentEvent } from '@shared/agent'
 
@@ -37,6 +38,9 @@ export class MessageTranslator {
   /** `total_cost_usd` is the session's running total; turns report the difference. */
   private costSoFar = 0
 
+  /** Context size after the main thread's last request, for the gauge. */
+  private lastContext: number | null = null
+
   private state(id: string): MessageState {
     let s = this.messages.get(id)
     if (!s) {
@@ -69,7 +73,11 @@ export class MessageTranslator {
               (msg.usage.cache_read_input_tokens ?? 0) +
               (msg.usage.cache_creation_input_tokens ?? 0),
             outputTokens: msg.usage.output_tokens,
-            durationMs: msg.duration_ms
+            durationMs: msg.duration_ms,
+            cacheReadTokens: msg.usage.cache_read_input_tokens ?? 0,
+            cacheWriteTokens: msg.usage.cache_creation_input_tokens ?? 0,
+            contextTokens: this.lastContext,
+            contextWindow: Math.max(0, ...Object.values(msg.modelUsage ?? {}).map((u) => u.contextWindow ?? 0)) || null
           }
         ]
       }
@@ -88,9 +96,10 @@ export class MessageTranslator {
       case 'system':
         if (msg.subtype === 'init') {
           return [
-            { type: 'init', model: msg.model, claudeCodeVersion: msg.claude_code_version, cwd: msg.cwd, tools: msg.tools }
+            { type: 'init', model: msg.model, cliVersion: msg.claude_code_version, cwd: msg.cwd, tools: msg.tools }
           ]
         }
+        if (msg.subtype === 'compact_boundary') return [{ type: 'context_compacted' }]
         if (msg.subtype === 'permission_denied') {
           const reason = 'reason' in msg && typeof msg.reason === 'string' ? msg.reason : 'Permission denied'
           return [{ type: 'permission_denied', toolUseId: msg.tool_use_id, toolName: msg.tool_name, reason }]
@@ -131,6 +140,11 @@ export class MessageTranslator {
     const out: AgentEvent[] = []
     const id = msg.message.id
     const subagent = msg.parent_tool_use_id
+    // The main thread's last request: its input plus what it wrote is the conversation's size now.
+    const usage = msg.message.usage as { input_tokens?: number; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null; output_tokens?: number } | undefined
+    if (usage && !subagent) {
+      this.lastContext = (usage.input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0) + (usage.output_tokens ?? 0)
+    }
     for (const block of msg.message.content) {
       if (block.type === 'text' && !subagent) {
         const s = this.state(id)
@@ -172,16 +186,16 @@ export class MessageTranslator {
 export function describeAssistantError(error: string): string {
   switch (error) {
     case 'authentication_failed':
-      return 'Claude Code is not signed in for this profile, or its key was rejected. Open Accounts to sign in or update the key.'
+      return t('Claude Code is not signed in for this profile, or its key was rejected. Open Accounts to sign in or update the key.')
     case 'billing_error':
-      return 'The account has a billing problem. Check it on claude.ai or in the Anthropic Console.'
+      return t('The account has a billing problem. Check it on claude.ai or in the Anthropic Console.')
     case 'rate_limit':
-      return 'The account hit a usage limit. Wait for the reset or switch to another profile.'
+      return t('The account hit a usage limit. Wait for the reset or switch to another profile.')
     case 'overloaded':
-      return 'The API is overloaded. Try again in a moment.'
+      return t('The API is overloaded. Try again in a moment.')
     case 'model_not_found':
-      return 'This model is not available for the profile. Pick another model.'
+      return t('This model is not available for the profile. Pick another model.')
     default:
-      return `Claude Code reported an error: ${error.replace(/_/g, ' ')}.`
+      return t('Claude Code reported an error: {error}.', { error: error.replace(/_/g, ' ') })
   }
 }

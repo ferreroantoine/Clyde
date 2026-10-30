@@ -25,7 +25,7 @@ function setup({ cipher = fakeCipher(), distribution = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'clyde-profiles-'))
   const onChanged = vi.fn()
   const secrets = new SecretsService(db, cipher)
-  const profiles = new ProfilesService(db, secrets, { profilesRoot: root, distribution, onChanged })
+  const profiles = new ProfilesService(db, secrets, { dataRoot: root, distribution, onChanged })
   return { db, root, profiles, secrets, onChanged }
 }
 
@@ -100,7 +100,7 @@ describe('ProfilesService', () => {
   it('marks subscription profiles made by a personal build as unusable in a distribution build', () => {
     const personal = setup()
     const p = personal.profiles.create({ name: 'Perso', color: '#6366f1', auth: 'subscription' })
-    const dist = new ProfilesService(personal.db, personal.secrets, { profilesRoot: personal.root, distribution: true })
+    const dist = new ProfilesService(personal.db, personal.secrets, { dataRoot: personal.root, distribution: true })
     expect(dist.get(p.id).usable).toBe(false)
     expect(() => dist.requireUsable(p.id)).toThrow(/disabled/)
   })
@@ -126,7 +126,7 @@ describe('API provider profiles', () => {
 
   it('rejects sign-in modes a kind does not support', () => {
     const { profiles } = setup()
-    expect(() => profiles.create({ kind: 'mistral', name: 'M', color: '#f97316', auth: 'subscription' })).toThrow(/cannot use/)
+    expect(() => profiles.create({ kind: 'openai', name: 'M', color: '#f97316', auth: 'subscription' })).toThrow(/cannot use/)
     expect(() => profiles.create({ kind: 'ollama', name: 'O', color: '#f97316', auth: 'api-key', apiKey: 'k' })).toThrow(/cannot use/)
     expect(() => profiles.create({ kind: 'anthropic', name: 'A', color: '#f97316', auth: 'api-key' })).toThrow(/API key is required/)
     expect(() =>
