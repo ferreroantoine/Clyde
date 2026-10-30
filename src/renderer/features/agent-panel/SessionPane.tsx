@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { intlLocale, t, tk } from '@shared/i18n'
 import { ArrowUp, CircleAlert, FoldVertical, Gauge, Square, StepForward } from 'lucide-react'
 import { PERMISSION_LEVEL_LABELS, type AgentStatus } from '@shared/agent'
-import { kindLabel } from '@shared/profiles'
+import { EFFORT_LABELS, kindLabel } from '@shared/profiles'
 import { Button } from '@/components/ui/button'
 import { ProfileBadge } from '@/components/ProfileBadge'
 import type { SessionView, TranscriptItem } from '@/lib/transcript'
@@ -259,6 +259,7 @@ export function SessionPane({ view }: { view: SessionView }) {
       <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b px-3 py-2 text-[11px] text-muted-foreground">
         {profile ? <ProfileBadge profile={profile} className="font-medium text-foreground" /> : <span>{t('Deleted account')}</span>}
         <span className="font-mono">{view.info.model || t('default model')}</span>
+        {view.info.effort && <span title={t('Reasoning effort')}>· {t(EFFORT_LABELS[view.info.effort])}</span>}
         <span>· {t(PERMISSION_LEVEL_LABELS[view.info.permissionLevel])}</span>
         <span className="ml-auto flex items-center gap-1.5">
           <StatusDot status={view.info.status} />
@@ -295,7 +296,7 @@ export function SessionPane({ view }: { view: SessionView }) {
           else if (el.scrollTop < lastTop.current - 2) stuck.current = false
           lastTop.current = el.scrollTop
         }}
-        className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3"
+        className="selectable min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3"
         aria-live="polite"
       >
         {view.items.length === 0 && (

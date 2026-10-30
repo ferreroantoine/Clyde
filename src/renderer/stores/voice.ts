@@ -69,6 +69,21 @@ export const useVoice = create<VoiceState>()((set, get) => ({
       for (const [id, target] of targets) if (target.element() === e.target) lastFocused = id
     }
     document.addEventListener('focusin', onFocus)
+    // While listening, Enter ends the dictation (the text goes in, nothing is sent) and Escape drops it.
+    // Captured before the fields see it, so Enter does not also send the message.
+    const onKey = (e: KeyboardEvent) => {
+      if (get().state !== 'listening' || e.isComposing) return
+      if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        void get().stop()
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        void get().cancel()
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
     const off = on('voice:progress', (p) => {
       set({ progress: { ...get().progress, [p.id]: p } })
       if (p.state === 'done') void get().loadStatus()
@@ -76,6 +91,7 @@ export const useVoice = create<VoiceState>()((set, get) => ({
     })
     return () => {
       document.removeEventListener('focusin', onFocus)
+      window.removeEventListener('keydown', onKey, true)
       off()
     }
   },

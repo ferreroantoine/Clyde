@@ -1,11 +1,25 @@
 import { t } from '@shared/i18n'
-import type { ConnectionResult, ModelOption } from '@shared/profiles'
+import { REASONING_EFFORTS, type ConnectionResult, type ModelOption, type ReasoningEffort } from '@shared/profiles'
 import type { AgentMcpServer } from '../../mcp/hub'
 import { withoutAccountVars } from '../claude-code/runtime'
 import type { SpawnCli } from '../cli/process'
 import { RpcConnection, RpcRequestError } from './rpc'
-import type { GetAccountRateLimitsResponse, GetAccountResponse, InitializeResponse, ModelListResponse } from './protocol'
+import type { GetAccountRateLimitsResponse, GetAccountResponse, InitializeResponse, Model, ModelListResponse } from './protocol'
 import { versionFromUserAgent } from './translate'
+
+/** A Codex model with the reasoning efforts it advertises (`model/list`). */
+export function codexModelOption(m: Model): ModelOption {
+  const known = (e: string | undefined): e is ReasoningEffort => (REASONING_EFFORTS as readonly (string | undefined)[]).includes(e)
+  const efforts = (m.supportedReasoningEfforts ?? []).map((e) => e.reasoningEffort).filter(known)
+  return {
+    value: m.model,
+    displayName: m.displayName,
+    description: m.description,
+    ...(efforts.length ? { efforts } : {}),
+    ...(known(m.defaultReasoningEffort) ? { defaultEffort: m.defaultReasoningEffort } : {}),
+    ...(m.isDefault ? { isDefault: true } : {})
+  }
+}
 
 /** Environment for a Codex process: the app's, minus every account variable, plus the profile's CODEX_HOME. */
 export function buildCodexEnv(base: NodeJS.ProcessEnv, codexHome: string): Record<string, string> {
@@ -63,7 +77,7 @@ export async function probeCodex(
       rateLimits,
       models: models.data
         .filter((m) => !m.hidden)
-        .map((m) => ({ value: m.model, displayName: m.displayName, description: m.description }))
+        .map((m) => codexModelOption(m))
     }
   } catch (err) {
     if (err instanceof RpcRequestError) throw new Error(`Codex answered ${err.method} with: ${err.message}`, { cause: err })

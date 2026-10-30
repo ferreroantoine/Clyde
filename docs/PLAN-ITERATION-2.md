@@ -167,3 +167,16 @@ Je travaille dans un conteneur Linux sans compte Claude Pro/Max, ChatGPT ou Goog
 - Chat : titres générés par le modèle interne (remplacent seulement le titre automatique) ; recherche dans les conversations passées par embeddings Ollama (`/api/embed`, cosinus en SQLite sans extension native), activable par conversation.
 - Supervision : taux de cache par compte, « Où vont les tokens » (sessions API ; CLI marqués non communiqués).
 - Vérifié dans l'app avec un faux serveur Ollama : édition et masquage d'un secret, synchronisation des fichiers, consolidation → diff → application, titre généré, passages injectés dans le prompt, jauge de contexte et répartition dans Supervision. Bug trouvé et corrigé : la synchronisation échouait avec un compte Ollama (pas de dossier de configuration).
+
+### Retours sur 0.2.0-beta.1 — faits (0.2.0-beta.2)
+- Texte sélectionnable dans le panneau agent, le chat et les transcripts de Supervision (classe `.selectable`, les boutons restent non sélectionnables).
+- Explorateur synchronisé avec l'onglet actif ; historique des onglets (MRU) : fermer l'onglet courant revient au précédent consulté ; aucun fichier ouvert → aucune sélection ; dossiers parents dépliés.
+- Dictée : Entrée arrête et insère (capturée avant le champ, donc rien n'est envoyé), Échap annule.
+- Sélecteur de modèle commun (panneau agent, chat, agents enregistrés) + niveau de réflexion. Vérifié :
+  - Claude Code : option `effort` de l'Agent SDK (`low|medium|high|xhigh|max`), niveaux par modèle via `supportedModels()` (`supportedEffortLevels`).
+  - Codex : `turn/start.effort`, niveaux par modèle dans `model/list` (`supportedReasoningEfforts`, `defaultReasoningEffort`) — schéma app-server.
+  - Antigravity : `agy --effort low|medium|high|xhigh|max` (lu dans `agy --help`) ; pas de niveaux par modèle, les cinq sont proposés.
+  - Anthropic API : `output_config.effort`, niveaux par modèle via `capabilities.effort` de `/v1/models` ; envoyé sans extended thinking (l'historique ne garde pas les blocs de réflexion).
+  - OpenAI / Gemini : `reasoning_effort` ; aucune liste ne dit quels modèles raisonnent, donc déduit du nom (o-series et GPT-5 hors « chat », Gemini 2.5+) avec low/medium/high seulement (minimal et none n'existent que sur certains modèles).
+  - Ollama : `reasoning_effort` sur `/v1` (docs.ollama.com) ; capacité `thinking` lue dans `/api/show` ; gpt-oss : low/medium/high, autres modèles qui pensent : désactivé/activé.
+- Migration SQL 14 : `agents.effort`, `conversations.effort`.

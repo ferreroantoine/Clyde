@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { tk } from './i18n'
-import { profileIdSchema, type ProfileKind } from './profiles'
+import { profileIdSchema, REASONING_EFFORTS, type ProfileKind, type ReasoningEffort } from './profiles'
 
 /**
  * Per-agent permission levels from the spec. Reads inside the working directory are always allowed.
@@ -34,6 +34,8 @@ export const agentStartSchema = z.object({
   profileId: profileIdSchema,
   /** Empty uses the profile's default model, then Claude Code's. */
   model: z.string().trim().max(200).default(''),
+  /** Reasoning effort; empty leaves the model's own default. */
+  effort: z.enum(REASONING_EFFORTS).or(z.literal('')).default(''),
   permissionLevel: z.enum(PERMISSION_LEVELS).default('validate-all'),
   /** Defaults to the open workspace. */
   cwd: z.string().max(4096).optional(),
@@ -73,6 +75,8 @@ export interface AgentSessionInfo {
   profileId: string
   kind: ProfileKind
   model: string
+  /** Reasoning effort asked for; empty is the model's default. */
+  effort: ReasoningEffort | ''
   permissionLevel: PermissionLevel
   cwd: string
   mcpTools: string[]

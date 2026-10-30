@@ -16,6 +16,7 @@ interface Row {
   name: string
   profile_id: string
   model: string
+  effort: string
   system_prompt: string
   permission_level: string
   mcp_tools: string
@@ -28,6 +29,7 @@ const toDefinition = (r: Row): AgentDefinition => ({
   name: r.name,
   profileId: r.profile_id,
   model: r.model,
+  effort: (r.effort ?? '') as AgentDefinition['effort'],
   systemPrompt: r.system_prompt,
   permissionLevel: r.permission_level as PermissionLevel,
   mcpTools: JSON.parse(r.mcp_tools) as string[],
@@ -59,10 +61,10 @@ export class AgentDefinitionsService {
     const now = Date.now()
     this.db
       .prepare(
-        `INSERT INTO agents (id, name, profile_id, model, system_prompt, permission_level, mcp_tools, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO agents (id, name, profile_id, model, effort, system_prompt, permission_level, mcp_tools, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(id, d.name, d.profileId, d.model, d.systemPrompt, d.permissionLevel, JSON.stringify(d.mcpTools), now, now)
+      .run(id, d.name, d.profileId, d.model, d.effort, d.systemPrompt, d.permissionLevel, JSON.stringify(d.mcpTools), now, now)
     this.onChanged(this.list())
     return this.get(id)
   }
@@ -73,13 +75,14 @@ export class AgentDefinitionsService {
     if (d.profileId) this.requireProfile(d.profileId)
     this.db
       .prepare(
-        `UPDATE agents SET name = ?, profile_id = ?, model = ?, system_prompt = ?, permission_level = ?, mcp_tools = ?, updated_at = ?
+        `UPDATE agents SET name = ?, profile_id = ?, model = ?, effort = ?, system_prompt = ?, permission_level = ?, mcp_tools = ?, updated_at = ?
          WHERE id = ?`
       )
       .run(
         d.name ?? current.name,
         d.profileId ?? current.profileId,
         d.model ?? current.model,
+        d.effort ?? current.effort,
         d.systemPrompt ?? current.systemPrompt,
         d.permissionLevel ?? current.permissionLevel,
         JSON.stringify(d.mcpTools ?? current.mcpTools),

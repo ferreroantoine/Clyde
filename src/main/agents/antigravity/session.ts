@@ -18,6 +18,7 @@ export interface AntigravitySessionConfig {
   home: string
   cwd: string
   model: string
+  effort?: string
   permissionLevel: PermissionLevel
   /** Clyde's instructions; agy has no flag for them, so they open the first message. */
   instructions: string
@@ -129,7 +130,7 @@ export class AntigravitySession {
       }
     }
     this.interrupted = false
-    const args = agyArgs(prompt, { model: this.cfg.model, conversationId: this.conversationId })
+    const args = agyArgs(prompt, { model: this.cfg.model, ...(this.cfg.effort ? { effort: this.cfg.effort } : {}), conversationId: this.conversationId })
     let proc: PtyProcess
     try {
       proc = this.deps.spawn({ file: this.cfg.binary, args, env: this.cfg.env, cwd: this.cfg.cwd })

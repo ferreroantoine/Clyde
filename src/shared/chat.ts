@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { tk } from './i18n'
-import { profileIdSchema } from './profiles'
+import { profileIdSchema, REASONING_EFFORTS, type ReasoningEffort } from './profiles'
 import type { Billing, SessionLimitUsage } from './limits'
 
 /**
@@ -18,6 +18,8 @@ export interface Conversation {
   agentId: string | null
   profileId: string
   model: string
+  /** Reasoning effort; empty is the model's default. */
+  effort: ReasoningEffort | ''
   /** The agent's allowed MCP tools are offered to the model. */
   toolsEnabled: boolean
   /** Relevant passages of past conversations are added to each message (local embeddings). */
@@ -89,6 +91,7 @@ export const conversationCreateSchema = z.object({
   agentId: z.uuid().nullable().default(null),
   profileId: profileIdSchema,
   model: z.string().trim().max(200).default(''),
+  effort: z.enum(REASONING_EFFORTS).or(z.literal('')).default(''),
   toolsEnabled: z.boolean().default(false)
 })
 export type ConversationCreate = z.input<typeof conversationCreateSchema>
@@ -100,6 +103,7 @@ export const conversationUpdateSchema = z.object({
   agentId: z.uuid().nullable().optional(),
   profileId: profileIdSchema.optional(),
   model: z.string().trim().max(200).optional(),
+  effort: z.enum(REASONING_EFFORTS).or(z.literal('')).optional(),
   toolsEnabled: z.boolean().optional(),
   useHistory: z.boolean().optional()
 })

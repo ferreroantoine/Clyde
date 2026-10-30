@@ -13,6 +13,8 @@ interface ExplorerState {
   loadDir: (path: string) => Promise<void>
   toggle: (path: string) => void
   select: (path: string | null) => void
+  /** Expands these folders (loading them if needed), so a file below them shows. */
+  reveal: (dirs: string[]) => void
   collapseAll: () => void
   refresh: () => Promise<void>
   applyFsChanges: (changes: FsChange[]) => void
@@ -55,6 +57,13 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
   },
 
   select: (path) => set({ selected: path }),
+
+  reveal: (dirs) => {
+    const closed = dirs.filter((d) => !get().expanded[d])
+    if (closed.length === 0) return
+    set({ expanded: { ...get().expanded, ...Object.fromEntries(closed.map((d) => [d, true])) } })
+    for (const d of closed) if (!get().children[d]) void get().loadDir(d)
+  },
 
   collapseAll: () => set({ expanded: {} }),
 
