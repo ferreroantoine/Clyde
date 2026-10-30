@@ -1,5 +1,6 @@
+import { t } from '@shared/i18n'
 import { ipcMain, type IpcMainInvokeEvent } from 'electron'
-import { z } from 'zod'
+import type { z } from 'zod'
 import type { InvokeChannel } from '@shared/ipc/channels'
 import { requestSchemas, type InvokeResponses, type ParsedRequest } from '@shared/ipc/contract'
 import { toIpcError } from '@shared/errors'
@@ -26,11 +27,11 @@ export function handle<C extends InvokeChannel>(channel: C, handler: Handler<C>)
   ipcMain.handle(channel, async (event, raw: unknown): Promise<IpcResult<InvokeResponses[C]>> => {
     if (!isTrustedSender(event)) {
       log.warn(`rejected ${channel} from untrusted sender`)
-      return { ok: false, error: { code: 'forbidden', message: 'Untrusted sender' } }
+      return { ok: false, error: { code: 'forbidden', message: t('Untrusted sender') } }
     }
     const parsed = schema.safeParse(raw)
     if (!parsed.success) {
-      return { ok: false, error: { code: 'invalid_request', message: z.prettifyError(parsed.error) } }
+      return { ok: false, error: { code: 'invalid_request', message: parsed.error.issues.map((i) => t(i.message) + (i.path.length ? ` (${i.path.join('.')})` : '')).join('\n') } }
     }
     try {
       const data = await handler(parsed.data as ParsedRequest<C>, event)

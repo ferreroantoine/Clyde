@@ -1,7 +1,12 @@
+import type { Db } from './database'
+import { removeMistral } from './remove-mistral'
+
 export interface Migration {
   version: number
   name: string
   sql: string
+  /** Runs after `sql`, in the same transaction, for steps that need to read data first. */
+  up?: (db: Db) => void
 }
 
 /**
@@ -196,6 +201,231 @@ export const migrations: Migration[] = [
         ('seed-claude-haiku-4-5', 'anthropic', 'claude-haiku-4-5', 1, 5, 'seed', 0),
         ('seed-claude-3-5-haiku', 'anthropic', 'claude-3-5-haiku', 0.8, 4, 'seed', 0),
         ('seed-mistral-large', 'mistral', 'mistral-large', 0.5, 1.5, 'seed', 0);
+    `
+  },
+  {
+    version: 7,
+    name: 'app notices, remove mistral',
+    sql: `
+      -- Messages main leaves for the user, shown once by the renderer.
+      CREATE TABLE app_notices (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        type       TEXT NOT NULL,
+        payload    TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        shown_at   INTEGER
+      );
+      DELETE FROM pricing WHERE kind = 'mistral';
+    `,
+    up: removeMistral
+  },
+  {
+    version: 8,
+    name: 'openai and gemini prices',
+    sql: `
+      -- Standard-tier list prices from developers.openai.com/api/docs/pricing (short context) and
+      -- ai.google.dev/gemini-api/docs/pricing (prompts up to 200k), read on 29 October 2026.
+      -- Google announced increases: gemini-4-argon on 1 December 2026, the 3.6 and 3.8 Flash models on 1 January 2027.
+      -- OR IGNORE keeps any price the user already entered for the same prefix.
+      INSERT OR IGNORE INTO pricing (id, kind, model_prefix, input_per_mtok, output_per_mtok, source, updated_at) VALUES
+        ('seed-gpt-6.1-sol', 'openai', 'gpt-6.1-sol', 2, 10, 'seed', 0),
+        ('seed-gpt-6.1-terra', 'openai', 'gpt-6.1-terra', 1, 5, 'seed', 0),
+        ('seed-gpt-6-astra', 'openai', 'gpt-6-astra', 10, 50, 'seed', 0),
+        ('seed-gpt-6-sol', 'openai', 'gpt-6-sol', 2, 10, 'seed', 0),
+        ('seed-gpt-6-luna', 'openai', 'gpt-6-luna', 0.1, 0.5, 'seed', 0),
+        ('seed-gpt-5.6-sol', 'openai', 'gpt-5.6-sol', 4, 20, 'seed', 0),
+        ('seed-gpt-5.6-terra', 'openai', 'gpt-5.6-terra', 2, 12, 'seed', 0),
+        ('seed-gpt-5.6-luna', 'openai', 'gpt-5.6-luna', 0.2, 1.2, 'seed', 0),
+        ('seed-gpt-5.5-pro', 'openai', 'gpt-5.5-pro', 30, 180, 'seed', 0),
+        ('seed-gpt-5.5', 'openai', 'gpt-5.5', 5, 30, 'seed', 0),
+        ('seed-gpt-5.4-pro', 'openai', 'gpt-5.4-pro', 30, 180, 'seed', 0),
+        ('seed-gpt-5.4-mini', 'openai', 'gpt-5.4-mini', 0.75, 4.5, 'seed', 0),
+        ('seed-gpt-5.4-nano', 'openai', 'gpt-5.4-nano', 0.2, 1.25, 'seed', 0),
+        ('seed-gpt-5.4', 'openai', 'gpt-5.4', 2.5, 15, 'seed', 0),
+        ('seed-gpt-5.3-codex', 'openai', 'gpt-5.3-codex', 1.75, 14, 'seed', 0),
+        ('seed-gpt-5.2-pro', 'openai', 'gpt-5.2-pro', 21, 168, 'seed', 0),
+        ('seed-gpt-5.2', 'openai', 'gpt-5.2', 1.75, 14, 'seed', 0),
+        ('seed-gpt-5.1', 'openai', 'gpt-5.1', 1.25, 10, 'seed', 0),
+        ('seed-gpt-5-pro', 'openai', 'gpt-5-pro', 15, 120, 'seed', 0),
+        ('seed-gpt-5-mini', 'openai', 'gpt-5-mini', 0.25, 2, 'seed', 0),
+        ('seed-gpt-5-nano', 'openai', 'gpt-5-nano', 0.05, 0.4, 'seed', 0),
+        ('seed-gpt-5', 'openai', 'gpt-5', 1.25, 10, 'seed', 0),
+        ('seed-gpt-4.1-mini', 'openai', 'gpt-4.1-mini', 0.4, 1.6, 'seed', 0),
+        ('seed-gpt-4.1-nano', 'openai', 'gpt-4.1-nano', 0.1, 0.4, 'seed', 0),
+        ('seed-gpt-4.1', 'openai', 'gpt-4.1', 2, 8, 'seed', 0),
+        ('seed-gpt-4o-mini', 'openai', 'gpt-4o-mini', 0.15, 0.6, 'seed', 0),
+        ('seed-gpt-4o', 'openai', 'gpt-4o', 2.5, 10, 'seed', 0),
+        ('seed-o4-mini', 'openai', 'o4-mini', 1.1, 4.4, 'seed', 0),
+        ('seed-o3-pro', 'openai', 'o3-pro', 20, 80, 'seed', 0),
+        ('seed-o3', 'openai', 'o3', 2, 8, 'seed', 0),
+        ('seed-gemini-4-argon', 'gemini', 'gemini-4-argon', 2, 10, 'seed', 0),
+        ('seed-gemini-3.8-flash', 'gemini', 'gemini-3.8-flash', 0.75, 3.75, 'seed', 0),
+        ('seed-gemini-3.6-flash', 'gemini', 'gemini-3.6-flash', 0.75, 3.75, 'seed', 0),
+        ('seed-gemini-3.5-flash-lite', 'gemini', 'gemini-3.5-flash-lite', 0.3, 2.5, 'seed', 0),
+        ('seed-gemini-3.1-flash-lite', 'gemini', 'gemini-3.1-flash-lite', 0.25, 1.5, 'seed', 0),
+        ('seed-gemini-3.1-pro', 'gemini', 'gemini-3.1-pro', 2, 12, 'seed', 0),
+        ('seed-gemini-3-flash', 'gemini', 'gemini-3-flash', 0.5, 3, 'seed', 0),
+        ('seed-gemini-2.5-pro', 'gemini', 'gemini-2.5-pro', 1.25, 10, 'seed', 0),
+        ('seed-gemini-2.5-flash-lite', 'gemini', 'gemini-2.5-flash-lite', 0.1, 0.4, 'seed', 0),
+        ('seed-gemini-2.5-flash', 'gemini', 'gemini-2.5-flash', 0.3, 2.5, 'seed', 0);
+    `
+  },
+  {
+    version: 9,
+    name: 'usage limits',
+    sql: `
+      -- How a session is paid: a plan's limits (subscription), per token (api), or not at all (local).
+      ALTER TABLE sessions ADD COLUMN billing TEXT NOT NULL DEFAULT 'api';
+      UPDATE sessions SET billing = 'local' WHERE kind = 'ollama';
+      UPDATE sessions SET billing = 'subscription'
+        WHERE kind IN ('codex', 'antigravity') OR profile_id IN (SELECT id FROM profiles WHERE auth = 'subscription');
+      -- Every limit reading, for the history chart and to measure each session's share.
+      CREATE TABLE limit_snapshots (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        profile_id TEXT NOT NULL,
+        session_id TEXT,
+        at         INTEGER NOT NULL,
+        source     TEXT NOT NULL,
+        window     TEXT NOT NULL,
+        label      TEXT NOT NULL,
+        used_pct   REAL NOT NULL,
+        resets_at  INTEGER
+      );
+      CREATE INDEX limit_snapshots_profile ON limit_snapshots(profile_id, window, at);
+      CREATE TABLE session_limit_usage (
+        session_id TEXT NOT NULL,
+        window     TEXT NOT NULL,
+        label      TEXT NOT NULL,
+        delta_pct  REAL NOT NULL,
+        -- 'estimated' as soon as one share was split with another session.
+        badge      TEXT NOT NULL,
+        PRIMARY KEY (session_id, window)
+      );
+      -- Alerts already raised, so each threshold fires once per window period.
+      CREATE TABLE limit_alerts (
+        profile_id TEXT NOT NULL,
+        window     TEXT NOT NULL,
+        period     INTEGER NOT NULL,
+        threshold  INTEGER NOT NULL,
+        at         INTEGER NOT NULL,
+        PRIMARY KEY (profile_id, window, period, threshold)
+      );
+    `
+  },
+  {
+    version: 10,
+    name: 'task order',
+    sql: `
+      -- Board order inside a column, set by drag and drop. New tasks go last.
+      ALTER TABLE tasks ADD COLUMN position REAL NOT NULL DEFAULT 0;
+      UPDATE tasks SET position = created_at;
+    `
+  },
+  {
+    version: 11,
+    name: 'chat',
+    sql: `
+      -- The Chat view. A conversation answers through agent sessions (chat_sessions), whose
+      -- usage is already in sessions/usage_events; messages are kept here as Markdown.
+      CREATE TABLE conversations (
+        id            TEXT PRIMARY KEY,
+        title         TEXT NOT NULL,
+        pinned        INTEGER NOT NULL DEFAULT 0,
+        agent_id      TEXT,
+        profile_id    TEXT NOT NULL,
+        model         TEXT NOT NULL DEFAULT '',
+        tools_enabled INTEGER NOT NULL DEFAULT 0,
+        created_at    INTEGER NOT NULL,
+        updated_at    INTEGER NOT NULL
+      );
+      CREATE TABLE chat_messages (
+        id              TEXT PRIMARY KEY,
+        conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        role            TEXT NOT NULL,
+        content         TEXT NOT NULL,
+        -- JSON arrays: files kept in the conversation's folder, tools used for the answer.
+        attachments     TEXT NOT NULL DEFAULT '[]',
+        tools           TEXT NOT NULL DEFAULT '[]',
+        status          TEXT NOT NULL DEFAULT 'done',
+        error           TEXT,
+        created_at      INTEGER NOT NULL
+      );
+      CREATE INDEX chat_messages_conversation ON chat_messages(conversation_id, created_at);
+      CREATE TABLE chat_sessions (
+        conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        session_id      TEXT NOT NULL,
+        PRIMARY KEY (conversation_id, session_id)
+      );
+    `
+  },
+  {
+    version: 12,
+    name: 'mcp catalog',
+    sql: `
+      -- Which catalog preset a server came from; built-in presets live in code.
+      ALTER TABLE mcp_servers ADD COLUMN preset_id TEXT;
+      -- Presets the user saved from their own servers. Secrets are not kept: only the names of
+      -- the environment variables and headers, asked again at install.
+      CREATE TABLE mcp_presets (
+        id          TEXT PRIMARY KEY,
+        title       TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        name        TEXT NOT NULL,
+        transport   TEXT NOT NULL,
+        command     TEXT NOT NULL DEFAULT '',
+        args_json   TEXT NOT NULL DEFAULT '[]',
+        url         TEXT NOT NULL DEFAULT '',
+        params_json TEXT NOT NULL DEFAULT '[]',
+        created_at  INTEGER NOT NULL
+      );
+    `
+  },
+  {
+    version: 13,
+    name: 'memory and context',
+    sql: `
+      -- Memory changes an agent proposed, waiting for the user: nothing is written without them.
+      CREATE TABLE memory_proposals (
+        id           TEXT PRIMARY KEY,
+        scope        TEXT NOT NULL,
+        project_root TEXT,
+        session_id   TEXT,
+        kind         TEXT NOT NULL,
+        before       TEXT NOT NULL,
+        after        TEXT NOT NULL,
+        reason       TEXT NOT NULL DEFAULT '',
+        status       TEXT NOT NULL DEFAULT 'pending',
+        created_at   INTEGER NOT NULL
+      );
+      -- Prompt cache use, per turn and per session.
+      ALTER TABLE usage_events ADD COLUMN cache_read_tokens INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE usage_events ADD COLUMN cache_write_tokens INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE sessions ADD COLUMN cache_read_tokens INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE sessions ADD COLUMN context_tokens INTEGER;
+      ALTER TABLE sessions ADD COLUMN context_window INTEGER;
+      -- Where the last request of each turn spent its tokens (Clyde's loop; CLIs give totals only).
+      CREATE TABLE turn_context (
+        session_id   TEXT NOT NULL,
+        at           INTEGER NOT NULL,
+        system       INTEGER NOT NULL,
+        memory       INTEGER NOT NULL,
+        tools        INTEGER NOT NULL,
+        history      INTEGER NOT NULL,
+        tool_results INTEGER NOT NULL,
+        output       INTEGER NOT NULL
+      );
+      CREATE INDEX turn_context_session ON turn_context(session_id, at);
+      -- Chat history search: passages of past conversations and their local embeddings.
+      CREATE TABLE chat_chunks (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        message_id      TEXT NOT NULL,
+        text            TEXT NOT NULL,
+        model           TEXT NOT NULL,
+        embedding       BLOB NOT NULL
+      );
+      CREATE INDEX chat_chunks_conversation ON chat_chunks(conversation_id);
+      ALTER TABLE conversations ADD COLUMN use_history INTEGER NOT NULL DEFAULT 0;
     `
   }
 ]

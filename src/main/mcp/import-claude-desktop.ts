@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import type { McpServerInput } from '@shared/mcp'
@@ -32,19 +33,19 @@ export function parseClaudeDesktopConfig(text: string): ParsedConfig {
   try {
     json = JSON.parse(text)
   } catch (err) {
-    throw new Error(`This file is not valid JSON: ${(err as Error).message}`, { cause: err })
+    throw new Error(t('This file is not valid JSON: {message}', { message: (err as Error).message }), { cause: err })
   }
   if (!isRecord(json) || !isRecord(json['mcpServers'])) {
-    throw new Error('This file has no "mcpServers" section.')
+    throw new Error(t('This file has no "mcpServers" section.'))
   }
   const out: ParsedConfig = { servers: [], skipped: [] }
   for (const [name, raw] of Object.entries(json['mcpServers'])) {
     if (!isRecord(raw)) {
-      out.skipped.push({ name, reason: 'Not an object' })
+      out.skipped.push({ name, reason: t('Not an object') })
       continue
     }
     if (raw['disabled'] === true) {
-      out.skipped.push({ name, reason: 'Disabled in the file' })
+      out.skipped.push({ name, reason: t('Disabled in the file') })
       continue
     }
     const type = typeof raw['type'] === 'string' ? raw['type'] : undefined
@@ -63,7 +64,7 @@ export function parseClaudeDesktopConfig(text: string): ParsedConfig {
       // Streamable HTTP and the older SSE transport share one entry; the hub tries both.
       out.servers.push({ name, input: { transport: 'http', name, url: raw['url'], headers: stringMap(raw['headers']) } })
     } else {
-      out.skipped.push({ name, reason: 'Neither a command nor an http(s) URL' })
+      out.skipped.push({ name, reason: t('Neither a command nor an http(s) URL') })
     }
   }
   return out

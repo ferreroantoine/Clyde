@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { tk } from './i18n'
 import { PERMISSION_LEVELS, type PermissionLevel } from './agent'
 import { profileIdSchema } from './profiles'
 
@@ -12,7 +13,7 @@ const mcpTools = z
 
 /** A saved agent: account, model, instructions, permission level and MCP tools (spec: "Un Agent = …"). */
 export const agentDefinitionInputSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required').max(60),
+  name: z.string().trim().min(1, tk('Name is required')).max(60),
   profileId: profileIdSchema,
   model: z.string().trim().max(200).default(''),
   systemPrompt: z.string().max(20_000).default(''),
@@ -39,17 +40,17 @@ export interface AgentDefinition {
 export const TASK_STATUSES = ['todo', 'in_progress', 'review', 'done'] as const
 export type TaskStatus = (typeof TASK_STATUSES)[number]
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
-  todo: 'To do',
-  in_progress: 'In progress',
-  review: 'To review',
-  done: 'Done'
+  todo: tk('To do'),
+  in_progress: tk('In progress'),
+  review: tk('To review'),
+  done: tk('Done')
 }
 export type TaskOutcome = 'merged' | 'abandoned'
 
 export const taskInputSchema = z.object({
-  title: z.string().trim().min(1, 'Title is required').max(120),
+  title: z.string().trim().min(1, tk('Title is required')).max(120),
   /** The first message the agent receives. */
-  description: z.string().trim().min(1, 'Describe the task').max(50_000),
+  description: z.string().trim().min(1, tk('Describe the task')).max(50_000),
   agentId: agentIdSchema
 })
 export type TaskInput = z.input<typeof taskInputSchema>

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t } from '@shared/i18n'
 import type { FsChange } from '@shared/types'
 import { invoke } from '@/lib/ipc'
 import { disposeModel, getModel, languageFor, upsertModel } from '@/lib/monaco/models'
@@ -48,6 +49,9 @@ const ownWrites = new Map<string, number>()
 const OWN_WRITE_WINDOW_MS = 2000
 
 const nameOf = (path: string) => path.split('/').pop() ?? path
+
+/** Runs before the active file is saved, e.g. "format on save"; set by the editor host. */
+export const saveHooks: { beforeSave: ((path: string) => Promise<void>) | null } = { beforeSave: null }
 
 export const useEditor = create<EditorState>()((set, get) => {
   const patch = (path: string, update: Partial<EditorTab>) =>
@@ -113,7 +117,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       const index = tabs.findIndex((t) => t.path === path)
       const tab = tabs[index]
       if (!tab) return
-      if (tab.dirty && !window.confirm(`${tab.name} has unsaved changes. Close it anyway?`)) return
+      if (tab.dirty && !window.confirm(t('{name} has unsaved changes. Close it anyway?', { name: tab.name }))) return
       release(path)
       const rest = tabs.filter((t) => t.path !== path)
       const nextActive = active === path ? (rest[index] ?? rest[index - 1] ?? null)?.path ?? null : active
@@ -129,6 +133,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       const target = path ?? get().active
       const model = target ? getModel(target) : null
       if (!target || !model) return
+      if (target === get().active) await saveHooks.beforeSave?.(target).catch(() => undefined)
       const version = model.getAlternativeVersionId()
       try {
         ownWrites.set(target, Date.now())
@@ -136,7 +141,7 @@ export const useEditor = create<EditorState>()((set, get) => {
         savedVersion.set(target, version)
         patch(target, { dirty: model.getAlternativeVersionId() !== version, conflict: undefined })
       } catch (err) {
-        notify.error(`Could not save ${nameOf(target)}`, err)
+        notify.error(t('Could not save {name}', { name: nameOf(target) }), err)
       }
     },
 

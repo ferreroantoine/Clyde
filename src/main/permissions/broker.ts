@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { randomUUID } from 'node:crypto'
 import type { AgentEvent, ApprovalDecision } from '@shared/agent'
 import { AppError } from '@shared/errors'
@@ -42,14 +43,14 @@ export class ApprovalBroker {
     const requestId = randomUUID()
     return new Promise<ApprovalOutcome>((resolve) => {
       this.pending.set(requestId, { sessionId, rule, resolve })
-      signal?.addEventListener('abort', () => this.cancel(requestId, 'The request was cancelled'), { once: true })
+      signal?.addEventListener('abort', () => this.cancel(requestId, t('The request was cancelled')), { once: true })
       this.emit(sessionId, { type: 'approval_request', requestId, ...question })
     })
   }
 
   answer(sessionId: string, requestId: string, decision: ApprovalDecision, message?: string): void {
     const entry = this.pending.get(requestId)
-    if (!entry || entry.sessionId !== sessionId) throw new AppError('not_found', 'This request was already answered')
+    if (!entry || entry.sessionId !== sessionId) throw new AppError('not_found', t('This request was already answered'))
     this.pending.delete(requestId)
     if (decision === 'allow-session') {
       let set = this.rules.get(sessionId)
@@ -70,7 +71,7 @@ export class ApprovalBroker {
   }
 
   /** Denies everything still waiting for a session, e.g. when it is interrupted or stopped. */
-  cancelSession(sessionId: string, message = 'The session was stopped'): void {
+  cancelSession(sessionId: string, message = t('The session was stopped')): void {
     for (const [id, p] of this.pending) if (p.sessionId === sessionId) this.cancel(id, message)
   }
 

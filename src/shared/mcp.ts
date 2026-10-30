@@ -1,15 +1,16 @@
+import { tk } from './i18n'
 import { z } from 'zod'
 
 export const mcpIdSchema = z.uuid()
 
-const name = z.string().trim().min(1, 'Name is required').max(60)
+const name = z.string().trim().min(1, tk('Name is required')).max(60)
 const keyValues = z.record(z.string().trim().min(1).max(200), z.string().max(10_000))
 
 export const mcpServerInputSchema = z.discriminatedUnion('transport', [
   z.object({
     transport: z.literal('stdio'),
     name,
-    command: z.string().trim().min(1, 'Command is required').max(4096),
+    command: z.string().trim().min(1, tk('Command is required')).max(4096),
     args: z.array(z.string().max(4096)).max(100).default([]),
     /** Often holds tokens: stored encrypted, and only the keys go back to the renderer. */
     env: keyValues.default({}),
@@ -18,7 +19,7 @@ export const mcpServerInputSchema = z.discriminatedUnion('transport', [
   z.object({
     transport: z.literal('http'),
     name,
-    url: z.string().trim().regex(/^https?:\/\/\S+$/i, 'Enter an http:// or https:// URL'),
+    url: z.string().trim().regex(/^https?:\/\/\S+$/i, tk('Enter an http:// or https:// URL')),
     headers: keyValues.default({}),
     enabled: z.boolean().default(true)
   })
@@ -45,6 +46,8 @@ export interface McpTool {
   /** `mcp__<server slug>__<tool>`, the name Claude Code uses and the one allow-lists store. */
   qualifiedName: string
   description: string
+  /** Size of its definition (name, description, input schema) in JSON characters: its context cost. */
+  chars: number
 }
 
 export interface McpServer {
@@ -59,6 +62,8 @@ export interface McpServer {
   envKeys: string[]
   headerKeys: string[]
   enabled: boolean
+  /** The catalog preset it came from, if any. */
+  presetId: string | null
   status: McpStatus
   error: string | null
   tools: McpTool[]

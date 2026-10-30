@@ -30,7 +30,7 @@ export function IconButton({
           aria-label={label}
           aria-pressed={active}
           className={cn(
-            'inline-flex items-center justify-center rounded-md text-muted-foreground transition-colors',
+            'press inline-flex items-center justify-center rounded-md text-muted-foreground',
             'hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
             'disabled:pointer-events-none disabled:opacity-40',
             size === 'sm' ? 'size-6 [&_svg]:size-3.5' : 'size-9 [&_svg]:size-[18px]',

@@ -6,7 +6,8 @@ import { slugify } from '@shared/mcp'
 import { migrate } from '../services/db/database'
 import type { Cipher } from '../services/secrets'
 import { McpStore } from './store'
-import { apiToolName, contentText, McpHub, type McpConnection } from './hub'
+import { apiToolName, cliCommand, networkEnv, contentText, definitionChars, McpHub, type McpConnection } from './hub'
+import { BUILTIN_PRESETS, estimateTokens, presetToInput, type McpPreset } from '@shared/mcp-catalog'
 import { claudeDesktopConfigPath, parseClaudeDesktopConfig } from './import-claude-desktop'
 
 vi.mock('electron', () => ({ app: { getPath: () => { throw new Error('no electron in tests') } }, safeStorage: {} }))
@@ -115,7 +116,7 @@ describe('McpHub', () => {
     const hub = new McpHub(s, { onChanged: (list) => changes.push(list), connect: async () => fake.connection, log })
     hub.create({ transport: 'stdio', name: 'Docs', command: 'docs-mcp' })
     await vi.waitFor(() => expect(hub.list()[0]?.status).toBe('connected'))
-    expect(hub.list()[0]?.tools).toEqual([{ name: 'search', qualifiedName: 'mcp__docs__search', description: 'Search' }])
+    expect(hub.list()[0]?.tools).toEqual([{ name: 'search', qualifiedName: 'mcp__docs__search', description: 'Search', chars: 72 }])
     expect(changes.map((c) => c[0]?.status)).toEqual(['connecting', 'connecting', 'connected'])
 
     expect(hub.toolSpecs(new Set())).toEqual([])
@@ -176,5 +177,77 @@ describe('helpers', () => {
     expect(apiToolName(long)).toHaveLength(64)
     expect(apiToolName(long)).toBe(apiToolName(long))
     expect(apiToolName('mcp__a__b')).toBe('mcp__a__b')
+  })
+})
+
+describe('MCP catalog', () => {
+  it('turns a preset into a server: placeholders, env and header secrets, required values', () => {
+    const fs = BUILTIN_PRESETS.find((p) => p.id === 'filesystem') as McpPreset
+    expect(presetToInput(fs, { folder: 'C:\\work\\app' })).toEqual({
+      transport: 'stdio',
+      name: 'filesystem',
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-filesystem', 'C:\\work\\app'],
+      env: {},
+      enabled: true
+    })
+    expect(() => presetToInput(fs, {})).toThrow(/Allowed folder/)
+    const github = BUILTIN_PRESETS.find((p) => p.id === 'github') as McpPreset
+    expect(presetToInput(github, { token: 'ghp_x' })).toMatchObject({ transport: 'http', url: 'https://api.githubcopilot.com/mcp/', headers: { Authorization: 'Bearer ghp_x' } })
+    const context7 = BUILTIN_PRESETS.find((p) => p.id === 'context7') as McpPreset
+    expect(presetToInput(context7, {})).toMatchObject({ env: {} })
+    expect(presetToInput(context7, { apiKey: 'k' })).toMatchObject({ env: { CONTEXT7_API_KEY: 'k' } })
+    // Every preset's placeholders have a parameter.
+    for (const p of BUILTIN_PRESETS) {
+      for (const arg of p.args) for (const [, key] of arg.matchAll(/\{(\w+)\}/g)) expect(p.params.map((x) => x.key)).toContain(key)
+    }
+    expect(estimateTokens(8_042)).toBe(2011)
+  })
+
+  it('links installed servers to their preset and saves user presets without secret values', () => {
+    const { store: s } = store()
+    const server = s.create({ transport: 'stdio', name: 'notes', command: 'node', args: ['notes.js'], env: { NOTES_TOKEN: 'shh-value' } }, 'custom-1')
+    expect(server.presetId).toBe('custom-1')
+    const presets = s.savePreset(server.id, 'My notes', 'Personal notes')
+    expect(presets).toHaveLength(1)
+    expect(presets[0]).toMatchObject({ title: 'My notes', command: 'node', args: ['notes.js'], builtin: false })
+    expect(JSON.stringify(presets[0])).not.toContain('shh-value')
+    expect(presets[0]?.params).toEqual([expect.objectContaining({ label: 'NOTES_TOKEN', kind: 'secret', target: { type: 'env', name: 'NOTES_TOKEN' } })])
+    expect(presetToInput(presets[0] as McpPreset, { env0: 'again' })).toMatchObject({ env: { NOTES_TOKEN: 'again' } })
+    expect(s.deletePreset((presets[0] as McpPreset).id)).toEqual([])
+  })
+
+  it('tests a server without saving it, and reports the size of its tools', async () => {
+    const { store: s } = store()
+    const fake = fakeConnection([{ name: 'search', description: 'Search the docs', inputSchema: { type: 'object', properties: { q: { type: 'string' } } } }])
+    const hub = new McpHub(s, { onChanged: () => undefined, connect: async () => fake.connection, log })
+    const probe = await hub.probe({ transport: 'stdio', name: 'docs', command: 'docs-server' })
+    expect(probe).toMatchObject({ ok: true, error: null, tools: [{ name: 'search', description: 'Search the docs' }] })
+    expect(probe.tools[0]?.chars).toBe(definitionChars({ name: 'search', description: 'Search the docs', inputSchema: { type: 'object', properties: { q: { type: 'string' } } } }))
+    expect(s.list()).toEqual([])
+    const failing = new McpHub(s, { onChanged: () => undefined, connect: async () => Promise.reject(new Error('spawn uvx ENOENT')), log })
+    expect(await failing.probe({ transport: 'stdio', name: 'git', command: 'uvx' })).toEqual({ ok: false, error: 'spawn uvx ENOENT', tools: [] })
+  })
+
+  it('passes proxy and certificate settings to stdio servers, nothing else', () => {
+    expect(networkEnv({ HTTPS_PROXY: 'http://p:8080', no_proxy: 'localhost', NODE_EXTRA_CA_CERTS: '/ca.pem', OPENAI_API_KEY: 'sk', PATH: '/bin' })).toEqual({
+      HTTPS_PROXY: 'http://p:8080',
+      no_proxy: 'localhost',
+      NODE_EXTRA_CA_CERTS: '/ca.pem'
+    })
+  })
+
+  it('runs npx and uvx through cmd /c for CLIs on Windows', async () => {
+    expect(cliCommand('npx', ['-y', 'pkg'], 'win32')).toEqual({ command: 'cmd', args: ['/c', 'npx', '-y', 'pkg'] })
+    expect(cliCommand('uvx', ['mcp-server-git'], 'win32')).toEqual({ command: 'cmd', args: ['/c', 'uvx', 'mcp-server-git'] })
+    expect(cliCommand('C:\\tools\\server.exe', [], 'win32')).toEqual({ command: 'C:\\tools\\server.exe', args: [] })
+    expect(cliCommand('npx', ['pkg'], 'linux')).toEqual({ command: 'npx', args: ['pkg'] })
+    const { store: s } = store()
+    const fake = fakeConnection()
+    const hub = new McpHub(s, { onChanged: () => undefined, connect: async () => fake.connection, log, platform: 'win32' })
+    hub.create({ transport: 'stdio', name: 'docs', command: 'npx', args: ['-y', 'docs'] })
+    await vi.waitFor(() => expect(hub.list()[0]?.status).toBe('connected'))
+    expect(hub.claudeCodeConfig(new Set(['mcp__docs__search'])).servers['docs']).toMatchObject({ command: 'cmd', args: ['/c', 'npx', '-y', 'docs'] })
+    expect(hub.agentServers(new Set(['mcp__docs__search']))[0]).toMatchObject({ command: 'cmd', args: ['/c', 'npx', '-y', 'docs'] })
   })
 })

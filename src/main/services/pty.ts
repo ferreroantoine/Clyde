@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { homedir, release } from 'node:os'
@@ -83,7 +84,7 @@ export class PtyService {
         env: { ...env, TERM_PROGRAM: 'Clyde' }
       })
     } catch (err) {
-      throw new AppError('pty_error', `Could not start ${shell}: ${(err as Error).message}`)
+      throw new AppError('pty_error', t('Could not start {shell}: {message}', { shell, message: (err as Error).message }))
     }
     const session: Session = { pty, buffer: '', timer: null }
     this.sessions.set(id, session)
@@ -114,7 +115,7 @@ export class PtyService {
 
   private get(id: string): Session {
     const session = this.sessions.get(id)
-    if (!session) throw new AppError('not_found', `Terminal ${id} is not running`)
+    if (!session) throw new AppError('not_found', t('Terminal {id} is not running', { id }))
     return session
   }
 

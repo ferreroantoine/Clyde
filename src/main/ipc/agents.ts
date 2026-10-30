@@ -12,6 +12,11 @@ export function registerAgentHandlers(agents: AgentManager): void {
     await agents.interrupt(sessionId)
     return null
   })
+  handle('agent:compact', async ({ sessionId }) => {
+    await agents.compact(sessionId)
+    return null
+  })
+  handle('agent:continueWithSummary', ({ sessionId }) => agents.continueWithSummary(sessionId))
   handle('agent:stop', ({ sessionId }) => {
     agents.stop(sessionId)
     return null

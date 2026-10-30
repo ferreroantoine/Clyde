@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t } from '@shared/i18n'
 import { invoke, on } from '@/lib/ipc'
 import { terminals } from '@/lib/terminal/registry'
 import { notify } from './notifications'
@@ -61,7 +62,7 @@ export const useTerminals = create<TerminalsState>()((set, get) => ({
       const tab: TerminalTab = { id: info.id, title: info.title, cwd: info.cwd, kind: 'shell', exitCode: null, used: false }
       set({ tabs: [...get().tabs, tab], active: info.id })
     } catch (err) {
-      notify.error('Could not start a terminal', err)
+      notify.error(t('Could not start a terminal'), err)
     } finally {
       set({ creating: false })
     }

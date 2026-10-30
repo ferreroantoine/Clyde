@@ -12,6 +12,7 @@ export type ErrorCode =
   | 'secrets_unavailable'
   | 'not_allowed'
   | 'claude_code_missing'
+  | 'cli_missing'
   | 'agent_error'
   | 'internal'
 

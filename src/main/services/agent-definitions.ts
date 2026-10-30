@@ -1,3 +1,4 @@
+import { t } from '@shared/i18n'
 import { randomUUID } from 'node:crypto'
 import { AppError } from '@shared/errors'
 import type { PermissionLevel } from '@shared/agent'
@@ -47,7 +48,7 @@ export class AgentDefinitionsService {
 
   get(id: string): AgentDefinition {
     const row = this.db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as Row | undefined
-    if (!row) throw new AppError('not_found', 'This agent no longer exists')
+    if (!row) throw new AppError('not_found', t('This agent no longer exists'))
     return toDefinition(row)
   }
 
@@ -97,7 +98,7 @@ export class AgentDefinitionsService {
 
   private requireProfile(id: string): void {
     if (!this.db.prepare('SELECT 1 FROM profiles WHERE id = ?').get(id)) {
-      throw new AppError('not_found', 'This account no longer exists')
+      throw new AppError('not_found', t('This account no longer exists'))
     }
   }
 }

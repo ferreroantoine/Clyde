@@ -11,8 +11,11 @@ export function usePanelSync(open: boolean, setOpen: (open: boolean) => void) {
   useEffect(() => {
     const panel = panelRef.current
     if (!panel) return
-    if (open && panel.isCollapsed()) panel.expand()
-    if (!open && !panel.isCollapsed()) panel.collapse()
+    const toggle = open && panel.isCollapsed() ? () => panel.expand() : !open && !panel.isCollapsed() ? () => panel.collapse() : null
+    if (!toggle) return
+    // Animate the size change (CSS transition on flex-grow) only for toggles, never while dragging.
+    animatePanels()
+    toggle()
   }, [open, panelRef])
 
   const onResize = useCallback(
@@ -24,4 +27,13 @@ export function usePanelSync(open: boolean, setOpen: (open: boolean) => void) {
   )
 
   return { panelRef, onResize }
+}
+
+let animationTimer: ReturnType<typeof setTimeout> | undefined
+
+function animatePanels(): void {
+  const root = document.documentElement
+  root.dataset['panelsAnimating'] = ''
+  clearTimeout(animationTimer)
+  animationTimer = setTimeout(() => delete root.dataset['panelsAnimating'], 260)
 }

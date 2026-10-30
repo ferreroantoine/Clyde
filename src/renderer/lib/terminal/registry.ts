@@ -78,6 +78,8 @@ interface Entry {
 const entries = new Map<string, Entry>()
 let currentTheme: ResolvedTheme = 'light'
 let currentFontSize = 13
+let currentFontFamily = "'JetBrains Mono Variable', 'Cascadia Code', Consolas, monospace"
+let currentScrollback = 10_000
 
 /**
  * xterm instances live outside React so switching tabs or collapsing the panel
@@ -86,12 +88,12 @@ let currentFontSize = 13
 export const terminals = {
   create(id: string, opts: { readOnly: boolean; windowsBuild: number | null }, handlers: TerminalHandlers): void {
     const term = new Terminal({
-      fontFamily: "'JetBrains Mono Variable', 'Cascadia Mono', monospace",
+      fontFamily: currentFontFamily,
       fontSize: currentFontSize,
       lineHeight: 1.25,
       cursorBlink: !opts.readOnly,
       disableStdin: opts.readOnly,
-      scrollback: 10000,
+      scrollback: currentScrollback,
       allowProposedApi: false,
       theme: themeFor(currentTheme),
       ...(opts.windowsBuild ? { windowsPty: { backend: 'conpty' as const, buildNumber: opts.windowsBuild } } : {})
@@ -189,6 +191,17 @@ export const terminals = {
     currentFontSize = size
     for (const [id, { term }] of entries) {
       term.options.fontSize = size
+      this.fit(id)
+    }
+  },
+
+  /** Settings › Terminal: font and scrollback, for open and future terminals. */
+  setOptions({ fontFamily, scrollback }: { fontFamily: string; scrollback: number }): void {
+    currentFontFamily = fontFamily
+    currentScrollback = scrollback
+    for (const [id, { term }] of entries) {
+      term.options.fontFamily = fontFamily
+      term.options.scrollback = scrollback
       this.fit(id)
     }
   }

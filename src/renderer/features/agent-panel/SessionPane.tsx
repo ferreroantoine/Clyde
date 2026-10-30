@@ -1,22 +1,29 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { ArrowUp, CircleAlert, Gauge, Square } from 'lucide-react'
+import { intlLocale, t, tk } from '@shared/i18n'
+import { ArrowUp, CircleAlert, FoldVertical, Gauge, Square, StepForward } from 'lucide-react'
 import { PERMISSION_LEVEL_LABELS, type AgentStatus } from '@shared/agent'
+import { kindLabel } from '@shared/profiles'
 import { Button } from '@/components/ui/button'
 import { ProfileBadge } from '@/components/ProfileBadge'
 import type { SessionView, TranscriptItem } from '@/lib/transcript'
 import { ENDED_STATUSES, useAgents } from '@/stores/agents'
 import { profileById, useProfiles } from '@/stores/profiles'
 import { cn } from '@/lib/utils'
+import { MicButton } from '@/components/MicButton'
 import { RichText } from './RichText'
+import { SessionLimitLine } from '@/features/limits/LimitGauge'
+import { useLimits } from '@/stores/limits'
 import { ToolCard } from './ToolCard'
+import { Appear } from '@/components/Appear'
+import { useSettings } from '@/stores/settings'
 
 export const STATUS_LABELS: Record<AgentStatus, string> = {
-  starting: 'Starting',
-  idle: 'Ready',
-  running: 'Working',
-  'awaiting-approval': 'Needs approval',
-  stopped: 'Stopped',
-  error: 'Ended with an error'
+  starting: tk('Starting'),
+  idle: tk('Ready'),
+  running: tk('Working'),
+  'awaiting-approval': tk('Needs approval'),
+  stopped: tk('Stopped'),
+  error: tk('Ended with an error')
 }
 
 export function StatusDot({ status }: { status: AgentStatus }) {
@@ -38,7 +45,21 @@ export const usd = (n: number) => (n < 0.01 && n > 0 ? '<$0.01' : `$${n.toFixed(
 export const tokens = (n: number) =>
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)
 
-export function Item({ item, cwd, ended }: { item: TranscriptItem; cwd: string; ended: boolean }) {
+/** `subscription` hides per-turn prices: on a plan, Claude Code's cost is not what you pay. */
+export function Item({
+  item,
+  cwd,
+  ended,
+  subscription = false,
+  streaming = false
+}: {
+  item: TranscriptItem
+  cwd: string
+  ended: boolean
+  subscription?: boolean
+  /** The last text of a running turn: shows a typing caret. */
+  streaming?: boolean
+}) {
   switch (item.kind) {
     case 'user':
       return (
@@ -47,17 +68,17 @@ export function Item({ item, cwd, ended }: { item: TranscriptItem; cwd: string; 
         </div>
       )
     case 'text':
-      return <RichText text={item.text} />
+      return <RichText text={item.text} streaming={streaming} />
     case 'tool':
       return <ToolCard tool={item} cwd={cwd} ended={ended} />
     case 'turn':
       return (
         <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground" data-turn={item.subtype}>
           {item.isError && <CircleAlert className="size-3 text-destructive" />}
-          {item.isError ? item.errors[0] ?? `Turn ended: ${item.subtype.replace(/_/g, ' ')}` : 'Done'}
+          {item.isError ? item.errors[0] ?? t('Turn ended: {reason}', { reason: item.subtype.replace(/_/g, ' ') }) : t('Done')}
           <span>
-            · {(item.durationMs / 1000).toFixed(1)}s · {tokens(item.inputTokens)} in / {tokens(item.outputTokens)} out
-            {item.costUsd !== null && ` · ${usd(item.costUsd)}`}
+            · {(item.durationMs / 1000).toFixed(1)}s · {t('{input} in / {output} out', { input: tokens(item.inputTokens), output: tokens(item.outputTokens) })}
+            {item.costUsd !== null && !subscription && ` · ${usd(item.costUsd)}`}
           </span>
         </p>
       )
@@ -68,6 +89,8 @@ export function Item({ item, cwd, ended }: { item: TranscriptItem; cwd: string; 
           {item.message}
         </p>
       )
+    case 'note':
+      return <p className="text-center text-[11px] text-muted-foreground italic">{item.text}</p>
   }
 }
 
@@ -76,6 +99,7 @@ export function itemKey(item: TranscriptItem): string {
     case 'user':
     case 'turn':
     case 'error':
+    case 'note':
       return `${item.kind}-${item.id}`
     case 'text':
       return `text-${item.key}`
@@ -122,16 +146,17 @@ function Composer({ view }: { view: SessionView }) {
               void submit()
             }
           }}
-          placeholder={ended ? 'This session has ended' : busy ? 'Queue a follow-up…' : 'Ask the agent… (Enter to send)'}
-          aria-label="Message to the agent"
+          placeholder={ended ? t('This session has ended') : busy ? t('Queue a follow-up…') : t('Ask the agent… (Enter to send)')}
+          aria-label={t('Message to the agent')}
           className="max-h-[200px] min-h-6 flex-1 resize-none bg-transparent py-0.5 text-[13px] outline-none placeholder:text-muted-foreground"
         />
+        <MicButton inputRef={area} setValue={setText} size="xs" />
         {busy ? (
-          <Button type="button" size="icon-xs" variant="outline" aria-label="Interrupt the agent" onClick={() => void interrupt()}>
+          <Button type="button" size="icon-xs" variant="outline" aria-label={t('Interrupt the agent')} onClick={() => void interrupt()}>
             <Square className="fill-current" />
           </Button>
         ) : (
-          <Button type="button" size="icon-xs" aria-label="Send" disabled={!text.trim() || ended} onClick={() => void submit()}>
+          <Button type="button" size="icon-xs" aria-label={t('Send')} disabled={!text.trim() || ended} onClick={() => void submit()}>
             <ArrowUp />
           </Button>
         )}
@@ -140,30 +165,105 @@ function Composer({ view }: { view: SessionView }) {
   )
 }
 
+const compactTokens = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n))
+
+/** How full the context is, with the ways to free it. */
+export function ContextBar({ view }: { view: SessionView }) {
+  const suggestAt = useSettings((s) => s.settings.memory.compactSuggestPct)
+  const compact = useAgents((s) => s.compact)
+  const continueWithSummary = useAgents((s) => s.continueWithSummary)
+  const starting = useAgents((s) => s.starting)
+  const [compacting, setCompacting] = useState(false)
+  const context = view.context
+  if (!context || ENDED_STATUSES.has(view.info.status)) return null
+  const pct = context.window ? Math.min(100, Math.round((context.tokens / context.window) * 100)) : null
+  const suggest = pct !== null && pct >= suggestAt
+  const busy = view.info.status === 'running' || view.info.status === 'awaiting-approval'
+  // Antigravity's /compact is not documented: only a new session with a summary is offered there.
+  const canCompact = view.info.kind !== 'antigravity'
+  return (
+    <div
+      className={cn('flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-1.5 text-[11px] text-muted-foreground', suggest && 'bg-warning/10')}
+      aria-label={t('Context of this session')}
+      data-testid="context-bar"
+    >
+      <span>{t('Context')}</span>
+      {pct !== null && (
+        <span className="h-1.5 w-20 overflow-hidden rounded-full bg-muted" role="meter" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={t('Context used')}>
+          <span className={cn('block h-full rounded-full', suggest ? 'bg-warning' : 'bg-primary/70')} style={{ width: `${pct}%` }} />
+        </span>
+      )}
+      <span className="tabular-nums">
+        {context.window
+          ? t('{used} of {window} tokens ({pct}%)', { used: compactTokens(context.tokens), window: compactTokens(context.window), pct: pct ?? 0 })
+          : t('{used} tokens', { used: compactTokens(context.tokens) })}
+      </span>
+      {suggest && <span className="text-foreground">{t('Compact to keep answers sharp and cheaper.')}</span>}
+      <span className="ml-auto flex items-center gap-1">
+        {canCompact && (
+          <Button
+            size="xs"
+            variant="ghost"
+            disabled={busy}
+            loading={compacting}
+            title={t('Replaces the conversation so far with a summary, in the same session.')}
+            onClick={() => {
+              setCompacting(true)
+              void compact(view.info.id).finally(() => setCompacting(false))
+            }}
+          >
+            <FoldVertical /> {t('Compact')}
+          </Button>
+        )}
+        <Button
+          size="xs"
+          variant="ghost"
+          disabled={busy}
+          loading={starting}
+          title={t('Ends this session and starts the same agent with a summary of it.')}
+          onClick={() => void continueWithSummary(view.info.id)}
+        >
+          <StepForward /> {t('New session with summary')}
+        </Button>
+      </span>
+    </div>
+  )
+}
+
 export function SessionPane({ view }: { view: SessionView }) {
   const profile = profileById(useProfiles((s) => s.profiles), view.info.profileId)
   const scroller = useRef<HTMLDivElement>(null)
   const stuck = useRef(true)
+  const lastTop = useRef(0)
   const ended = ENDED_STATUSES.has(view.info.status)
   const last = view.items.at(-1)
 
-  // Follow the conversation unless the user scrolled up to read.
+  // Follow the conversation unless the user scrolled up to read; glide when animations are on.
   useEffect(() => {
     const el = scroller.current
-    if (el && stuck.current) el.scrollTop = el.scrollHeight
+    if (!el || !stuck.current) return
+    const smooth = document.documentElement.dataset['motion'] === 'full'
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
   }, [view.items.length, last])
 
   const limit = view.rateLimit
+  const subscription = profile?.auth === 'subscription'
+  const sessionId = view.info.id
+  const planUse = useLimits((s) => s.sessions[sessionId])
+  const loadPlanUse = useLimits((s) => s.loadSession)
+  useEffect(() => {
+    if (subscription) void loadPlanUse(sessionId)
+  }, [subscription, sessionId, loadPlanUse])
   return (
     <div className="flex h-full min-h-0 flex-col" data-session={view.info.id} data-status={view.info.status}>
       <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b px-3 py-2 text-[11px] text-muted-foreground">
-        {profile ? <ProfileBadge profile={profile} className="font-medium text-foreground" /> : <span>Deleted account</span>}
-        <span className="font-mono">{view.info.model || 'default model'}</span>
-        <span>· {PERMISSION_LEVEL_LABELS[view.info.permissionLevel]}</span>
+        {profile ? <ProfileBadge profile={profile} className="font-medium text-foreground" /> : <span>{t('Deleted account')}</span>}
+        <span className="font-mono">{view.info.model || t('default model')}</span>
+        <span>· {t(PERMISSION_LEVEL_LABELS[view.info.permissionLevel])}</span>
         <span className="ml-auto flex items-center gap-1.5">
           <StatusDot status={view.info.status} />
-          {STATUS_LABELS[view.info.status]}
-          {view.totals.costUsd > 0 && <span>· {usd(view.totals.costUsd)}</span>}
+          {t(STATUS_LABELS[view.info.status])}
+          {!subscription && view.totals.costUsd > 0 && <span>· {usd(view.totals.costUsd)}</span>}
         </span>
       </div>
       {limit && limit.status !== 'allowed' && (
@@ -174,32 +274,52 @@ export function SessionPane({ view }: { view: SessionView }) {
           )}
         >
           <Gauge className="size-3.5" />
-          {limit.status === 'rejected' ? 'Usage limit reached' : 'Close to the usage limit'}
-          {limit.utilization !== null && ` (${Math.round(limit.utilization * 100)}%)`}
-          {limit.resetsAt && ` · resets ${new Date(limit.resetsAt * 1000).toLocaleTimeString()}`}
+          {limit.status === 'rejected' ? t('Usage limit reached') : t('Close to the usage limit')}
+          {limit.resetsAt && ` · ${t('resets {time}', { time: new Date(limit.resetsAt * 1000).toLocaleTimeString(intlLocale()) })}`}
         </p>
       )}
+      {subscription && (
+        <div className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5 text-[11px] text-muted-foreground" aria-label={t('Plan use of this session')}>
+          <span>{t('This session')}</span>
+          <SessionLimitLine usage={planUse ?? []} />
+        </div>
+      )}
+      <ContextBar view={view} />
       <div
         ref={scroller}
         onScroll={(e) => {
+          // Only scrolling up lets go (a smooth auto-scroll in flight only goes down); reaching the end follows again.
           const el = e.currentTarget
-          stuck.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+          const atEnd = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+          if (atEnd) stuck.current = true
+          else if (el.scrollTop < lastTop.current - 2) stuck.current = false
+          lastTop.current = el.scrollTop
         }}
         className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3"
         aria-live="polite"
       >
         {view.items.length === 0 && (
           <p className="pt-6 text-center text-xs text-muted-foreground">
-            {view.info.status === 'starting' ? 'Starting Claude Code…' : 'Ask something to start.'}
+            {view.info.status === 'starting' ? t('Starting {cli}…', { cli: kindLabel(view.info.kind) }) : t('Ask something to start.')}
           </p>
         )}
         {view.items.map((item) => (
-          <Item key={itemKey(item)} item={item} cwd={view.info.cwd} ended={ended} />
+          <Appear key={itemKey(item)}>
+            <Item
+              item={item}
+              cwd={view.info.cwd}
+              ended={ended}
+              subscription={subscription}
+              streaming={item === last && item.kind === 'text' && !item.final && view.info.status === 'running'}
+            />
+          </Appear>
         ))}
         {view.info.status === 'running' && last?.kind !== 'text' && (
-          <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-            <StatusDot status="running" /> Working…
-          </p>
+          <Appear>
+            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <StatusDot status="running" /> {t('Working…')}
+            </p>
+          </Appear>
         )}
       </div>
       <Composer view={view} />

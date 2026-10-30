@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { tk } from './i18n'
 import { profileIdSchema, type ProfileKind } from './profiles'
 
 /**
@@ -12,9 +13,19 @@ export const PERMISSION_LEVELS = ['validate-all', 'files-auto', 'autonomous'] as
 export type PermissionLevel = (typeof PERMISSION_LEVELS)[number]
 
 export const PERMISSION_LEVEL_LABELS: Record<PermissionLevel, string> = {
-  'validate-all': 'Validate everything',
-  'files-auto': 'Files auto, commands validated',
-  autonomous: 'Autonomous in its folder'
+  'validate-all': tk('Validate everything'),
+  'files-auto': tk('Files auto, commands validated'),
+  autonomous: tk('Autonomous in its folder')
+}
+
+/**
+ * What each level means for Antigravity, which cannot ask for approval in headless mode:
+ * anything that would need it is refused instead.
+ */
+export const ANTIGRAVITY_LEVEL_HINTS: Record<PermissionLevel, string> = {
+  'validate-all': tk('Antigravity cannot ask: it only reads.'),
+  'files-auto': tk('Edits files in its folder; commands are refused (it cannot ask).'),
+  autonomous: tk('Edits and runs commands in its folder; git push is refused.')
 }
 
 export const sessionIdSchema = z.string().regex(/^as-[a-z0-9-]{1,40}$/)
@@ -31,6 +42,12 @@ export const agentStartSchema = z.object({
   /** The saved agent and the board task this session works for, if any. */
   agentId: z.uuid().optional(),
   taskId: z.uuid().optional(),
+  /**
+   * The chat conversation this session answers, if any. A chat session only reads (files in its
+   * own folder, which holds the attachments) and uses the MCP tools it was given; it never
+   * writes files or runs commands, and it never asks for approval.
+   */
+  chatId: z.uuid().optional(),
   /** MCP tools this agent may use, as `mcp__<server>__<tool>`. Nothing else from MCP is visible to it. */
   mcpTools: z
     .array(z.string().regex(/^mcp__[a-z0-9_-]+__.+$/).max(300))
@@ -61,6 +78,7 @@ export interface AgentSessionInfo {
   mcpTools: string[]
   agentId: string | null
   taskId: string | null
+  chatId: string | null
   status: AgentStatus
   createdAt: number
 }
@@ -73,10 +91,20 @@ export interface ToolCallInfo {
   parentToolUseId: string | null
 }
 
+/** Tokens of one request by part, estimated from sizes and scaled to the reported input. */
+export interface ContextBreakdown {
+  system: number
+  memory: number
+  tools: number
+  history: number
+  toolResults: number
+  output: number
+}
+
 /** Everything the agent panel renders, pushed from main as `agent:event`. */
 export type AgentEvent =
   | { type: 'status'; status: AgentStatus }
-  | { type: 'init'; model: string; claudeCodeVersion: string; cwd: string; tools: string[] }
+  | { type: 'init'; model: string; /** Version of the CLI behind the session; empty for API agents. */ cliVersion: string; cwd: string; tools: string[] }
   | { type: 'user'; id: string; text: string }
   /** Streaming text; `key` identifies one text block of one assistant message. */
   | { type: 'text_delta'; key: string; text: string }
@@ -104,9 +132,18 @@ export type AgentEvent =
       errors: string[]
       /** Claude Code reports the cost; null for API providers until pricing arrives. */
       costUsd: number | null
+      /** All input tokens of the turn, cached ones included. */
       inputTokens: number
       outputTokens: number
       durationMs: number
+      /** Of `inputTokens`: read from the prompt cache, and written to it. 0 when the provider does not say. */
+      cacheReadTokens?: number
+      cacheWriteTokens?: number
+      /** Size of the conversation after the turn, and the model's window, when known: the context gauge. */
+      contextTokens?: number | null
+      contextWindow?: number | null
+      /** Where the last request's tokens went; Clyde's own loop only (CLIs report totals). */
+      breakdown?: ContextBreakdown
     }
   | {
       type: 'rate_limit'
@@ -116,6 +153,9 @@ export type AgentEvent =
       limitType: string | null
     }
   | { type: 'error'; message: string }
+  /** Older turns were replaced by a summary (Clyde's loop), or the CLI compacted its context. */
+  | { type: 'context_summarized'; turns: number }
+  | { type: 'context_compacted' }
 
 export interface AgentEventEnvelope {
   sessionId: string

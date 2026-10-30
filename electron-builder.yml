@@ -12,6 +12,10 @@ files:
   - '!**/*.map'
   - '!**/*.{md,markdown}'
   - '!**/{test,tests,__tests__}/**'
+# The tray icon, read from process.resourcesPath.
+extraResources:
+  - from: resources/icon.png
+    to: icon.png
 # Executables and native modules cannot run from inside app.asar.
 asarUnpack:
   - node_modules/node-pty/**

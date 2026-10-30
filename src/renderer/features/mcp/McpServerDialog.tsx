@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { t } from '@shared/i18n'
 import { Globe, SquareTerminal } from 'lucide-react'
 import type { McpServer } from '@shared/mcp'
 import { Button } from '@/components/ui/button'
@@ -87,10 +88,9 @@ function ServerForm({ server, close }: { server?: McpServer; close: () => void }
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{editing ? `Edit ${server.name}` : 'Add an MCP server'}</DialogTitle>
+        <DialogTitle>{editing ? t('Edit {name}', { name: server.name }) : t('Add an MCP server')}</DialogTitle>
         <DialogDescription>
-          Clyde connects to the server and lists its tools. Each agent only sees the tools you allow when you start it.
-        </DialogDescription>
+          {t('Clyde connects to the server and lists its tools. Each agent only sees the tools you allow when you start it.')}</DialogDescription>
       </DialogHeader>
       <form
         className="grid gap-4"
@@ -100,11 +100,11 @@ function ServerForm({ server, close }: { server?: McpServer; close: () => void }
         }}
       >
         {!editing && (
-          <div className="grid grid-cols-2 gap-2" role="group" aria-label="Transport">
+          <div className="grid grid-cols-2 gap-2" role="group" aria-label={t('Transport')}>
             {(
               [
-                ['stdio', SquareTerminal, 'Local command', 'Clyde starts the server (stdio).'],
-                ['http', Globe, 'Remote URL', 'Streamable HTTP, or SSE for older servers.']
+                ['stdio', SquareTerminal, t('Local command'), t('Clyde starts the server (stdio).')],
+                ['http', Globe, t('Remote URL'), t('Streamable HTTP, or SSE for older servers.')]
               ] as const
             ).map(([value, Icon, title, description]) => (
               <button
@@ -127,22 +127,22 @@ function ServerForm({ server, close }: { server?: McpServer; close: () => void }
           </div>
         )}
 
-        <Field label="Name" hint="Tools appear as mcp__<name>__<tool>.">
-          <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="github" maxLength={60} />
+        <Field label={t('Name')} hint={t('Tools appear as mcp__<name>__<tool>.')}>
+          <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t('github')} maxLength={60} />
         </Field>
 
         {transport === 'stdio' ? (
           <>
-            <Field label="Command">
+            <Field label={t('Command')}>
               <Input
                 value={command}
                 onChange={(e) => setCommand(e.target.value)}
-                placeholder="npx"
+                placeholder={t('npx')}
                 className="font-mono text-xs"
                 spellCheck={false}
               />
             </Field>
-            <Field label="Arguments" hint="One per line.">
+            <Field label={t('Arguments')} hint={t('One per line.')}>
               <textarea
                 value={args}
                 onChange={(e) => setArgs(e.target.value)}
@@ -153,11 +153,11 @@ function ServerForm({ server, close }: { server?: McpServer; close: () => void }
             </Field>
           </>
         ) : (
-          <Field label="URL">
+          <Field label={t('URL')}>
             <Input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://mcp.example.com/mcp"
+              placeholder={t('https://mcp.example.com/mcp')}
               className="font-mono text-xs"
               spellCheck={false}
             />
@@ -165,19 +165,18 @@ function ServerForm({ server, close }: { server?: McpServer; close: () => void }
         )}
 
         <Field
-          label={transport === 'stdio' ? 'Environment variables' : 'Headers'}
+          label={transport === 'stdio' ? t('Environment variables') : t('Headers')}
           hint={
             editing && !replaceSecrets
               ? undefined
-              : `${transport === 'stdio' ? 'KEY=value' : 'Name: value'} per line. Encrypted like API keys; values are never shown again.`
+              : t('{format} per line. Encrypted like API keys; values are never shown again.', { format: transport === 'stdio' ? 'KEY=value' : 'Name: value' })
           }
         >
           {editing && !replaceSecrets ? (
             <div className="flex items-center justify-between gap-2 rounded-md border border-dashed px-3 py-2 text-xs text-muted-foreground">
-              <span className="truncate font-mono">{secretKeys.length ? secretKeys.join(', ') : 'None'}</span>
+              <span className="truncate font-mono">{secretKeys.length ? secretKeys.join(', ') : t('None')}</span>
               <Button type="button" size="xs" variant="outline" onClick={() => setReplaceSecrets(true)}>
-                Replace
-              </Button>
+                {t('Replace')}</Button>
             </div>
           ) : (
             <textarea
@@ -193,10 +192,9 @@ function ServerForm({ server, close }: { server?: McpServer; close: () => void }
 
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={close}>
-            Cancel
-          </Button>
+            {t('Cancel')}</Button>
           <Button type="submit" disabled={!canSave}>
-            {editing ? 'Save' : 'Add server'}
+            {editing ? t('Save') : t('Add server')}
           </Button>
         </DialogFooter>
       </form>

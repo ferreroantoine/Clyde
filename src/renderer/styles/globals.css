@@ -60,6 +60,69 @@
   --terminal: oklch(0.16 0.006 265);
 }
 
+/* Accent colors (Settings › Appearance). Indigo is the default above. */
+[data-accent='blue'] {
+  --primary: oklch(0.52 0.17 250);
+  --ring: oklch(0.52 0.17 250 / 0.5);
+}
+.dark[data-accent='blue'] {
+  --primary: oklch(0.68 0.15 250);
+  --ring: oklch(0.68 0.15 250 / 0.5);
+}
+[data-accent='teal'] {
+  --primary: oklch(0.55 0.11 190);
+  --ring: oklch(0.55 0.11 190 / 0.5);
+}
+.dark[data-accent='teal'] {
+  --primary: oklch(0.68 0.11 190);
+  --ring: oklch(0.68 0.11 190 / 0.5);
+}
+[data-accent='green'] {
+  --primary: oklch(0.55 0.15 150);
+  --ring: oklch(0.55 0.15 150 / 0.5);
+}
+.dark[data-accent='green'] {
+  --primary: oklch(0.68 0.14 150);
+  --ring: oklch(0.68 0.14 150 / 0.5);
+}
+[data-accent='orange'] {
+  --primary: oklch(0.55 0.17 50);
+  --ring: oklch(0.55 0.17 50 / 0.5);
+}
+.dark[data-accent='orange'] {
+  --primary: oklch(0.68 0.15 50);
+  --ring: oklch(0.68 0.15 50 / 0.5);
+}
+[data-accent='rose'] {
+  --primary: oklch(0.52 0.19 10);
+  --ring: oklch(0.52 0.19 10 / 0.5);
+}
+.dark[data-accent='rose'] {
+  --primary: oklch(0.68 0.17 10);
+  --ring: oklch(0.68 0.17 10 / 0.5);
+}
+[data-accent='violet'] {
+  --primary: oklch(0.52 0.2 300);
+  --ring: oklch(0.52 0.2 300 / 0.5);
+}
+.dark[data-accent='violet'] {
+  --primary: oklch(0.68 0.17 300);
+  --ring: oklch(0.68 0.17 300 / 0.5);
+}
+[data-accent='slate'] {
+  --primary: oklch(0.52 0.035 260);
+  --ring: oklch(0.52 0.035 260 / 0.5);
+}
+.dark[data-accent='slate'] {
+  --primary: oklch(0.68 0.035 260);
+  --ring: oklch(0.68 0.035 260 / 0.5);
+}
+
+/* Compact density tightens every Tailwind spacing (padding, gaps, margins). */
+[data-density='compact'] {
+  --spacing: 0.2rem;
+}
+
 @theme inline {
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', monospace;
@@ -126,5 +189,213 @@
   }
   ::-webkit-scrollbar-track {
     background: transparent;
+  }
+}
+
+/*
+ * Motion. Durations and easings mirror src/renderer/lib/motion.ts. `data-motion` on <html> is
+ * the effective level: the setting, lowered to "reduced" by the system preference.
+ */
+:root {
+  --motion-fast: 150ms;
+  --motion-base: 200ms;
+  --motion-slow: 300ms;
+  --motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer components {
+  /* Press feedback for anything clickable that is not a <Button>: tabs, rows, cards. */
+  .press {
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-duration: var(--motion-fast);
+    transition-timing-function: var(--motion-ease-out);
+  }
+  .press:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .press-soft:active:not(:disabled) {
+    transform: scale(0.99);
+  }
+  /* A visible focus for keyboard users on every pressable element, even those that drop the outline. */
+  .press:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+  }
+
+  /* Placeholder while something loads. */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-md);
+    background: color-mix(in oklch, var(--muted-foreground) 12%, transparent);
+  }
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--background) 55%, transparent), transparent);
+    animation: shimmer 1.4s var(--motion-ease-out) infinite;
+  }
+
+  /* Work in progress (a running tool): a light sweeping across. */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--primary) 9%, transparent), transparent);
+    animation: shimmer 1.6s ease-in-out infinite;
+  }
+
+  /* Typing caret at the end of streaming text. */
+  .stream-caret::after {
+    content: '';
+    display: inline-block;
+    width: 0.45em;
+    height: 1.05em;
+    margin-left: 1px;
+    vertical-align: text-bottom;
+    border-radius: 1px;
+    background: currentColor;
+    opacity: 0.6;
+    animation: caret 1s steps(1) infinite;
+  }
+
+  /* Panels opening and closing from the store (not while dragging a divider). */
+  [data-panels-animating] [data-panel] {
+    transition: flex-grow var(--motion-base) var(--motion-ease-out);
+  }
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Reduced: fades only, no movement or scale. */
+[data-motion='reduced'] .press:active,
+[data-motion='reduced'] [data-slot='button']:active {
+  transform: none;
+}
+[data-motion='reduced'] .skeleton::after,
+[data-motion='reduced'] .shimmer::before {
+  animation: none;
+}
+
+/* Off: nothing moves; state changes are instant. The caret stays, without blinking. */
+[data-motion='off'] *,
+[data-motion='off'] *::before,
+[data-motion='off'] *::after {
+  transition-duration: 0s !important;
+  animation-duration: 0s !important;
+  animation-iteration-count: 1 !important;
+}
+[data-motion='off'] .press:active,
+[data-motion='off'] [data-slot='button']:active {
+  transform: none;
+}
+
+/* An approval request glows twice, then stays still. */
+@keyframes approval-glow {
+  50% {
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--warning) 70%, transparent);
+  }
+}
+.approval-glow {
+  animation: approval-glow 1.2s var(--motion-ease-out) 2;
+}
+[data-motion='reduced'] .approval-glow {
+  animation: none;
+}
+
+/* Chat messages: comfortable reading, claude.ai-like rhythm. */
+@layer components {
+  .chat-prose {
+    font-size: 14px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+  }
+  .chat-prose > :first-child {
+    margin-top: 0;
+  }
+  .chat-prose > :last-child {
+    margin-bottom: 0;
+  }
+  .chat-prose p {
+    margin: 0.6em 0;
+  }
+  .chat-prose h1,
+  .chat-prose h2,
+  .chat-prose h3,
+  .chat-prose h4 {
+    margin: 1.2em 0 0.5em;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .chat-prose h1 {
+    font-size: 1.45em;
+  }
+  .chat-prose h2 {
+    font-size: 1.25em;
+  }
+  .chat-prose h3 {
+    font-size: 1.1em;
+  }
+  .chat-prose ul,
+  .chat-prose ol {
+    margin: 0.6em 0;
+    padding-left: 1.5em;
+  }
+  .chat-prose ul {
+    list-style: disc;
+  }
+  .chat-prose ol {
+    list-style: decimal;
+  }
+  .chat-prose li {
+    margin: 0.25em 0;
+  }
+  .chat-prose li > input[type='checkbox'] {
+    margin-right: 0.4em;
+  }
+  .chat-prose blockquote {
+    margin: 0.8em 0;
+    border-left: 3px solid var(--border);
+    padding-left: 0.9em;
+    color: var(--muted-foreground);
+  }
+  .chat-prose hr {
+    margin: 1.2em 0;
+  }
+  .chat-prose .katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0.3em 0;
+  }
+  /* Caret after the last block while the answer streams in. */
+  .chat-streaming > :last-child::after {
+    content: '';
+    display: inline-block;
+    width: 0.45em;
+    height: 1.05em;
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    border-radius: 1px;
+    background: currentColor;
+    opacity: 0.55;
+    animation: caret 1s steps(1) infinite;
   }
 }

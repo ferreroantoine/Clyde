@@ -11,6 +11,8 @@ export interface ToolCall {
   id: string
   name: string
   input: Record<string, unknown>
+  /** Opaque vendor data to send back with the call, e.g. Gemini's `extra_content`. */
+  extra?: Record<string, unknown>
 }
 
 export interface ToolResult {
@@ -20,17 +22,26 @@ export interface ToolResult {
   isError: boolean
 }
 
+/** An image sent with a user message (chat attachments), base64 without the data: prefix. */
+export interface ImageInput {
+  mime: string
+  data: string
+}
+
 /** Vendor-neutral conversation history; each adapter converts it to its own wire format. */
 export type ChatMessage =
-  | { role: 'user'; text: string }
+  | { role: 'user'; text: string; images?: ImageInput[] }
   | { role: 'assistant'; text: string; toolCalls: ToolCall[] }
   | { role: 'tool'; results: ToolResult[] }
 
 export type StopReason = 'end' | 'tool_use' | 'max_tokens' | 'other'
 
 export interface Usage {
+  /** All input tokens, cached ones included. */
   inputTokens: number
   outputTokens: number
+  cacheReadTokens?: number
+  cacheWriteTokens?: number
 }
 
 export type AdapterEvent =
@@ -49,6 +60,8 @@ export interface ChatRequest {
 export interface ChatAdapter {
   stream(request: ChatRequest): AsyncGenerator<AdapterEvent>
   listModels(): Promise<ModelOption[]>
+  /** The model's context window in tokens, when the provider tells it. */
+  contextWindow?(model: string): Promise<number | null>
 }
 
 /** Parses streamed tool arguments; models occasionally send nothing for tools without parameters. */

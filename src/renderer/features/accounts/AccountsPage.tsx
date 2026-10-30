@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Appear } from '@/components/Appear'
+import { SkeletonCards } from '@/components/Skeleton'
+import { t } from '@shared/i18n'
 import {
   Bot,
   CircleAlert,
@@ -11,13 +14,16 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Gem,
+  Orbit,
   Sparkles,
+  SquareTerminal,
   Trash2,
   UserRound,
-  Wind,
   type LucideIcon
 } from 'lucide-react'
-import { PROFILE_KIND_LABELS, type Profile } from '@shared/profiles'
+import { type Profile } from '@shared/profiles'
+import type { CliStatus } from '@shared/cli'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -39,16 +45,15 @@ import { LoginDialog } from './LoginDialog'
 function ConnectionLine({ profile }: { profile: Profile }) {
   const test = useProfiles((s) => s.tests[profile.id])
   if (!profile.usable) {
-    return <p className="text-xs text-muted-foreground">Disabled in this build: subscription logins are for personal use.</p>
+    return <p className="text-xs text-muted-foreground">{t('Disabled in this build: subscription logins are for personal use.')}</p>
   }
   if (test === 'testing') {
     return (
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <LoaderCircle className="size-3.5 animate-spin" /> Testing the connection…
-      </p>
+        <LoaderCircle className="size-3.5 animate-spin" /> {' '}{t('Testing the connection…')}</p>
     )
   }
-  if (!test) return <p className="text-xs text-muted-foreground">Not tested yet.</p>
+  if (!test) return <p className="text-xs text-muted-foreground">{t('Not tested yet.')}</p>
   const who = [test.email, test.subscriptionType].filter(Boolean).join(' · ')
   return (
     <div className="space-y-0.5 text-xs">
@@ -60,7 +65,7 @@ function ConnectionLine({ profile }: { profile: Profile }) {
       {test.detail && <p className="text-muted-foreground">{test.detail}</p>}
       {test.ok && test.models.length > 0 && (
         <p className="truncate text-muted-foreground" title={test.models.map((m) => m.displayName).join(', ')}>
-          Models: {test.models.map((m) => m.displayName).join(', ')}
+          {t('Models: {list}', { list: test.models.map((m) => m.displayName).join(', ') })}
         </p>
       )}
     </div>
@@ -68,19 +73,24 @@ function ConnectionLine({ profile }: { profile: Profile }) {
 }
 
 function kindLine(profile: Profile): { icon: LucideIcon; text: string } {
-  if (profile.kind === 'claude-code') {
-    return profile.auth === 'subscription'
-      ? { icon: UserRound, text: 'Claude Code · subscription' }
-      : { icon: KeyRound, text: 'Claude Code · API key' }
+  switch (profile.kind) {
+    case 'claude-code':
+      return profile.auth === 'subscription'
+        ? { icon: UserRound, text: t('Claude Code · subscription') }
+        : { icon: KeyRound, text: t('Claude Code · API key') }
+    case 'codex':
+      return { icon: SquareTerminal, text: t('Codex CLI · ChatGPT subscription') }
+    case 'antigravity':
+      return { icon: Orbit, text: t('Antigravity CLI · Google account') }
+    case 'ollama':
+      return { icon: Cpu, text: `Ollama · ${profile.baseUrl}` }
+    case 'anthropic':
+      return { icon: Sparkles, text: t('Anthropic API · API key') }
+    case 'openai':
+      return { icon: Bot, text: t('OpenAI API · API key') }
+    case 'gemini':
+      return { icon: Gem, text: t('Gemini API · API key') }
   }
-  const icons: Record<Exclude<Profile['kind'], 'claude-code'>, LucideIcon> = {
-    anthropic: Sparkles,
-    openai: Bot,
-    mistral: Wind,
-    ollama: Cpu
-  }
-  const text = profile.kind === 'ollama' ? `Ollama · ${profile.baseUrl}` : `${PROFILE_KIND_LABELS[profile.kind]} · API key`
-  return { icon: icons[profile.kind], text }
 }
 
 function ProfileCard({
@@ -96,7 +106,7 @@ function ProfileCard({
 }) {
   const test = useProfiles((s) => s.test)
   const testing = useProfiles((s) => s.tests[profile.id] === 'testing')
-  const subscription = profile.kind === 'claude-code' && profile.auth === 'subscription'
+  const subscription = profile.auth === 'subscription'
   const { icon: KindIcon, text: kindText } = kindLine(profile)
 
   return (
@@ -124,26 +134,23 @@ function ProfileCard({
             <span className="truncate">{kindText}</span>
             {profile.personalUse && (
               <Badge variant="outline" className="h-4 px-1.5 text-[10px] font-medium">
-                Personal use
-              </Badge>
+                {t('Personal use')}</Badge>
             )}
             {profile.defaultModel && <span className="font-mono">· {profile.defaultModel}</span>}
           </div>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-xs" aria-label={`Actions for ${profile.name}`}>
+            <Button variant="ghost" size="icon-xs" aria-label={t('Actions for {name}', { name: profile.name })}>
               <MoreHorizontal />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onSelect={onEdit}>
-              <Pencil /> Edit
-            </DropdownMenuItem>
+              <Pencil /> {' '}{t('Edit')}</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-              <Trash2 /> Delete
-            </DropdownMenuItem>
+              <Trash2 /> {' '}{t('Delete')}</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
@@ -153,18 +160,51 @@ function ProfileCard({
       <footer className="flex gap-2">
         {subscription && (
           <Button size="xs" variant="outline" disabled={!profile.usable} onClick={onLogin}>
-            <LogIn /> Sign in
-          </Button>
+            <LogIn /> {' '}{t('Sign in')}</Button>
         )}
         <Button size="xs" variant="outline" disabled={!profile.usable || testing} onClick={() => void test(profile.id)}>
-          <RefreshCw className={testing ? 'animate-spin' : undefined} /> Test connection
-        </Button>
+          <RefreshCw className={testing ? 'animate-spin' : undefined} /> {' '}{t('Test connection')}</Button>
       </footer>
     </article>
   )
 }
 
-export function AccountsPage() {
+const CLI_NAMES: Record<CliStatus['kind'], string> = { 'claude-code': 'Claude Code', codex: 'Codex', antigravity: 'Antigravity' }
+
+/** Which coding CLIs Clyde found, with their versions. */
+function CliLine() {
+  const [status, setStatus] = useState<CliStatus[] | null>(null)
+  const [checking, setChecking] = useState(true)
+  const fetchStatus = useCallback((refresh: boolean) => {
+    invoke('cli:status', { refresh })
+      .then(setStatus)
+      .catch(() => setStatus([]))
+      .finally(() => setChecking(false))
+  }, [])
+  const load = (refresh: boolean) => {
+    setChecking(true)
+    fetchStatus(refresh)
+  }
+  useEffect(() => fetchStatus(false), [fetchStatus])
+  return (
+    <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground" aria-label={t('Coding CLIs')}>
+      {(status ?? []).map((c) => (
+        <span key={c.kind} className="flex items-center gap-1.5" title={c.detail ?? c.path ?? undefined}>
+          {c.installed ? <CircleCheck className="size-3.5 text-success" /> : <CircleAlert className="size-3.5 text-warning" />}
+          <span className="font-medium text-foreground">{CLI_NAMES[c.kind]}</span>
+          {c.installed ? (c.version ?? t('version unknown')) : t('not found')}
+          {c.bundled && ` · ${t('bundled')}`}
+        </span>
+      ))}
+      <Button size="xs" variant="ghost" disabled={checking} onClick={() => load(true)} aria-label={t('Check CLIs again')}>
+        <RefreshCw className={checking ? 'animate-spin' : undefined} /> {status ? t('Check again') : t('Checking CLIs…')}
+      </Button>
+    </div>
+  )
+}
+
+/** `embedded` drops the page frame and title, for Settings. */
+export function AccountsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const profiles = useProfiles((s) => s.profiles)
   const loaded = useProfiles((s) => s.loaded)
   const remove = useProfiles((s) => s.remove)
@@ -182,56 +222,52 @@ export function AccountsPage() {
   }, [])
 
   const onCreated = (profile: Profile) => {
-    if (profile.kind === 'claude-code' && profile.auth === 'subscription') setLoginFor(profile)
+    if (profile.auth === 'subscription') setLoginFor(profile)
     else void test(profile.id)
   }
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-4xl px-8 py-10">
+    <div className={embedded ? undefined : 'h-full overflow-y-auto'}>
+      <div className={embedded ? 'pb-2' : 'mx-auto max-w-4xl px-8 py-10'}>
         <div className="flex items-end justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold tracking-tight">Accounts</h1>
+            {!embedded && <h1 className="text-lg font-semibold tracking-tight">{t('Accounts')}</h1>}
             <p className="mt-1 text-sm text-muted-foreground">
-              Each account has its own color and label, shown wherever it works. Clyde never switches accounts on its own.
-            </p>
+              {t('Each account has its own color and label, shown wherever it works. Clyde never switches accounts on its own.')}</p>
           </div>
           <Button size="sm" onClick={() => setEditing('new')}>
-            <Plus /> Add account
-          </Button>
+            <Plus /> {' '}{t('Add account')}</Button>
         </div>
+        <CliLine />
 
         {loaded && profiles.length === 0 ? (
           <div className="mt-10 rounded-xl border border-dashed py-14">
             <EmptyState
               icon={KeyRound}
-              title="No account yet"
-              description="Add a Claude subscription, an API key for Anthropic, OpenAI or Mistral, or a local Ollama."
+              title={t('No account yet')}
+              description={t('Add a Claude, ChatGPT or Google subscription, an API key for Anthropic, OpenAI or Gemini, or a local Ollama.')}
               action={
                 <Button size="sm" variant="outline" onClick={() => setEditing('new')}>
-                  <Plus /> Add account
-                </Button>
+                  <Plus /> {' '}{t('Add account')}</Button>
               }
             />
           </div>
         ) : (
           <div className="mt-8 grid gap-3 sm:grid-cols-2">
+            {!loaded && <SkeletonCards count={2} className="contents space-y-0" />}
             {profiles.map((p) => (
-              <ProfileCard
-                key={p.id}
-                profile={p}
-                onEdit={() => setEditing(p)}
-                onLogin={() => setLoginFor(p)}
-                onDelete={() => setDeleting(p)}
-              />
+              <Appear key={p.id}>
+                <ProfileCard profile={p} onEdit={() => setEditing(p)} onLogin={() => setLoginFor(p)} onDelete={() => setDeleting(p)} />
+              </Appear>
             ))}
           </div>
         )}
 
         <p className="mt-8 text-xs leading-relaxed text-muted-foreground">
-          Claude subscription accounts sign in through Claude Code’s own login and are meant for personal use: Anthropic does
-          not allow third-party products to offer claude.ai login without approval.
-          {distribution && ' This build only allows API key accounts.'}
+          {t(
+            'Subscription accounts sign in through each CLI’s own login (Claude Code, Codex, Antigravity) and are meant for personal use: Clyde never sees the credentials, and Anthropic does not allow third-party products to offer claude.ai login without approval.'
+          )}
+          {distribution && ` ${t('This build only allows API key accounts.')}`}
         </p>
       </div>
 
@@ -250,15 +286,13 @@ export function AccountsPage() {
       <Dialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete {deleting?.name}?</DialogTitle>
+            <DialogTitle>{t('Delete {name}?', { name: deleting?.name ?? '' })}</DialogTitle>
             <DialogDescription>
-              This removes the account from Clyde, its stored key, and its Claude Code folder, including the sign-in.
-            </DialogDescription>
+              {t('This removes the account from Clyde, its stored key, and its Claude Code folder, including the sign-in.')}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDeleting(null)}>
-              Cancel
-            </Button>
+              {t('Cancel')}</Button>
             <Button
               variant="destructive"
               onClick={() => {
@@ -266,8 +300,7 @@ export function AccountsPage() {
                 setDeleting(null)
               }}
             >
-              Delete
-            </Button>
+              {t('Delete')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

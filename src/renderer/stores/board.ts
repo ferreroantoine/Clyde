@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { t } from '@shared/i18n'
 import type {
   AgentDefinition,
   AgentDefinitionInput,
@@ -36,6 +37,9 @@ interface BoardState {
   merge: (id: string) => Promise<MergeResult | null>
   abandon: (id: string) => Promise<void>
   deleteTask: (id: string) => Promise<void>
+  /** Drag and drop inside a column: shown at once, then saved. */
+  reorder: (id: string, beforeId: string | null) => Promise<void>
+  loaded: boolean
   openReview: (taskId: string) => Promise<void>
   selectFile: (path: string) => Promise<void>
   closeReview: () => void
@@ -61,6 +65,7 @@ export const useBoard = create<BoardState>()((set, get) => {
     tasks: [],
     review: null,
     busy: {},
+    loaded: false,
 
     init: () => {
       const offs = [
@@ -84,9 +89,10 @@ export const useBoard = create<BoardState>()((set, get) => {
 
     reloadTasks: async () => {
       try {
-        set({ tasks: await invoke('tasks:list') })
+        set({ tasks: await invoke('tasks:list'), loaded: true })
       } catch (err) {
-        notify.error('Could not load the board', err)
+        set({ loaded: true })
+        notify.error(t('Could not load the board'), err)
       }
     },
 
@@ -94,43 +100,58 @@ export const useBoard = create<BoardState>()((set, get) => {
       try {
         return 'id' in input ? await invoke('agents:update', input) : await invoke('agents:create', input)
       } catch (err) {
-        notify.error('Could not save the agent', err)
+        notify.error(t('Could not save the agent'), err)
         return null
       }
     },
 
     deleteAgent: async (id) => {
-      await invoke('agents:delete', { id }).catch((err) => notify.error('Could not delete the agent', err))
+      await invoke('agents:delete', { id }).catch((err) => notify.error(t('Could not delete the agent'), err))
     },
 
-    createTask: (input) => act('new-task', 'Could not create the task', () => invoke('tasks:create', input)),
+    createTask: (input) => act('new-task', t('Could not create the task'), () => invoke('tasks:create', input)),
 
     startTask: async (id) => {
-      await act(id, 'Could not start the task', () => invoke('tasks:start', { id }))
+      await act(id, t('Could not start the task'), () => invoke('tasks:start', { id }))
     },
 
     requestChanges: async (id, comments) => {
-      const task = await act(id, 'Could not send the changes', () => invoke('tasks:requestChanges', { id, comments }))
+      const task = await act(id, t('Could not send the changes'), () => invoke('tasks:requestChanges', { id, comments }))
       if (task) set({ review: null })
       return !!task
     },
 
     merge: async (id) => {
-      const result = await act(id, 'Merge failed', () => invoke('tasks:merge', { id }))
+      const result = await act(id, t('Merge failed'), () => invoke('tasks:merge', { id }))
       if (result?.ok) {
-        notify.success('Merged', `Commit ${result.commit.slice(0, 8)}`)
+        notify.success(t('Merged'), t('Commit {sha}', { sha: result.commit.slice(0, 8) }))
         set({ review: null })
-      } else if (result) notify.error('Not merged', result.reason)
+      } else if (result) notify.error(t('Not merged'), result.reason)
       return result
     },
 
     abandon: async (id) => {
-      const task = await act(id, 'Could not abandon the task', () => invoke('tasks:abandon', { id }))
+      const task = await act(id, t('Could not abandon the task'), () => invoke('tasks:abandon', { id }))
       if (task) set({ review: null })
     },
 
     deleteTask: async (id) => {
-      await act(id, 'Could not delete the task', () => invoke('tasks:delete', { id }))
+      await act(id, t('Could not delete the task'), () => invoke('tasks:delete', { id }))
+    },
+
+    reorder: async (id, beforeId) => {
+      const before = get().tasks
+      const moving = before.find((x) => x.id === id)
+      if (!moving || id === beforeId) return
+      const rest = before.filter((x) => x.id !== id)
+      const at = beforeId ? rest.findIndex((x) => x.id === beforeId) : -1
+      set({ tasks: at < 0 ? [...rest, moving] : [...rest.slice(0, at), moving, ...rest.slice(at)] })
+      try {
+        set({ tasks: await invoke('tasks:reorder', { id, beforeId }) })
+      } catch (err) {
+        set({ tasks: before })
+        notify.error(t('Could not move the task'), err)
+      }
     },
 
     openReview: async (taskId) => {
@@ -141,7 +162,7 @@ export const useBoard = create<BoardState>()((set, get) => {
         const first = changes[0]
         if (first) await get().selectFile(first.path)
       } catch (err) {
-        notify.error('Could not load the changes', err)
+        notify.error(t('Could not load the changes'), err)
         set({ review: null })
       }
     },
@@ -155,7 +176,7 @@ export const useBoard = create<BoardState>()((set, get) => {
         const current = get().review
         if (current?.selected === path) set({ review: { ...current, diff, loading: false } })
       } catch (err) {
-        notify.error('Could not load this file', err)
+        notify.error(t('Could not load this file'), err)
       }
     },
 

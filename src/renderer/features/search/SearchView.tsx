@@ -1,4 +1,5 @@
 import { CaseSensitive, LoaderCircle, Regex, Search, X } from 'lucide-react'
+import { t, tn } from '@shared/i18n'
 import { useEffect, useRef } from 'react'
 import { IconButton } from '@/components/IconButton'
 import { useSearch, type FileMatches } from '@/stores/search'
@@ -38,7 +39,7 @@ function FileGroup({ group }: { group: FileMatches }) {
           key={`${m.line}:${m.column}`}
           type="button"
           onClick={() => void open(m.path, { line: m.line, column: m.column, length: m.matchLength })}
-          className="flex h-6 w-full items-center gap-2 pr-3 pl-9 text-left text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+          className="press press-soft flex h-6 w-full items-center gap-2 pr-3 pl-9 text-left text-muted-foreground hover:bg-accent/70 hover:text-foreground"
         >
           <span className="w-7 shrink-0 text-right text-[10px] tabular-nums opacity-60">{m.line}</span>
           <Highlight preview={m.preview} start={m.previewStart} length={m.matchLength} />
@@ -66,13 +67,13 @@ export function SearchView() {
             value={s.query}
             onChange={(e) => s.setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Escape' && s.clear()}
-            placeholder="Search in files"
+            placeholder={t('Search in files')}
             spellCheck={false}
             className="h-7 min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground"
           />
-          {s.query && <IconButton icon={X} label="Clear" onClick={s.clear} />}
-          <IconButton icon={CaseSensitive} label="Match case" active={s.caseSensitive} onClick={s.toggleCase} />
-          <IconButton icon={Regex} label="Use regular expression" active={s.regex} onClick={s.toggleRegex} />
+          {s.query && <IconButton icon={X} label={t('Clear')} onClick={s.clear} />}
+          <IconButton icon={CaseSensitive} label={t('Match case')} active={s.caseSensitive} onClick={s.toggleCase} />
+          <IconButton icon={Regex} label={t('Use regular expression')} active={s.regex} onClick={s.toggleRegex} />
         </div>
         <div className="mt-1.5 flex h-4 items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
           {s.running && <LoaderCircle className="size-3 animate-spin" />}
@@ -82,8 +83,8 @@ export function SearchView() {
             s.query &&
             !s.running && (
               <span>
-                {s.total} result{s.total === 1 ? '' : 's'} in {s.results.length} file{s.results.length === 1 ? '' : 's'}
-                {s.truncated && ' (limit reached)'}
+                {tn('{count} result', '{count} results', s.total)} {tn('in {count} file', 'in {count} files', s.results.length)}
+                {s.truncated && ` ${t('(limit reached)')}`}
               </span>
             )
           )}

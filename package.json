@@ -1,7 +1,7 @@
 {
   "name": "clyde",
   "productName": "Clyde",
-  "version": "0.1.0-beta.2",
+  "version": "0.2.0-beta.1",
   "description": "Agent-centric desktop IDE, multi-account and multi-provider",
   "private": true,
   "main": "./out/main/index.js",
@@ -26,8 +26,14 @@
     "@vscode/ripgrep": "^1.18.0",
     "better-sqlite3": "^13.0.3",
     "chokidar": "^6.0.0",
+    "katex": "0.16.47",
+    "motion": "14.2.0",
     "node-pty": "^1.1.0",
     "openai": "^7.45.1",
+    "react-markdown": "10.1.0",
+    "rehype-katex": "7.0.1",
+    "remark-gfm": "4.0.1",
+    "remark-math": "6.0.0",
     "simple-git": "^4.0.2",
     "zod": "^4.6.7"
   },

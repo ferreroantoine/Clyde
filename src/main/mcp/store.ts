@@ -1,8 +1,10 @@
+import { t } from '@shared/i18n'
 import { randomUUID } from 'node:crypto'
 import { AppError } from '@shared/errors'
 import { mcpServerInputSchema, mcpServerUpdateSchema, slugify, type McpServerInput, type McpServerUpdate } from '@shared/mcp'
 import type { Db } from '../services/db/database'
 import type { Cipher } from '../services/secrets'
+import type { McpPreset, PresetParam } from '@shared/mcp-catalog'
 
 /** A server as main sees it, secrets included. Never sent to the renderer as is. */
 export interface McpServerRecord {
@@ -16,6 +18,7 @@ export interface McpServerRecord {
   env: Record<string, string>
   headers: Record<string, string>
   enabled: boolean
+  presetId: string | null
   createdAt: number
 }
 
@@ -29,6 +32,7 @@ interface Row {
   url: string
   secrets: Buffer | null
   enabled: number
+  preset_id: string | null
   created_at: number
 }
 
@@ -46,11 +50,11 @@ export class McpStore {
 
   get(id: string): McpServerRecord {
     const row = this.db.prepare('SELECT * FROM mcp_servers WHERE id = ?').get(id) as Row | undefined
-    if (!row) throw new AppError('not_found', 'This MCP server no longer exists')
+    if (!row) throw new AppError('not_found', t('This MCP server no longer exists'))
     return this.toRecord(row)
   }
 
-  create(input: McpServerInput): McpServerRecord {
+  create(input: McpServerInput, presetId: string | null = null): McpServerRecord {
     const data = mcpServerInputSchema.parse(input)
     const id = randomUUID()
     const now = Date.now()
@@ -58,8 +62,8 @@ export class McpStore {
     const headers = data.transport === 'http' ? data.headers : {}
     this.db
       .prepare(
-        `INSERT INTO mcp_servers (id, name, slug, transport, command, args_json, url, secrets, env_keys, header_keys, enabled, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO mcp_servers (id, name, slug, transport, command, args_json, url, secrets, env_keys, header_keys, enabled, preset_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -73,6 +77,7 @@ export class McpStore {
         JSON.stringify(Object.keys(env)),
         JSON.stringify(Object.keys(headers)),
         data.enabled ? 1 : 0,
+        presetId,
         now,
         now
       )
@@ -125,7 +130,7 @@ export class McpStore {
     if (!this.cipher.available()) {
       throw new AppError(
         'secrets_unavailable',
-        'Environment variables and headers can hold tokens, and this system has no secure storage for them. On Linux, install and unlock a keyring.'
+        t('Environment variables and headers can hold tokens, and this system has no secure storage for them. On Linux, install and unlock a keyring.')
       )
     }
     return this.cipher.encrypt(JSON.stringify({ env, headers }))
@@ -151,7 +156,81 @@ export class McpStore {
       env: secrets.env ?? {},
       headers: secrets.headers ?? {},
       enabled: row.enabled === 1,
+      presetId: row.preset_id,
       createdAt: row.created_at
     }
   }
+
+  /** Presets the user saved. */
+  presets(): McpPreset[] {
+    const rows = this.db.prepare('SELECT * FROM mcp_presets ORDER BY created_at').all() as PresetRow[]
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      title: r.title,
+      description: r.description,
+      publisher: t('Your preset'),
+      source: '',
+      transport: r.transport === 'http' ? 'http' : 'stdio',
+      command: r.command,
+      args: JSON.parse(r.args_json) as string[],
+      url: r.url,
+      params: JSON.parse(r.params_json) as PresetParam[],
+      tools: [],
+      toolChars: 0,
+      requires: '',
+      builtin: false
+    }))
+  }
+
+  /**
+   * Saves a server as a preset. Its command, arguments and URL are kept; the values of its
+   * environment variables and headers are not, only their names, asked again at install.
+   */
+  savePreset(serverId: string, title: string, description: string): McpPreset[] {
+    const server = this.get(serverId)
+    const params: PresetParam[] = [
+      ...Object.keys(server.env).map((name, i) => ({
+        key: `env${i}`,
+        label: name,
+        hint: '',
+        kind: 'secret' as const,
+        required: true,
+        target: { type: 'env' as const, name }
+      })),
+      ...Object.keys(server.headers).map((name, i) => ({
+        key: `header${i}`,
+        label: name,
+        hint: '',
+        kind: 'secret' as const,
+        required: true,
+        target: { type: 'header' as const, name, prefix: '' }
+      }))
+    ]
+    this.db
+      .prepare(
+        `INSERT INTO mcp_presets (id, title, description, name, transport, command, args_json, url, params_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(randomUUID(), title, description, server.name, server.transport, server.command, JSON.stringify(server.args), server.url, JSON.stringify(params), Date.now())
+    return this.presets()
+  }
+
+  deletePreset(id: string): McpPreset[] {
+    this.db.prepare('DELETE FROM mcp_presets WHERE id = ?').run(id)
+    return this.presets()
+  }
+}
+
+interface PresetRow {
+  id: string
+  title: string
+  description: string
+  name: string
+  transport: string
+  command: string
+  args_json: string
+  url: string
+  params_json: string
+  created_at: number
 }

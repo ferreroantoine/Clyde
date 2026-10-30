@@ -1,12 +1,14 @@
 import { create } from 'zustand'
 
-export type NoticeLevel = 'info' | 'success' | 'error'
+export type NoticeLevel = 'info' | 'success' | 'warning' | 'error'
 
 export interface Notice {
   id: number
   level: NoticeLevel
   title: string
   detail?: string
+  /** Stays until dismissed, for messages the user must not miss. */
+  persistent?: boolean
 }
 
 interface NotificationState {
@@ -23,7 +25,9 @@ export const useNotifications = create<NotificationState>()((set, get) => ({
   push: (notice) => {
     const id = nextId++
     set({ notices: [...get().notices, { ...notice, id }].slice(-5) })
-    setTimeout(() => get().dismiss(id), notice.level === 'error' ? AUTO_DISMISS_MS * 2 : AUTO_DISMISS_MS)
+    if (!notice.persistent) {
+      setTimeout(() => get().dismiss(id), notice.level === 'error' ? AUTO_DISMISS_MS * 2 : AUTO_DISMISS_MS)
+    }
   },
   dismiss: (id) => set({ notices: get().notices.filter((n) => n.id !== id) })
 }))
@@ -40,6 +44,8 @@ export const notify = {
     useNotifications.getState().push({ level: 'info', title, ...(detail ? { detail } : {}) }),
   success: (title: string, detail?: string) =>
     useNotifications.getState().push({ level: 'success', title, ...(detail ? { detail } : {}) }),
+  warning: (title: string, detail?: string) =>
+    useNotifications.getState().push({ level: 'warning', title, ...(detail ? { detail } : {}) }),
   error: (title: string, err?: unknown) => {
     const detail = detailOf(err)
     useNotifications.getState().push({ level: 'error', title, ...(detail ? { detail } : {}) })
