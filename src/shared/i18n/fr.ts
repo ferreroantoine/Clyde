@@ -1451,5 +1451,20 @@ export const fr: Record<string, string> = {
   'Could not plan the resume': 'Impossible de planifier la reprise',
   'Could not cancel the resume': 'Impossible d’annuler la reprise',
   'Choose the account; at a usage limit, Clyde switches it only if Settings › Agents says so.':
-    'Choisissez le compte ; à une limite d’utilisation, Clyde n’en change que si Paramètres › Agents le prévoit.'
+    'Choisissez le compte ; à une limite d’utilisation, Clyde n’en change que si Paramètres › Agents le prévoit.',
+  'No restore point for this session': 'Aucun point de restauration pour cette session',
+  'Could not run git: {message}': 'Impossible de lancer git : {message}',
+  'git took too long and was stopped': 'git a mis trop de temps et a été arrêté',
+  'The open folder is not in a git repository': 'Le dossier ouvert n’est pas dans un dépôt git',
+  'This part cannot be changed that way': 'Cette partie ne peut pas être modifiée ainsi',
+  'This part of the change no longer exists. Refresh and try again.': 'Cette partie de la modification n’existe plus. Actualisez et réessayez.',
+  'Conflicts in {count} file. Resolve them, then commit.': 'Conflit dans {count} fichier. Résolvez-le, puis faites un commit.',
+  'Conflicts in {count} files. Resolve them, then commit.': 'Conflits dans {count} fichiers. Résolvez-les, puis faites un commit.',
+  'This repository has no remote. Add one with git remote add.': 'Ce dépôt n’a pas de dépôt distant. Ajoutez-en un avec git remote add.',
+  'This branch has no upstream branch. Publish it first.': 'Cette branche n’a pas de branche distante. Publiez-la d’abord.',
+  'Check out a branch to push it': 'Passez sur une branche pour la pousser',
+  'Stage some changes first': 'Indexez d’abord des modifications',
+  'The model wrote no message': 'Le modèle n’a écrit aucun message',
+  'Restore point before each session': 'Point de restauration avant chaque session',
+  'In a git repository, Clyde records the files before an agent works on them, so the Source view can undo everything it did.': 'Dans un dépôt git, Clyde enregistre les fichiers avant qu’un agent n’y travaille : la vue Source peut alors annuler tout ce qu’il a fait.'
 }

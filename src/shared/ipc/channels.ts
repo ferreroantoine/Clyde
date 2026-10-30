@@ -121,7 +121,42 @@ export const INVOKE_CHANNELS = [
   'pricing:list',
   'pricing:save',
   'pricing:delete',
-  'files:list'
+  'files:list',
+  'git:status',
+  'git:init',
+  'git:stage',
+  'git:stageAll',
+  'git:unstage',
+  'git:unstageAll',
+  'git:discard',
+  'git:diff',
+  'git:applyHunk',
+  'git:commit',
+  'git:lastMessage',
+  'git:generateMessage',
+  'git:log',
+  'git:commitFiles',
+  'git:commitDiff',
+  'git:revert',
+  'git:cherryPick',
+  'git:branches',
+  'git:checkout',
+  'git:createBranch',
+  'git:deleteBranch',
+  'git:merge',
+  'git:abort',
+  'git:continue',
+  'git:fetch',
+  'git:pull',
+  'git:push',
+  'git:stashes',
+  'git:stash',
+  'git:stashApply',
+  'git:stashDrop',
+  'git:checkpoints',
+  'git:checkpointChanges',
+  'git:restoreCheckpoint',
+  'git:fileSessions'
 ] as const
 
 export const EVENT_CHANNELS = [
@@ -143,7 +178,8 @@ export const EVENT_CHANNELS = [
   'memory:changed',
   'limits:changed',
   'limits:sessionChanged',
-  'limits:alert'
+  'limits:alert',
+  'git:changed'
 ] as const
 
 export type InvokeChannel = (typeof INVOKE_CHANNELS)[number]

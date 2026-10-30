@@ -1,6 +1,7 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, dialog, net, Notification } from 'electron'
+import { app, BrowserWindow, dialog, net, Notification, shell } from 'electron'
 import { isEnded, type AgentEventEnvelope } from '@shared/agent'
+import { isApiKind } from '@shared/profiles'
 import { resolveLocale, setLocale, t } from '@shared/i18n'
 import { handleClose, refreshTray, syncTray } from './tray'
 import { openDatabase, migrate, type Db } from './services/db/database'
@@ -49,6 +50,9 @@ import { registerMemoryHandlers } from './ipc/memory'
 import { registerVoiceHandlers } from './ipc/voice'
 import { loadQuery, type QueryFn } from './agents/claude-code/provider'
 import { DISTRIBUTION } from './build-flags'
+import { GitService } from './git/service'
+import { CheckpointService } from './git/checkpoints'
+import { registerGitHandlers } from './ipc/git'
 
 const log = createLogger('main')
 
@@ -123,9 +127,12 @@ if (!app.requestSingleInstanceLock()) {
     // Created once the services it reads exist; callbacks before that skip it.
     // eslint-disable-next-line prefer-const -- assigned below, after the services it needs
     let memory: MemoryService | undefined
+    const trash = (abs: string) => shell.trashItem(abs)
+    const gitService = new GitService({ onChanged: () => broadcast('git:changed', null), trash })
     const workspace = new WorkspaceService(settings, {
       onChanged: (info) => {
         broadcast('workspace:changed', info)
+        void gitService.open(info?.root ?? null).catch((err) => log.warn('could not read the repository', err))
         // The open project's memory reaches its CLAUDE.md / AGENTS.md.
         try {
           memory?.sync()
@@ -186,6 +193,7 @@ if (!app.requestSingleInstanceLock()) {
       apiKey: (id) => profiles.apiKey(id),
       createAdapter: (target) => createAdapter(target, fetch)
     })
+    const checkpoints = new CheckpointService(profileDb)
     const media = new MediaStore(join(app.getPath('userData'), 'session-media'))
     const agents = new AgentManager({
       media,
@@ -218,6 +226,10 @@ if (!app.requestSingleInstanceLock()) {
       onLimits: (profileId, sessionId, readings) => limitsSetup.ingest(profileId, readings, sessionId),
       onSession: (info) => {
         broadcast('agent:session', info)
+        // Settings › Agents: a restore point of the project before the session changes anything.
+        if (info.status === 'starting' && !info.taskId && !info.chatId && settings.getAll().agents.gitCheckpoints) {
+          void checkpoints.create(info.id, info.cwd).catch((err) => log.warn('could not make a restore point', err))
+        }
         // End of a project session: the agent may propose memory changes, to review in Settings.
         if (info.status === 'stopped' && !shuttingDown && !info.chatId && settings.getAll().memory.proposeAtSessionEnd && internal.target()) {
           void memory?.proposeFromSession(info.id).catch((err) => log.warn('memory proposal failed', err))
@@ -322,6 +334,16 @@ if (!app.requestSingleInstanceLock()) {
       onChanged: (state) => broadcast('memory:changed', state)
     })
     registerMemoryHandlers(memory)
+    registerGitHandlers({
+      git: gitService,
+      checkpoints,
+      trash,
+      complete: (system, prompt) => {
+        // Clyde's internal model; without one, the first usable API account.
+        const api = profiles.list().find((p) => p.usable && isApiKind(p.kind))
+        return internal.complete({ system, prompt, ...(api ? { fallback: { profileId: api.id, model: api.defaultModel } } : {}) })
+      }
+    })
     registerVoiceHandlers(
       new VoiceService({
         root: join(app.getPath('userData'), 'whisper'),
@@ -367,6 +389,7 @@ if (!app.requestSingleInstanceLock()) {
       void mcp.dispose()
       ptys.killAll()
       void workspace.dispose()
+      void gitService.dispose()
       db?.close()
     })
 
