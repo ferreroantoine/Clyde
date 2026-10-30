@@ -9,6 +9,7 @@ import { SecretsService } from '../services/secrets'
 import { ProfilesService } from '../services/profiles'
 import { AgentManager, MAX_ACTIVE_SESSIONS, withPrefix, type AgentManagerDeps } from './manager'
 import { MetricsService } from '../metrics/metrics'
+import { MediaStore } from './media'
 import { fakeQuery, sdk, type FakeContext } from './claude-code/fake-query'
 import type { ChatAdapter, ChatRequest } from './api/chat'
 
@@ -55,6 +56,7 @@ function setup(
   const events: AgentEventEnvelope[] = []
   const sessions: AgentSessionInfo[] = []
   const metrics = new MetricsService(db, { profiles: () => profiles.list(), activeSessions: () => [] })
+  const media = new MediaStore(join(dir, 'media'))
   const { query, calls } = fakeQuery(script as never)
   const mcp = fakeMcp()
   const cliSpawns: Array<{ file: string; args: string[]; env: Record<string, string>; cwd: string }> = []
@@ -94,6 +96,7 @@ function setup(
       metrics.onSession(s)
     },
     store: { saveRequest: (id, request) => metrics.saveRequest(id, request), resumable: (id) => metrics.resumable(id) },
+    media,
     clientApp: 'clyde/test',
     baseEnv: { PATH: '/usr/bin', ANTHROPIC_API_KEY: 'sk-ant-inherited' },
     log
@@ -104,7 +107,7 @@ function setup(
       .filter((s) => s.id === id)
       .map((s) => s.status)
       .filter((status, i, all) => status !== all[i - 1])
-  return { manager, profile, profiles, events, calls, statuses, repo, mcp, cliSpawns, metrics }
+  return { manager, profile, profiles, events, calls, statuses, repo, mcp, cliSpawns, metrics, media }
 }
 
 async function* idle(ctx: FakeContext) {
@@ -306,6 +309,32 @@ describe('AgentManager', () => {
       { role: 'assistant', text: 'answer 1', toolCalls: [] },
       { role: 'user', text: 'second' }
     ])
+    manager.stop(info.id)
+  })
+
+  it('keeps screenshots from MCP tools on disk and passes on only their ids', async () => {
+    const replies = [{ toolCalls: [{ id: 'c1', name: 'mcp__docs__search', input: {} }] }, { toolCalls: [] }]
+    const adapter: ChatAdapter = {
+      async *stream() {
+        yield { type: 'thinking_delta', text: 'Look first.' }
+        const reply = replies.shift() ?? { toolCalls: [] }
+        yield { type: 'done', text: '', toolCalls: reply.toolCalls, stopReason: 'end', usage: { inputTokens: 1, outputTokens: 1 } }
+      },
+      listModels: async () => [{ value: 'qwen3', displayName: 'qwen3', description: '' }]
+    }
+    const { manager, profiles, events, mcp, media } = setup(idle as never, { adapter })
+    const png = Buffer.from('89504e470d0a1a0a', 'hex').toString('base64')
+    mcp.callTool.mockResolvedValueOnce({ content: '[image]', isError: false, images: [{ mime: 'image/png', data: png }] } as never)
+    const ollama = profiles.create({ kind: 'ollama', name: 'Local', color: '#64748b', auth: 'none' })
+    const info = await manager.start({ profileId: ollama.id, mcpTools: ['mcp__docs__search'], permissionLevel: 'autonomous' })
+    manager.send(info.id, 'look')
+    await vi.waitFor(() => expect(events.some((e) => e.event.type === 'turn_end')).toBe(true))
+    expect(events.map((e) => e.event)).toContainEqual({ type: 'thinking', key: 't1s0:th', text: 'Look first.' })
+    const result = events.map((e) => e.event).find((e) => e.type === 'tool_result')
+    expect(result).toMatchObject({ images: [{ id: expect.stringMatching(/^[a-f0-9]{24}\.png$/), mime: 'image/png' }] })
+    const image = (result as { images: Array<{ id: string; data?: string }> }).images[0]
+    expect(image?.data).toBeUndefined()
+    expect(media.read(info.id, image?.id ?? '')).toEqual({ mime: 'image/png', data: png })
     manager.stop(info.id)
   })
 

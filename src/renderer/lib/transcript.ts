@@ -1,4 +1,4 @@
-import type { AgentEvent, AgentEventEnvelope, AgentQuestion, AgentSessionInfo, ApprovalDecision } from '@shared/agent'
+import type { AgentEvent, AgentEventEnvelope, AgentQuestion, AgentSessionInfo, ApprovalDecision, ToolImage } from '@shared/agent'
 import { t, tn } from '@shared/i18n'
 
 export interface Approval {
@@ -18,13 +18,15 @@ export interface Questions {
 export type TranscriptItem =
   | { kind: 'user'; id: string; text: string }
   | { kind: 'text'; key: string; text: string; final: boolean }
+  /** The model's reasoning between actions; `final` once the block is complete. */
+  | { kind: 'thinking'; key: string; text: string; final: boolean }
   | {
       kind: 'tool'
       toolUseId: string
       name: string
       input: Record<string, unknown>
       parentToolUseId: string | null
-      result: { content: string; isError: boolean } | null
+      result: { content: string; isError: boolean; images: ToolImage[] } | null
       denied: string | null
       approval: Approval | null
       questions: Questions | null
@@ -136,8 +138,20 @@ function reduce(view: SessionView, event: AgentEvent, seq: number): SessionView 
         items: [...items, { ...newTool(event.toolUseId, event.name, event.input), parentToolUseId: event.parentToolUseId }]
       }
     }
+    case 'thinking_delta':
+    case 'thinking': {
+      const index = items.findIndex((i) => i.kind === 'thinking' && i.key === event.key)
+      if (index < 0) {
+        return { ...view, items: [...items, { kind: 'thinking', key: event.key, text: event.text, final: event.type === 'thinking' }] }
+      }
+      const current = items[index] as Extract<TranscriptItem, { kind: 'thinking' }>
+      if (current.final && event.type === 'thinking_delta') return view
+      const next = items.slice()
+      next[index] = { ...current, text: event.type === 'thinking' ? event.text : current.text + event.text, final: event.type === 'thinking' }
+      return { ...view, items: next }
+    }
     case 'tool_result': {
-      const result = { content: event.content, isError: event.isError }
+      const result = { content: event.content, isError: event.isError, images: (event.images ?? []).filter((i) => i.id) }
       const patched = updateTool(items, event.toolUseId, (t) => ({ ...t, result }))
       return patched ? { ...view, items: patched } : view
     }

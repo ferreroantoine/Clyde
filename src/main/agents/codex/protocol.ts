@@ -71,7 +71,7 @@ export interface FileUpdateChange {
 export type ThreadItem =
   | { type: 'userMessage'; id: string }
   | { type: 'agentMessage'; id: string; text: string }
-  | { type: 'reasoning'; id: string }
+  | { type: 'reasoning'; id: string; summary: string[]; content: string[] }
   | { type: 'plan'; id: string; text: string }
   | {
       type: 'commandExecution'
@@ -95,6 +95,7 @@ export type ThreadItem =
     }
   | { type: 'webSearch'; id: string; query: string }
   | { type: 'contextCompaction'; id: string }
+  | { type: 'imageView'; id: string; path: string }
   | { type: string; id: string }
 
 export interface TokenUsageBreakdown {
@@ -160,6 +161,7 @@ export interface Notifications {
   'item/started': { item: ThreadItem; threadId: string; turnId: string }
   'item/completed': { item: ThreadItem; threadId: string; turnId: string }
   'item/agentMessage/delta': { threadId: string; turnId: string; itemId: string; delta: string }
+  'item/reasoning/summaryTextDelta': { threadId: string; turnId: string; itemId: string; delta: string; summaryIndex: number }
   'item/commandExecution/outputDelta': { threadId: string; turnId: string; itemId: string; delta: string }
   'turn/started': { threadId: string; turn: Turn }
   'turn/completed': { threadId: string; turn: Turn }

@@ -147,6 +147,10 @@ export class OpenAICompatAdapter implements ChatAdapter {
       const choice = chunk.choices[0]
       if (!choice) continue
       const delta = choice.delta
+      // Not in OpenAI's types: DeepSeek-style servers send `reasoning_content`, Ollama's /v1 `reasoning`.
+      const reasoning = (delta as { reasoning_content?: unknown; reasoning?: unknown } | undefined)
+      const thought = typeof reasoning?.reasoning_content === 'string' ? reasoning.reasoning_content : typeof reasoning?.reasoning === 'string' ? reasoning.reasoning : ''
+      if (thought) yield { type: 'thinking_delta', text: thought }
       if (delta?.content) {
         text += delta.content
         yield { type: 'text_delta', text: delta.content }

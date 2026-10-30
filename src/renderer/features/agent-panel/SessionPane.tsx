@@ -14,6 +14,8 @@ import { RichText } from './RichText'
 import { SessionLimitLine } from '@/features/limits/LimitGauge'
 import { useLimits } from '@/stores/limits'
 import { ToolCard } from './ToolCard'
+import { ActionGroup, ThinkingBlock } from './Activity'
+import { groupRows } from '@/lib/activity'
 import { EXPLORER_PATH_TYPE } from '@/features/explorer/FileTree'
 import { mention } from '@/features/explorer/mention'
 import { Appear } from '@/components/Appear'
@@ -53,12 +55,14 @@ export function Item({
   item,
   cwd,
   ended,
+  sessionId,
   subscription = false,
   streaming = false
 }: {
   item: TranscriptItem
   cwd: string
   ended: boolean
+  sessionId: string
   subscription?: boolean
   /** The last text of a running turn: shows a typing caret. */
   streaming?: boolean
@@ -72,8 +76,10 @@ export function Item({
       )
     case 'text':
       return <RichText text={item.text} streaming={streaming} />
+    case 'thinking':
+      return <ThinkingBlock text={item.text} live={!item.final && !ended} />
     case 'tool':
-      return <ToolCard tool={item} cwd={cwd} ended={ended} />
+      return <ToolCard tool={item} cwd={cwd} ended={ended} sessionId={sessionId} />
     case 'turn':
       return (
         <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground" data-turn={item.subtype}>
@@ -106,9 +112,38 @@ export function itemKey(item: TranscriptItem): string {
       return `${item.kind}-${item.id}`
     case 'text':
       return `text-${item.key}`
+    case 'thinking':
+      return `thinking-${item.key}`
     case 'tool':
       return `tool-${item.toolUseId}`
   }
+}
+
+/**
+ * The transcript as the user reads it: messages, the agent's reasoning between its actions,
+ * tool cards, and runs of actions folded under a summary.
+ */
+export function TranscriptRows({ view, live = true, subscription = false }: { view: SessionView; live?: boolean; subscription?: boolean }) {
+  const ended = !live || ENDED_STATUSES.has(view.info.status)
+  const last = view.items.at(-1)
+  return groupRows(view.items).map((row) =>
+    row.kind === 'group' ? (
+      <Appear key={row.id}>
+        <ActionGroup tools={row.tools} cwd={view.info.cwd} ended={ended} sessionId={view.info.id} />
+      </Appear>
+    ) : (
+      <Appear key={itemKey(row.item)}>
+        <Item
+          item={row.item}
+          cwd={view.info.cwd}
+          ended={ended}
+          sessionId={view.info.id}
+          subscription={subscription}
+          streaming={live && row.item === last && row.item.kind === 'text' && !row.item.final && view.info.status === 'running'}
+        />
+      </Appear>
+    )
+  )
 }
 
 function Composer({ view }: { view: SessionView }) {
@@ -323,7 +358,6 @@ export function SessionPane({ view }: { view: SessionView }) {
   const scroller = useRef<HTMLDivElement>(null)
   const stuck = useRef(true)
   const lastTop = useRef(0)
-  const ended = ENDED_STATUSES.has(view.info.status)
   const last = view.items.at(-1)
 
   // Follow the conversation unless the user scrolled up to read; glide when animations are on.
@@ -393,18 +427,8 @@ export function SessionPane({ view }: { view: SessionView }) {
             {view.info.status === 'starting' ? t('Starting {cli}…', { cli: kindLabel(view.info.kind) }) : t('Ask something to start.')}
           </p>
         )}
-        {view.items.map((item) => (
-          <Appear key={itemKey(item)}>
-            <Item
-              item={item}
-              cwd={view.info.cwd}
-              ended={ended}
-              subscription={subscription}
-              streaming={item === last && item.kind === 'text' && !item.final && view.info.status === 'running'}
-            />
-          </Appear>
-        ))}
-        {view.info.status === 'running' && last?.kind !== 'text' && (
+        <TranscriptRows view={view} subscription={subscription} />
+        {view.info.status === 'running' && last?.kind !== 'text' && !(last?.kind === 'thinking' && !last.final) && (
           <Appear>
             <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <StatusDot status="running" /> {t('Working…')}
