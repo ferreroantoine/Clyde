@@ -18,6 +18,8 @@ import { t } from '@shared/i18n'
 import type { DirEntry } from '@shared/types'
 import { parentOf, useExplorer } from '@/stores/explorer'
 import { useEditor } from '@/stores/editor'
+import { useGit } from '@/stores/git'
+import { STATE_COLOR, STATE_LABEL, STATE_LETTER } from '@/features/git/actions'
 import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/Skeleton'
 import {
@@ -154,6 +156,9 @@ function Row({ entry, depth }: { entry: DirEntry; depth: number }) {
   const select = useExplorer((s) => s.select)
   const openFile = useEditor((s) => s.open)
   const isDir = entry.kind === 'dir'
+  const state = useGit((s) => (isDir ? undefined : s.decorations[entry.path]))
+  const dirty = useGit((s) => isDir && !!s.dirtyDirs[entry.path])
+  const ignored = useGit((s) => !!s.ignored[entry.path])
 
   const onClick = () => {
     select(entry.path)
@@ -199,7 +204,13 @@ function Row({ entry, depth }: { entry: DirEntry; depth: number }) {
                 )}
               />
               <FileIcon name={entry.name} dir={isDir} open={expanded} />
-              <span className="truncate">{entry.name}</span>
+              <span className={cn('truncate', state && STATE_COLOR[state], ignored && 'opacity-50')}>{entry.name}</span>
+              {state && (
+                <span className={cn('ml-auto shrink-0 pl-1 font-mono text-[10px] font-semibold', STATE_COLOR[state])} title={t(STATE_LABEL[state])}>
+                  {STATE_LETTER[state]}
+                </span>
+              )}
+              {dirty && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-warning/80" aria-label={t('Contains changes')} />}
             </button>
           </ContextMenuTrigger>
           <EntryMenu entry={entry} />

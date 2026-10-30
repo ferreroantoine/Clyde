@@ -148,6 +148,13 @@ export class GitService {
     return r.code === 0
   }
 
+  /** Which of these open-folder paths git ignores. */
+  async ignored(paths: string[]): Promise<string[]> {
+    if (!this.repo || !this.dir || !paths.length) return []
+    const r = await runGit(['check-ignore', '-z', '--stdin'], { cwd: this.dir, input: paths.join('\0') + '\0', okCodes: [0, 1] })
+    return r.stdout.toString('utf8').split('\0').filter(Boolean)
+  }
+
   // Staging
 
   async stage(paths: string[]): Promise<void> {

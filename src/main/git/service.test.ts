@@ -92,6 +92,15 @@ describe('GitService', () => {
     await git.dispose()
   })
 
+  it('tells which explorer paths are ignored', async () => {
+    const dir = repo()
+    writeFileSync(join(dir, '.gitignore'), 'out/\n*.log\n')
+    mkdirSync(join(dir, 'out'))
+    const { git } = await service(dir)
+    expect(await git.ignored(['out', 'a.txt', 'x.log', 'b.txt'])).toEqual(['out', 'x.log'])
+    await git.dispose()
+  })
+
   it('discards tracked changes and sends new files to the bin', async () => {
     const dir = repo()
     writeFileSync(join(dir, 'b.txt'), 'changed\n')
