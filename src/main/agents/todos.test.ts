@@ -51,7 +51,7 @@ describe('todosFromCodexPlan', () => {
 
 describe('todoReflex', () => {
   it('names the tool each provider has', () => {
-    expect(todoReflex('claude-code')).toContain('TodoWrite')
+    expect(todoReflex('claude-code')).toContain('mcp__clyde__update_todos')
     expect(todoReflex('codex')).toContain('update_plan')
     expect(todoReflex('antigravity')).toContain('clyde MCP server')
     expect(todoReflex('ollama')).toContain('update_todos')

@@ -94,7 +94,7 @@ export const UPDATE_TODOS_SCHEMA = {
 export function todoReflex(kind: ProfileKind): string {
   const tool =
     kind === 'claude-code'
-      ? 'the TodoWrite tool'
+      ? `the ${MCP_UPDATE_TODOS} tool (load it with ToolSearch first if it is deferred)`
       : kind === 'codex'
         ? 'your plan tool (update_plan)'
         : kind === 'antigravity'
