@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
 import { ProfileBadge, ProfileDot } from '@/components/ProfileBadge'
-import { useBoard } from '@/stores/board'
+import { useSavedAgents } from '@/stores/saved-agents'
 import { useProfiles, profileById } from '@/stores/profiles'
 import type { ChatTarget } from '@/stores/chat'
 import { cn } from '@/lib/utils'
@@ -18,7 +18,7 @@ import { ModelPicker } from '@/components/ModelPicker'
 
 /** The agent, or the account and model, that answers; colored like the account. */
 export function TargetPicker({ target, onChange }: { target: ChatTarget | null; onChange: (target: ChatTarget) => void }) {
-  const agents = useBoard((s) => s.agents)
+  const agents = useSavedAgents((s) => s.agents)
   const profiles = useProfiles((s) => s.profiles).filter((p) => p.usable)
   const agent = target?.agentId ? agents.find((a) => a.id === target.agentId) : undefined
   const profile = profileById(profiles, target?.profileId)

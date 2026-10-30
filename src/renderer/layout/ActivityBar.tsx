@@ -1,6 +1,6 @@
 import { motion } from 'motion/react'
 import { spring } from '@/lib/motion'
-import { Bot, Files, Gauge, GitBranch, MessagesSquare, Settings, type LucideIcon } from 'lucide-react'
+import { Files, Gauge, GitBranch, ListTodo, MessagesSquare, Settings, type LucideIcon } from 'lucide-react'
 import { IconButton } from '@/components/IconButton'
 import { t, tk } from '@shared/i18n'
 import { effectiveBindings, formatCombo } from '@shared/keybindings'
@@ -19,7 +19,7 @@ interface Item {
 const TOP: Item[] = [
   { view: 'chat', icon: MessagesSquare, label: tk('Chat'), command: 'view.chat' },
   { view: 'editor', icon: Files, label: tk('Explorer'), command: 'view.explorer' },
-  { view: 'agents', icon: Bot, label: tk('Agents') },
+  { view: 'tasks', icon: ListTodo, label: tk('Tasks') },
   { view: 'supervision', icon: Gauge, label: tk('Supervision') }
 ]
 

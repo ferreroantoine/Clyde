@@ -162,3 +162,34 @@ export function hunkPatch(diff: ParsedDiff, index: number): string | null {
   if (!hunk || diff.binary) return null
   return [...diff.header, hunk.header, ...hunk.lines].join('\n') + '\n'
 }
+
+export interface NameStatus {
+  path: string
+  oldPath: string | null
+  status: 'added' | 'modified' | 'deleted' | 'renamed'
+}
+
+function nameStatusOf(code: string): NameStatus['status'] {
+  if (code.startsWith('A')) return 'added'
+  if (code.startsWith('D')) return 'deleted'
+  if (code.startsWith('R')) return 'renamed'
+  return 'modified'
+}
+
+/** Parses `git diff --name-status -z`. */
+export function parseNameStatus(out: string): NameStatus[] {
+  const parts = out.split('\0').filter((p) => p !== '')
+  const changes: NameStatus[] = []
+  for (let i = 0; i < parts.length; ) {
+    const code = parts[i++] ?? ''
+    if (code.startsWith('R') || code.startsWith('C')) {
+      const oldPath = parts[i++] ?? ''
+      const path = parts[i++] ?? ''
+      changes.push({ path, oldPath, status: code.startsWith('R') ? 'renamed' : 'added' })
+    } else {
+      const path = parts[i++] ?? ''
+      changes.push({ path, oldPath: null, status: nameStatusOf(code) })
+    }
+  }
+  return changes.sort((a, b) => a.path.localeCompare(b.path))
+}

@@ -6,7 +6,7 @@ import { AppError } from '@shared/errors'
 import type { FileSession, GitCheckpoint, GitFileChange } from '@shared/git'
 import type { Db } from '../services/db/database'
 import { isInside, toRel } from '../services/paths'
-import { parseNameStatus } from '../services/worktrees'
+import { parseNameStatus } from './parse'
 import { findRepo } from './service'
 import { git } from './run'
 

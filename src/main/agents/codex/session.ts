@@ -30,7 +30,6 @@ const QUIET = [
   'item/reasoning/textDelta',
   'item/plan/delta',
   'turn/diff/updated',
-  'turn/plan/updated',
   'rawResponseItem/completed',
   'rawResponse/completed',
   'remoteControl/status/changed',

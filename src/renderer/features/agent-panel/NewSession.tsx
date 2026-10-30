@@ -9,7 +9,7 @@ import { ProfileDot } from '@/components/ProfileBadge'
 import { ModelPicker } from '@/components/ModelPicker'
 import { resolveNext, type NextSession } from '@/lib/next-session'
 import { useAgents } from '@/stores/agents'
-import { useBoard } from '@/stores/board'
+import { useSavedAgents } from '@/stores/saved-agents'
 import { useLayout } from '@/stores/layout'
 import { useNextSession } from '@/stores/next-session'
 import { useSettings } from '@/stores/settings'
@@ -27,7 +27,7 @@ import { SessionSettingsPopover } from './SessionSettings'
 export function NewSession() {
   const allProfiles = useProfiles((s) => s.profiles)
   const profiles = useMemo(() => allProfiles.filter((p) => p.usable), [allProfiles])
-  const agents = useBoard((s) => s.agents)
+  const agents = useSavedAgents((s) => s.agents)
   const workspace = useWorkspace((s) => s.info)
   const root = workspace?.root ?? ''
   const stored = useNextSession((s) => s.byProject[root])

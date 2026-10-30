@@ -15,7 +15,7 @@ import {
 import { ProfileDot } from '@/components/ProfileBadge'
 import { fromAgent, fromProfile, type NextSession } from '@/lib/next-session'
 import { useAgentDialog } from '@/stores/agent-dialog'
-import { useBoard } from '@/stores/board'
+import { useSavedAgents } from '@/stores/saved-agents'
 import { profileById, useProfiles } from '@/stores/profiles'
 
 /**
@@ -23,7 +23,7 @@ import { profileById, useProfiles } from '@/stores/profiles'
  * Also where agents are created ("+") and edited (the pencil).
  */
 export function AgentPicker({ value, onChange, defaultLevel }: { value: NextSession; onChange: (next: NextSession) => void; defaultLevel: PermissionLevel }) {
-  const agents = useBoard((s) => s.agents)
+  const agents = useSavedAgents((s) => s.agents)
   const profiles = useProfiles((s) => s.profiles).filter((p) => p.usable)
   const openDialog = useAgentDialog((s) => s.open)
   const agent = value.agentId ? agents.find((a) => a.id === value.agentId) : undefined

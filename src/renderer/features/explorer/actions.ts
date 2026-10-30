@@ -8,7 +8,7 @@ import { useWorkspace } from '@/stores/workspace'
 import { useTerminals } from '@/stores/terminals'
 import { useLayout } from '@/stores/layout'
 import { useAgents } from '@/stores/agents'
-import { useBoard } from '@/stores/board'
+import { useTodos } from '@/stores/todos'
 import { mention } from './mention'
 
 /** What the explorer's context menu and keyboard shortcuts do with an entry. */
@@ -113,6 +113,8 @@ export function askAgentToExplain(entry: DirEntry): void {
   void useAgents.getState().sendOrDraft(text)
 }
 
+/** Opens the Tasks view with a new task about this file, ready to be completed. */
 export function newTaskFor(path: string): void {
-  useBoard.getState().draftTask(mention(path))
+  useTodos.getState().draft(mention(path))
+  useLayout.getState().showCenter('tasks')
 }

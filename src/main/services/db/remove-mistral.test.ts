@@ -35,7 +35,8 @@ function v6WithMistral() {
 describe('migration 7: remove Mistral', () => {
   it('removes Mistral accounts, their keys and agents, and leaves a notice', () => {
     const db = v6WithMistral()
-    migrate(db)
+    // Up to 7 only: later migrations turn the tasks into the task list.
+    migrate(db, migrations.filter((m) => m.version <= 7))
     expect(db.prepare('SELECT id FROM profiles').all()).toEqual([{ id: 'p-openai' }])
     expect(db.prepare('SELECT profile_id FROM secrets').all()).toEqual([{ profile_id: 'p-openai' }])
     expect(db.prepare('SELECT id FROM agents').all()).toEqual([{ id: 'a-2' }])

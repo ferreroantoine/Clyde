@@ -9,7 +9,7 @@ import { notify } from '@/stores/notifications'
 import { IconButton } from '@/components/IconButton'
 import { EmptyState } from '@/components/EmptyState'
 import { Button } from '@/components/ui/button'
-import { DiffView } from '@/features/agents/DiffView'
+import { DiffView } from './DiffView'
 import { FileIcon } from '@/features/explorer/FileIcon'
 import { checkout, copyText, dateTime, dirOf, discard, explainCommit, nameOf, openFile, pick, STATE_COLOR, STATE_LETTER } from './actions'
 

@@ -5,12 +5,12 @@ import { z } from 'zod'
  * Adding a field with a default needs no bump: missing fields fall back to their defaults.
  * Each bump comes with a step in `settingsMigrations` (main/services/settings.ts).
  */
-export const SETTINGS_VERSION = 3
+export const SETTINGS_VERSION = 4
 
 const path = z.string().max(4096)
 
 export const LANGUAGES = ['system', 'en', 'fr'] as const
-export const START_VIEWS = ['chat', 'editor', 'agents', 'supervision'] as const
+export const START_VIEWS = ['chat', 'editor', 'tasks', 'supervision'] as const
 export const ACCENTS = ['indigo', 'blue', 'teal', 'green', 'orange', 'rose', 'violet', 'slate'] as const
 export const ANIMATION_LEVELS = ['full', 'reduced', 'off'] as const
 export type AnimationLevel = (typeof ANIMATION_LEVELS)[number]
@@ -55,9 +55,6 @@ export const settingsSchema = z.object({
     /** Used when neither the agent nor its account sets one. */
     defaultModel: z.string().trim().max(200).default(''),
     maxParallel: z.number().int().min(1).max(16).default(4),
-    /** Empty means %LOCALAPPDATA%\\Clyde\\worktrees. */
-    worktreesFolder: path.default(''),
-    deleteMergedWorktrees: z.boolean().default(true),
     /** At startup, sessions cut by the last shutdown are resumed and told to carry on. */
     resumeOnStart: z.boolean().default(false),
     /** An account hits its usage limit mid-task: ask, wait for the reset and resume, or switch account. */

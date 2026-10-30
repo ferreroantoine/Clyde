@@ -4,13 +4,13 @@ import { PERMISSION_LEVEL_LABELS } from '@shared/agent'
 import { Button } from '@/components/ui/button'
 import { ProfileDot } from '@/components/ProfileBadge'
 import { useAgentDialog } from '@/stores/agent-dialog'
-import { useBoard } from '@/stores/board'
+import { useSavedAgents } from '@/stores/saved-agents'
 import { profileById, useProfiles } from '@/stores/profiles'
 import { Row } from './controls'
 
 /** Saved agents, to create, edit or delete without going through the agent panel. */
 export function SavedAgentsBlock() {
-  const agents = useBoard((s) => s.agents)
+  const agents = useSavedAgents((s) => s.agents)
   const profiles = useProfiles((s) => s.profiles)
   const openDialog = useAgentDialog((s) => s.open)
   return (

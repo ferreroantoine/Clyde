@@ -6,8 +6,7 @@ import { t, tn } from '@shared/i18n'
 import { AppError } from '@shared/errors'
 import type { GitBranch, GitCommit, GitDiffMode, GitFileChange, GitFileDiff, GitOperation, GitResult, GitStash, GitStatus } from '@shared/git'
 import { resolveInside } from '../services/paths'
-import { parseNameStatus } from '../services/worktrees'
-import { BRANCH_FORMAT, hunkPatch, LOG_FORMAT, parseBranches, parseDiff, parseLog, parseStashes, parseStatus, STASH_FORMAT } from './parse'
+import { BRANCH_FORMAT, hunkPatch, LOG_FORMAT, parseBranches, parseDiff, parseLog, parseNameStatus, parseStashes, parseStatus, STASH_FORMAT } from './parse'
 import { git, GitCommandError, runGit, type RunOptions } from './run'
 
 const MAX_DIFF_BYTES = 1024 * 1024

@@ -10,6 +10,7 @@ import { ProfilesService } from '../services/profiles'
 import { AgentManager, MAX_ACTIVE_SESSIONS, withPrefix, type AgentManagerDeps } from './manager'
 import { MetricsService } from '../metrics/metrics'
 import { MediaStore } from './media'
+import { todoReflex } from './todos'
 import { fakeQuery, sdk, type FakeContext } from './claude-code/fake-query'
 import type { ChatAdapter, ChatRequest } from './api/chat'
 
@@ -170,10 +171,57 @@ describe('AgentManager', () => {
     expect(calls[0]).toMatchObject({
       mcpServers: { docs: { type: 'stdio', command: 'docs-mcp' } },
       disallowedTools: ['mcp__docs__delete'],
-      systemPrompt: { type: 'preset', preset: 'claude_code', append: 'Be brief.' }
+      systemPrompt: { type: 'preset', preset: 'claude_code', append: `Be brief.
+
+${todoReflex('claude-code')}` }
     })
     await manager.start({ profileId: profile.id })
     expect(calls[1]).not.toHaveProperty('mcpServers')
+  })
+
+  it('turns update_todos into the common todos event, with no approval asked', async () => {
+    const replies = [
+      { toolCalls: [{ id: 't1', name: 'update_todos', input: { todos: [{ id: 'a', text: 'Read the code', status: 'in_progress', active: 'Reading' }, { text: 'Fix it', status: 'pending' }] } }] },
+      { toolCalls: [] }
+    ]
+    const adapter: ChatAdapter = {
+      async *stream() {
+        const reply = replies.shift() ?? { toolCalls: [] }
+        yield { type: 'done', text: 'ok', toolCalls: reply.toolCalls, stopReason: 'end', usage: { inputTokens: 1, outputTokens: 1 } }
+      },
+      listModels: async () => [{ value: 'qwen3', displayName: 'qwen3', description: '' }]
+    }
+    const { manager, profiles, events } = setup(idle as never, { adapter })
+    const ollama = profiles.create({ kind: 'ollama', name: 'Local', color: '#64748b', auth: 'none' })
+    // validate-all: anything that changes files would wait for the user; the list does not.
+    const info = await manager.start({ profileId: ollama.id, permissionLevel: 'validate-all' })
+    manager.send(info.id, 'fix the bug')
+    await vi.waitFor(() => expect(events.some((e) => e.event.type === 'turn_end')).toBe(true))
+    expect(events.some((e) => e.event.type === 'approval_request')).toBe(false)
+    expect(events.flatMap((e) => (e.event.type === 'todos' ? [e.event.items] : []))).toEqual([
+      [
+        { key: 'a', text: 'Read the code', status: 'in_progress', active: 'Reading' },
+        { text: 'Fix it', status: 'pending' }
+      ]
+    ])
+    const result = events.find((e) => e.event.type === 'tool_result')?.event
+    expect(result).toMatchObject({ toolUseId: 't1', isError: false, content: 'Task list updated: 0/2 done, in progress: Read the code.' })
+    manager.stop(info.id)
+  })
+
+  it('turns Claude Code’s TodoWrite into the todos event', async () => {
+    async function* todoWrite(ctx: FakeContext) {
+      yield sdk.init()
+      while (await ctx.nextUser()) {
+        yield sdk.assistant('m1', [{ type: 'tool_use', id: 'tw1', name: 'TodoWrite', input: { todos: [{ content: 'Plan', status: 'completed', activeForm: 'Planning' }] } }])
+        yield sdk.result()
+      }
+    }
+    const { manager, profile, events } = setup(todoWrite as never)
+    const info = await manager.start({ profileId: profile.id })
+    manager.send(info.id, 'go')
+    await vi.waitFor(() => expect(events.some((e) => e.sessionId === info.id && e.event.type === 'todos')).toBe(true))
+    expect(events.find((e) => e.event.type === 'todos')?.event).toEqual({ type: 'todos', items: [{ text: 'Plan', status: 'completed', active: 'Planning' }] })
   })
 
   it('hides AskUserQuestion from chat sessions, which never wait for the user', async () => {
@@ -211,9 +259,12 @@ describe('AgentManager', () => {
       'run_command',
       'mcp__docs__search',
       'read_tool_output',
-      'ask_user'
+      'ask_user',
+      'update_todos'
     ])
     expect(requests[0]?.system).toContain('Linux')
+    // The reflex: keep the task list without being asked.
+    expect(requests[0]?.system).toContain(todoReflex('ollama'))
     // The allowed tool ran through the hub; the other one was refused without reaching it.
     expect(mcp.callTool).toHaveBeenCalledTimes(1)
     expect(mcp.callTool).toHaveBeenCalledWith('mcp__docs__search', { q: 'x' }, expect.any(AbortSignal))
@@ -260,7 +311,9 @@ describe('AgentManager', () => {
     const lastSeq = events.at(-1)?.seq ?? 0
     const resumed = await manager.resume(info.id)
     expect(resumed).toMatchObject({ id: info.id, status: 'idle' })
-    expect(calls[1]).toMatchObject({ resume: 'sdk-session', systemPrompt: { append: 'Be brief.' } })
+    expect(calls[1]).toMatchObject({ resume: 'sdk-session', systemPrompt: { append: `Be brief.
+
+${todoReflex('claude-code')}` } })
     const after = events.filter((e) => e.seq > lastSeq)
     // One thread: numbering goes on, and the new run's keys cannot clash with the first run's.
     expect(after[0]?.seq).toBe(lastSeq + 1)
@@ -298,7 +351,9 @@ describe('AgentManager', () => {
     expect(moved).toMatchObject({ id: info.id, profileId: work.id })
     // The session file now lives in the other account's folder too, and the CLI reopens it there.
     expect(readFileSync(join(profiles.configDir(work.id), 'projects', 'repo', 'sdk-session.jsonl'), 'utf8')).toBe('{"type":"user"}\n')
-    expect(calls[1]).toMatchObject({ resume: 'sdk-session', model: 'opus', env: { CLAUDE_CONFIG_DIR: profiles.configDir(work.id) }, systemPrompt: { append: 'Be brief.' } })
+    expect(calls[1]).toMatchObject({ resume: 'sdk-session', model: 'opus', env: { CLAUDE_CONFIG_DIR: profiles.configDir(work.id) }, systemPrompt: { append: `Be brief.
+
+${todoReflex('claude-code')}` } })
     expect(events.map((e) => e.event)).toContainEqual(expect.objectContaining({ type: 'account_switched', profileId: work.id, profileName: 'Work', full: true }))
     expect(manager.list()).toHaveLength(1)
     // A later resume starts on the new account.

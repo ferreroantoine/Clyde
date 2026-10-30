@@ -88,7 +88,7 @@ function EntryMenu({ entry }: { entry: DirEntry }) {
       <Item icon={Bot} label={t('Add to agent session')} onSelect={() => addToAgent(entry.path)} />
       <Item icon={MessageSquareText} label={isDir ? t('Explain this folder') : t('Explain this file')} onSelect={() => askAgentToExplain(entry)} />
       {!isDir && <Item icon={Pencil} label={t('Edit this file with the agent…')} onSelect={() => addToAgent(entry.path)} />}
-      <Item icon={ListTodo} label={t('Create an agent task…')} onSelect={() => newTaskFor(entry.path)} />
+      <Item icon={ListTodo} label={t('Add to tasks…')} onSelect={() => newTaskFor(entry.path)} />
       <ContextMenuSeparator />
       <CreateItems dir={isDir ? entry.path : parentOf(entry.path)} />
       <Item icon={Pencil} label={t('Rename…')} shortcut="F2" onSelect={() => setEditing({ mode: 'rename', path: entry.path })} />

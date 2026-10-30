@@ -17,7 +17,8 @@ import { useEditor } from '@/stores/editor'
 import { useProfiles } from '@/stores/profiles'
 import { useAgents } from '@/stores/agents'
 import { useMcp } from '@/stores/mcp'
-import { useBoard } from '@/stores/board'
+import { useSavedAgents } from '@/stores/saved-agents'
+import { useTodos } from '@/stores/todos'
 import { useLimits } from '@/stores/limits'
 import { useChat } from '@/stores/chat'
 import { useGit } from '@/stores/git'
@@ -62,7 +63,7 @@ export function App() {
         // Settings › General › Start view.
         const view = useSettings.getState().settings.general.startView
         const layout = useLayout.getState()
-        if (view === 'chat' || view === 'agents' || view === 'supervision') layout.showCenter(view)
+        if (view === 'chat' || view === 'tasks' || view === 'supervision') layout.showCenter(view)
         else layout.showCenter('editor')
       })
     // Settings › Notifications › Sounds.
@@ -84,7 +85,8 @@ export function App() {
     const offProfiles = useProfiles.getState().init()
     const offAgents = useAgents.getState().init()
     const offMcp = useMcp.getState().init()
-    const offBoard = useBoard.getState().init()
+    const offSavedAgents = useSavedAgents.getState().init()
+    const offTodos = useTodos.getState().init()
     const offLimits = useLimits.getState().init()
     const offChat = useChat.getState().init()
     const offVoice = useVoice.getState().init()
@@ -96,7 +98,8 @@ export function App() {
       })
       .catch(() => undefined)
     return () => {
-      offBoard()
+      offSavedAgents()
+      offTodos()
       offGit()
       offMemory()
       offLimits()
