@@ -47,6 +47,7 @@ import {
   type SessionSummary,
   type StoredSession
 } from '../agent'
+import { gitSchemas, type FileSession, type GitBranch, type GitCheckpoint, type GitCommit, type GitFileChange, type GitFileDiff, type GitResult, type GitStash, type GitStatus } from '../git'
 import type {
   AppInfo,
   DirEntry,
@@ -194,7 +195,45 @@ export const requestSchemas = {
   'pricing:list': z.undefined(),
   'pricing:save': priceInputSchema.extend({ id: z.string().min(1).max(64).optional() }),
   'pricing:delete': z.object({ id: z.string().min(1).max(64) }),
-  'files:list': z.undefined()
+  'files:list': z.undefined(),
+  'git:status': z.undefined(),
+  'git:init': z.undefined(),
+  'git:stage': gitSchemas.paths,
+  'git:stageAll': z.undefined(),
+  'git:unstage': gitSchemas.paths,
+  'git:unstageAll': z.undefined(),
+  /** Tracked files go back to their staged version; untracked ones to the Recycle Bin. */
+  'git:discard': gitSchemas.paths,
+  'git:diff': gitSchemas.diff,
+  'git:applyHunk': gitSchemas.hunk,
+  'git:commit': gitSchemas.commit,
+  'git:lastMessage': z.undefined(),
+  /** A commit message for the staged changes, written by Clyde's internal model. */
+  'git:generateMessage': z.undefined(),
+  'git:log': gitSchemas.log,
+  'git:commitFiles': gitSchemas.hash,
+  'git:commitDiff': gitSchemas.commitDiff,
+  'git:revert': gitSchemas.hash,
+  'git:cherryPick': gitSchemas.hash,
+  'git:branches': z.undefined(),
+  'git:checkout': gitSchemas.checkout,
+  'git:createBranch': gitSchemas.createBranch,
+  'git:deleteBranch': gitSchemas.deleteBranch,
+  'git:merge': gitSchemas.merge,
+  'git:abort': z.undefined(),
+  'git:continue': z.undefined(),
+  'git:fetch': z.undefined(),
+  'git:pull': z.undefined(),
+  /** Publishes the branch to the first remote when it has no upstream yet. */
+  'git:push': z.undefined(),
+  'git:stashes': z.undefined(),
+  'git:stash': gitSchemas.stash,
+  'git:stashApply': gitSchemas.stashApply,
+  'git:stashDrop': gitSchemas.stashDrop,
+  'git:checkpoints': z.undefined(),
+  'git:checkpointChanges': gitSchemas.session,
+  'git:restoreCheckpoint': gitSchemas.session,
+  'git:fileSessions': z.undefined()
 } satisfies Record<InvokeChannel, z.ZodType>
 
 export interface InvokeResponses {
@@ -324,6 +363,44 @@ export interface InvokeResponses {
   'pricing:save': PriceRow[]
   'pricing:delete': PriceRow[]
   'files:list': { files: string[]; truncated: boolean }
+  'git:status': GitStatus
+  'git:init': GitStatus
+  'git:stage': null
+  'git:stageAll': null
+  'git:unstage': null
+  'git:unstageAll': null
+  'git:discard': null
+  'git:diff': GitFileDiff
+  'git:applyHunk': null
+  /** The new commit's hash. */
+  'git:commit': string
+  'git:lastMessage': string
+  'git:generateMessage': string
+  'git:log': GitCommit[]
+  'git:commitFiles': GitFileChange[]
+  'git:commitDiff': GitFileDiff
+  'git:revert': GitResult
+  'git:cherryPick': GitResult
+  'git:branches': GitBranch[]
+  'git:checkout': null
+  'git:createBranch': null
+  'git:deleteBranch': null
+  'git:merge': GitResult
+  'git:abort': null
+  'git:continue': GitResult
+  'git:fetch': null
+  'git:pull': GitResult
+  'git:push': null
+  'git:stashes': GitStash[]
+  'git:stash': null
+  'git:stashApply': GitResult
+  'git:stashDrop': null
+  'git:checkpoints': GitCheckpoint[]
+  'git:checkpointChanges': GitFileChange[]
+  /** How many files were put back. */
+  'git:restoreCheckpoint': number
+  /** Agent sessions that wrote each file, by repository-relative path. */
+  'git:fileSessions': Record<string, FileSession[]>
 }
 
 export interface EventPayloads {
@@ -347,6 +424,8 @@ export interface EventPayloads {
   'limits:changed': ProfileLimits
   'limits:sessionChanged': { sessionId: string; usage: SessionLimitUsage[] }
   'limits:alert': LimitAlert
+  /** The repository changed (index, HEAD, branches); the Source view reloads. */
+  'git:changed': null
 }
 
 export type InvokeRequest<C extends InvokeChannel> = z.input<(typeof requestSchemas)[C]>

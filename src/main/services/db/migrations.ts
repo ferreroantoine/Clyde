@@ -459,5 +459,19 @@ export const migrations: Migration[] = [
         created_at INTEGER NOT NULL
       );
     `
+  },
+  {
+    version: 17,
+    name: 'git restore points',
+    sql: `
+      -- The working tree before an agent session worked in a repository (a commit under refs/clyde/checkpoints).
+      CREATE TABLE git_checkpoints (
+        session_id  TEXT PRIMARY KEY,
+        repo_root   TEXT NOT NULL,
+        commit_hash TEXT NOT NULL,
+        created_at  INTEGER NOT NULL
+      );
+      CREATE INDEX git_checkpoints_repo ON git_checkpoints(repo_root, created_at);
+    `
   }
 ]

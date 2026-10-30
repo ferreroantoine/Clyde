@@ -63,7 +63,9 @@ export const settingsSchema = z.object({
     /** An account hits its usage limit mid-task: ask, wait for the reset and resume, or switch account. */
     onLimit: z.enum(['ask', 'wait', 'switch']).default('ask'),
     /** Accounts to switch to, in order; the first one under its limits is used. */
-    fallbackProfiles: z.array(z.string().max(64)).max(20).default([])
+    fallbackProfiles: z.array(z.string().max(64)).max(20).default([]),
+    /** Before a session works in a git repository, its files are recorded so its changes can be undone. */
+    gitCheckpoints: z.boolean().default(true)
   }),
   editor: section({
     fontFamily: z.string().trim().max(300).default(DEFAULT_MONO),

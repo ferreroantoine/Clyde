@@ -454,6 +454,15 @@ export const SECTIONS: SectionSpec[] = [
         )
       },
       {
+        id: 'agents.gitCheckpoints',
+        label: t('Restore point before each session'),
+        hint: t('In a git repository, Clyde records the files before an agent works on them, so the Source view can undo everything it did.'),
+        keywords: 'git checkpoint undo restore stash',
+        control: ({ s, set }) => (
+          <Toggle label={t('Restore point before each session')} checked={s.agents.gitCheckpoints} onChange={(v) => set('agents.gitCheckpoints', v)} />
+        )
+      },
+      {
         id: 'agents.onLimit',
         label: t('When an account hits its usage limit'),
         hint: t('In the middle of a task. Waiting resumes the session a minute after the limit resets, even after Clyde restarts.'),
