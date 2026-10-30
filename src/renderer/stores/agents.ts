@@ -34,6 +34,8 @@ interface AgentsState {
   continueWithSummary: (id: string) => Promise<void>
   stop: (id?: string) => Promise<void>
   answer: (requestId: string, decision: ApprovalDecision, message?: string) => Promise<void>
+  /** Answers keyed by question text; null skips the questions. */
+  answerQuestions: (requestId: string, answers: Record<string, string> | null) => Promise<void>
   select: (id: string | null) => void
   /** Hides an ended session from the panel. */
   dismiss: (id: string) => void
@@ -171,6 +173,12 @@ export const useAgents = create<AgentsState>()((set, get) => {
       await invoke('agent:approve', { sessionId: id, requestId, decision, ...(message ? { message } : {}) }).catch((err) =>
         notify.error(t('Could not answer the request'), err)
       )
+    },
+
+    answerQuestions: async (requestId, answers) => {
+      const id = get().activeId
+      if (!id) return
+      await invoke('agent:answerQuestion', { sessionId: id, requestId, answers }).catch((err) => notify.error(t('Could not answer the request'), err))
     },
 
     select: (id) => set({ activeId: id }),

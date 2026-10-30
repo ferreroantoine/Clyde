@@ -157,11 +157,17 @@ describe('AgentManager', () => {
     await manager.start({ profileId: profile.id, mcpTools: ['mcp__docs__search'], systemPrompt: 'Be brief.' })
     expect(calls[0]).toMatchObject({
       mcpServers: { docs: { type: 'stdio', command: 'docs-mcp' } },
-      disallowedTools: ['AskUserQuestion', 'mcp__docs__delete'],
+      disallowedTools: ['mcp__docs__delete'],
       systemPrompt: { type: 'preset', preset: 'claude_code', append: 'Be brief.' }
     })
     await manager.start({ profileId: profile.id })
     expect(calls[1]).not.toHaveProperty('mcpServers')
+  })
+
+  it('hides AskUserQuestion from chat sessions, which never wait for the user', async () => {
+    const { manager, profile, calls } = setup(idle as never)
+    await manager.start({ profileId: profile.id, chatId: '7f3c2a1e-1111-4222-8333-944455556666' })
+    expect(calls[0]?.disallowedTools).toContain('AskUserQuestion')
   })
 
   it('runs API accounts in the in-house loop with their allowed MCP tools', async () => {
@@ -192,7 +198,8 @@ describe('AgentManager', () => {
       'list_files',
       'run_command',
       'mcp__docs__search',
-      'read_tool_output'
+      'read_tool_output',
+      'ask_user'
     ])
     expect(requests[0]?.system).toContain('Linux')
     // The allowed tool ran through the hub; the other one was refused without reaching it.

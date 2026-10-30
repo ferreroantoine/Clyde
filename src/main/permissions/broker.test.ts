@@ -90,3 +90,48 @@ describe('sessionRuleFor', () => {
     expect(sessionRuleFor('Edit', { file_path: 'a' })).toBe('Edit')
   })
 })
+
+describe('ApprovalBroker questions', () => {
+  const pick = [{ question: 'Which database?', header: 'Storage', options: [{ label: 'SQLite', description: '' }, { label: 'Postgres', description: '' }], multiSelect: false }]
+  const lastQuestionId = (events: Array<{ event: AgentEvent }>) => {
+    const req = [...events].reverse().find((e) => e.event.type === 'question_request')
+    return req && req.event.type === 'question_request' ? req.event.requestId : ''
+  }
+
+  it('waits for the answers and reports them', async () => {
+    const { broker, events } = setup()
+    const answers = broker.question('s1', 't1', pick)
+    expect(broker.hasPending('s1')).toBe(true)
+    expect(events[0]?.event).toMatchObject({ type: 'question_request', toolUseId: 't1', questions: pick })
+    broker.answerQuestion('s1', lastQuestionId(events), { 'Which database?': 'SQLite' })
+    await expect(answers).resolves.toEqual({ 'Which database?': 'SQLite' })
+    expect(broker.hasPending('s1')).toBe(false)
+    expect(events.at(-1)?.event).toMatchObject({ type: 'question_resolved', answers: { 'Which database?': 'SQLite' } })
+  })
+
+  it('resolves with null when skipped, cancelled or aborted', async () => {
+    const { broker, events } = setup()
+    const skipped = broker.question('s1', 't1', pick)
+    broker.answerQuestion('s1', lastQuestionId(events), null)
+    await expect(skipped).resolves.toBeNull()
+
+    const stopped = broker.question('s1', 't2', pick)
+    broker.cancelSession('s1')
+    await expect(stopped).resolves.toBeNull()
+    expect(events.at(-1)?.event).toMatchObject({ type: 'question_resolved', answers: null })
+
+    const controller = new AbortController()
+    const aborted = broker.question('s1', 't3', pick, controller.signal)
+    controller.abort()
+    await expect(aborted).resolves.toBeNull()
+  })
+
+  it('refuses answers from another session or given twice', () => {
+    const { broker, events } = setup()
+    void broker.question('s1', 't1', pick)
+    const id = lastQuestionId(events)
+    expect(() => broker.answerQuestion('s2', id, null)).toThrow()
+    broker.answerQuestion('s1', id, null)
+    expect(() => broker.answerQuestion('s1', id, null)).toThrow()
+  })
+})

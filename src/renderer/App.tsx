@@ -67,7 +67,7 @@ export function App() {
     const offSounds = on('agent:event', ({ event }) => {
       if (!useSettings.getState().settings.notifications.sounds) return
       if (event.type === 'turn_end') chime('done')
-      else if (event.type === 'approval_request') chime('attention')
+      else if (event.type === 'approval_request' || event.type === 'question_request') chime('attention')
     })
     let off: (() => void) | undefined
     let disposed = false

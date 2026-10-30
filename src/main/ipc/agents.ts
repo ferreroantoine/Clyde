@@ -21,6 +21,10 @@ export function registerAgentHandlers(agents: AgentManager): void {
     agents.stop(sessionId)
     return null
   })
+  handle('agent:answerQuestion', ({ sessionId, requestId, answers }) => {
+    agents.answerQuestion(sessionId, requestId, answers)
+    return null
+  })
   handle('agent:approve', ({ sessionId, requestId, decision, message }) => {
     agents.answer(sessionId, requestId, decision, message)
     return null
