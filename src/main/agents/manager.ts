@@ -37,7 +37,7 @@ import { resolveAntigravityBinary, resolveCodexBinary } from './cli/resolve'
 import { spawnPty, type SpawnPty } from './cli/pty-process'
 import { AntigravitySession } from './antigravity/session'
 import { buildAgyEnv } from './antigravity/runtime'
-import { todoReflex, todosFromToolCall } from './todos'
+import { MCP_UPDATE_TODOS, todoReflex, todosFromToolCall } from './todos'
 
 /** Default cap on agents running at once (plan: "agent CPU guard"). */
 export const MAX_ACTIVE_SESSIONS = 4
@@ -331,6 +331,8 @@ export class AgentManager {
     // MCP tools outside the allow-list are refused, whatever the permission level says.
     const chat = !!req.chatId
     const gate = (tool: ToolRequest): PermissionDecision => {
+      // The task list only reaches the Tasks view: never asked, whatever the level.
+      if (tool.name === MCP_UPDATE_TODOS && !chat) return { decision: 'allow' }
       if (tool.name.startsWith('mcp__') && !allowed.has(tool.name)) {
         return { decision: 'deny', reason: t("{name} is not in this agent's MCP tools", { name: tool.name }) }
       }
@@ -399,6 +401,10 @@ export class AgentManager {
       this.deps.clientApp
     )
     const mcp = this.deps.mcp.claudeCodeConfig(allowed)
+    // The SDK's Claude Code no longer has TodoWrite: Clyde's MCP server gives it update_todos (not in chat).
+    const clyde = info.chatId ? null : (this.deps.clydeMcp?.serverFor(info.id) ?? null)
+    const servers =
+      clyde?.transport === 'http' ? { ...mcp.servers, [clyde.slug]: { type: 'http' as const, url: clyde.url, headers: clyde.headers } } : mcp.servers
     const query = await this.deps.query()
     const log = this.deps.log
     return new ClaudeCodeSession(
@@ -409,7 +415,7 @@ export class AgentManager {
         model: info.model,
         effort: info.effort,
         appendSystemPrompt: systemPrompt,
-        mcpServers: mcp.servers,
+        mcpServers: servers,
         disallowedTools: [...mcp.disallowed, ...disallowed],
         ...(resumeId ? { resume: resumeId } : {})
       },
@@ -699,7 +705,8 @@ export class AgentManager {
     }
     this.emit(entry.info.id, out)
     // TodoWrite and update_todos calls are the agent's task list: one common event for the Tasks view.
-    if (out.type === 'tool_call' && !out.parentToolUseId && !entry.info.chatId) {
+    // The clyde MCP server's update_todos sends its own, once the call is accepted.
+    if (out.type === 'tool_call' && !out.parentToolUseId && !entry.info.chatId && out.name !== MCP_UPDATE_TODOS) {
       const items = todosFromToolCall(out.name, out.input)
       if (items) this.emit(entry.info.id, { type: 'todos', items })
     }

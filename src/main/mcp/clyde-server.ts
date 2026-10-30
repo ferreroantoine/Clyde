@@ -35,7 +35,7 @@ function readBody(req: IncomingMessage): Promise<unknown> {
 }
 
 /**
- * Clyde's own MCP server, for agents with no task-list tool of their own (Antigravity):
+ * Clyde's own MCP server, for agents with no task-list tool of their own (Antigravity, Claude Code):
  * `update_todos` reaches the Tasks view. Streamable HTTP on 127.0.0.1, one random token per
  * session in the URL, so a call is always tied to the session it was given to.
  */

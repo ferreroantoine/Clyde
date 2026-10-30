@@ -41,7 +41,7 @@ function fakeMcp() {
 
 function setup(
   script: (ctx: FakeContext) => AsyncGenerator<never>,
-  { workspace = true, adapter }: { workspace?: boolean; adapter?: ChatAdapter } = {}
+  { workspace = true, adapter, clydeMcp }: { workspace?: boolean; adapter?: ChatAdapter; clydeMcp?: AgentManagerDeps['clydeMcp'] } = {}
 ) {
   const db = new Database(':memory:')
   migrate(db)
@@ -79,6 +79,7 @@ function setup(
       throw new Error('no agy in this test')
     },
     mcp: mcp as unknown as AgentManagerDeps['mcp'],
+    ...(clydeMcp ? { clydeMcp } : {}),
     createAdapter: () => {
       if (!adapter) throw new Error('no adapter in this test')
       return adapter
@@ -222,6 +223,30 @@ ${todoReflex('claude-code')}` }
     manager.send(info.id, 'go')
     await vi.waitFor(() => expect(events.some((e) => e.sessionId === info.id && e.event.type === 'todos')).toBe(true))
     expect(events.find((e) => e.event.type === 'todos')?.event).toEqual({ type: 'todos', items: [{ text: 'Plan', status: 'completed', active: 'Planning' }] })
+  })
+
+  it('gives Claude Code the clyde MCP server’s update_todos, allowed without approval', async () => {
+    let hookResult: unknown
+    const clydeMcp = {
+      serverFor: (id: string) => ({ slug: 'clyde', tools: ['update_todos'], transport: 'http' as const, url: `http://127.0.0.1:1/mcp/${id}`, headers: {} })
+    }
+    const { manager, profile, calls, events } = setup(
+      (async function* (ctx: FakeContext) {
+        yield sdk.init()
+        await ctx.nextUser()
+        hookResult = await ctx.preToolUse('mcp__clyde__update_todos', { todos: [{ text: 'Plan', status: 'pending' }] }, 'tu1')
+        yield sdk.result()
+      }) as never,
+      { clydeMcp }
+    )
+    const info = await manager.start({ profileId: profile.id, permissionLevel: 'validate-all' })
+    expect(calls[0]?.mcpServers).toEqual({ clyde: { type: 'http', url: `http://127.0.0.1:1/mcp/${info.id}`, headers: {} } })
+    manager.send(info.id, 'go')
+    await vi.waitFor(() => expect(hookResult).toMatchObject({ hookSpecificOutput: { permissionDecision: 'allow' } }))
+    expect(events.some((e) => e.event.type === 'approval_request')).toBe(false)
+
+    await manager.start({ profileId: profile.id, chatId: '7f3c2a1e-1111-4222-8333-944455556666' })
+    expect(calls[1]).not.toHaveProperty('mcpServers')
   })
 
   it('hides AskUserQuestion from chat sessions, which never wait for the user', async () => {
