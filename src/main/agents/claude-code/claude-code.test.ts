@@ -100,6 +100,10 @@ describe('MessageTranslator', () => {
         errors: [],
         costUsd: 0.0123,
         inputTokens: 1100,
+        cacheReadTokens: 1000,
+        cacheWriteTokens: 0,
+        contextTokens: null,
+        contextWindow: null,
         outputTokens: 50,
         durationMs: 1500
       }

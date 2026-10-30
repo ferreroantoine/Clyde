@@ -28,6 +28,7 @@ import type { ImageInput } from '../agents/api/chat'
 import { resolveInside } from '../services/paths'
 import { billingOf } from '../metrics/metrics'
 import type { ChatStore } from './store'
+import { passagesPrompt, type ChatSearch } from './search'
 
 export interface ChatSessions {
   start(request: AgentStart): Promise<AgentSessionInfo>
@@ -50,6 +51,10 @@ export interface ChatServiceDeps {
   onChanged: (conversations: Conversation[]) => void
   onMessage: (message: ChatMessage) => void
   onLive: (live: ChatLive) => void
+  /** Past-conversation search, when Settings › Memory & context turns it on. */
+  search?: () => ChatSearch | null
+  /** A short title for a new conversation from its first exchange; a local model by default. */
+  title?: (exchange: string) => Promise<string | null>
 }
 
 /** The answer being written by a session, collected from its events. */
@@ -259,7 +264,13 @@ export class ChatService {
           .filter((a) => a.kind === 'image')
           .map((a) => ({ mime: a.mime, data: readFileSync(this.attachmentPath(conversation.id, a)).toString('base64') }))
       : []
-    const text = this.promptFor(conversation.id, message, api)
+    let text = this.promptFor(conversation.id, message, api)
+    const search = conversation.useHistory ? this.deps.search?.() : null
+    if (search && message.content.trim()) {
+      const passages = await search.search(message.content, conversation.id).catch(() => [])
+      const context = passagesPrompt(passages)
+      if (context) text = `${context}\n\n${text}`
+    }
 
     let sessionId = this.live.get(conversation.id)
     const current = sessionId ? this.deps.sessions.get(sessionId) : null
@@ -311,6 +322,31 @@ export class ChatService {
     if (status === 'stopped' || subtype === 'ended') this.live.delete(turn.conversationId)
     this.publishLive(turn.conversationId)
     this.changed()
+    if (message.status === 'done' && content) void this.afterAnswer(turn.conversationId, message)
+  }
+
+  /** Housekeeping after an answer: index the exchange for search, title a new conversation. */
+  private async afterAnswer(conversationId: string, answer: ChatMessage): Promise<void> {
+    const all = this.deps.store.messages(conversationId)
+    const question = all.slice(0, all.findIndex((m) => m.id === answer.id)).findLast((m) => m.role === 'user')
+    const search = this.deps.search?.()
+    if (search) {
+      try {
+        if (question?.content) await search.index(conversationId, question.id, question.content)
+        await search.index(conversationId, answer.id, answer.content)
+      } catch {
+        // Search is best effort: without Ollama, nothing is indexed.
+      }
+    }
+    if (all.length === 2 && question && this.deps.title) {
+      const title = await this.deps.title(`User: ${question.content.slice(0, 2_000)}\n\nAssistant: ${answer.content.slice(0, 2_000)}`).catch(() => null)
+      const current = this.deps.store.get(conversationId)
+      // Only replace the automatic title, never one the user typed.
+      if (title && current.title === titleFrom(question.content)) {
+        this.deps.store.update(conversationId, { title })
+        this.changed()
+      }
+    }
   }
 
   /** The message as the model gets it: text attachments inline, the others as files in its folder. */

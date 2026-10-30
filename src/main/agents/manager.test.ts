@@ -191,7 +191,8 @@ describe('AgentManager', () => {
       'edit_file',
       'list_files',
       'run_command',
-      'mcp__docs__search'
+      'mcp__docs__search',
+      'read_tool_output'
     ])
     expect(requests[0]?.system).toContain('Linux')
     // The allowed tool ran through the hub; the other one was refused without reaching it.

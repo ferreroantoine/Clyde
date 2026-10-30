@@ -118,7 +118,7 @@ describe('AgyTranslator', () => {
       { type: 'tool_result', toolUseId: 't1:2', content: 'clean', isError: false },
       { type: 'tool_call', toolUseId: 't1:3', name: 'view_file', input: {}, parentToolUseId: null },
       { type: 'tool_result', toolUseId: 't1:3', content: 'missing', isError: true },
-      { type: 'turn_end', isError: false, subtype: 'success', errors: [], costUsd: null, inputTokens: 1000, outputTokens: 50, durationMs: 2500 }
+      { type: 'turn_end', isError: false, subtype: 'success', errors: [], costUsd: null, inputTokens: 1000, outputTokens: 50, durationMs: 2500, cacheReadTokens: 100 }
     ])
     expect(t.conversationId).toBe('c1')
   })

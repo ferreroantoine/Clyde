@@ -18,6 +18,10 @@ interface AgentsState {
   start: (request: AgentStart) => Promise<boolean>
   send: (text: string) => Promise<boolean>
   interrupt: () => Promise<void>
+  /** Asks the agent to compact its own conversation (Claude Code /compact, Codex, Atelier's summary). */
+  compact: (id: string) => Promise<void>
+  /** Ends a session and starts the same agent again with a summary of it. */
+  continueWithSummary: (id: string) => Promise<void>
   stop: (id?: string) => Promise<void>
   answer: (requestId: string, decision: ApprovalDecision, message?: string) => Promise<void>
   select: (id: string | null) => void
@@ -99,6 +103,23 @@ export const useAgents = create<AgentsState>()((set, get) => {
       const id = get().activeId
       if (!id) return
       await invoke('agent:interrupt', { sessionId: id }).catch((err) => notify.error(t('Could not interrupt the agent'), err))
+    },
+
+    compact: async (id) => {
+      await invoke('agent:compact', { sessionId: id }).catch((err) => notify.error(t('Could not compact the conversation'), err))
+    },
+
+    continueWithSummary: async (id) => {
+      set({ starting: true })
+      try {
+        const info = await invoke('agent:continueWithSummary', { sessionId: id })
+        upsertSession(info)
+        set({ activeId: info.id })
+      } catch (err) {
+        notify.error(t('Could not start the new session'), err)
+      } finally {
+        set({ starting: false })
+      }
     },
 
     stop: async (id = get().activeId ?? undefined) => {

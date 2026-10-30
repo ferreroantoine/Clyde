@@ -12,6 +12,7 @@ interface ConversationRow {
   agent_id: string | null
   profile_id: string
   model: string
+  use_history: number
   tools_enabled: number
   created_at: number
   updated_at: number
@@ -37,6 +38,7 @@ const toConversation = (r: ConversationRow): Conversation => ({
   profileId: r.profile_id,
   model: r.model,
   toolsEnabled: r.tools_enabled === 1,
+  useHistory: r.use_history === 1,
   createdAt: r.created_at,
   updatedAt: r.updated_at
 })
@@ -87,7 +89,7 @@ export class ChatStore {
     const next = { ...current, ...fields }
     this.db
       .prepare(
-        `UPDATE conversations SET title = ?, pinned = ?, agent_id = ?, profile_id = ?, model = ?, tools_enabled = ?, updated_at = ? WHERE id = ?`
+        `UPDATE conversations SET title = ?, pinned = ?, agent_id = ?, profile_id = ?, model = ?, tools_enabled = ?, use_history = ?, updated_at = ? WHERE id = ?`
       )
       .run(
         next.title,
@@ -96,6 +98,7 @@ export class ChatStore {
         next.profileId,
         next.model,
         next.toolsEnabled ? 1 : 0,
+        next.useHistory ? 1 : 0,
         touch ? this.now() : current.updatedAt,
         id
       )

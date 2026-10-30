@@ -220,6 +220,13 @@ export class ClaudeCodeSession {
     await this.q?.interrupt()
   }
 
+  /** Claude Code's own `/compact`: it summarizes the conversation and reports a compact boundary. */
+  async compact(): Promise<void> {
+    if (this.closed) return
+    this.queue.push({ type: 'user', message: { role: 'user', content: '/compact' }, parent_tool_use_id: null })
+    this.wake?.()
+  }
+
   stop(): void {
     if (this.closed) return
     this.closed = true

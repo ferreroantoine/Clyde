@@ -37,8 +37,11 @@ export type ChatMessage =
 export type StopReason = 'end' | 'tool_use' | 'max_tokens' | 'other'
 
 export interface Usage {
+  /** All input tokens, cached ones included. */
   inputTokens: number
   outputTokens: number
+  cacheReadTokens?: number
+  cacheWriteTokens?: number
 }
 
 export type AdapterEvent =
@@ -57,6 +60,8 @@ export interface ChatRequest {
 export interface ChatAdapter {
   stream(request: ChatRequest): AsyncGenerator<AdapterEvent>
   listModels(): Promise<ModelOption[]>
+  /** The model's context window in tokens, when the provider tells it. */
+  contextWindow?(model: string): Promise<number | null>
 }
 
 /** Parses streamed tool arguments; models occasionally send nothing for tools without parameters. */

@@ -37,8 +37,13 @@ import { WorktreeService } from './services/worktrees'
 import { TaskService } from './agents/tasks'
 import { ChatStore } from './chat/store'
 import { ChatService } from './chat/service'
+import { ChatSearch, ollamaEmbed } from './chat/search'
 import { registerChatHandlers } from './ipc/chat'
 import { VoiceService } from './voice/service'
+import { InternalModel } from './context/internal'
+import { SUMMARY_SYSTEM, TITLE_SYSTEM } from './context/history'
+import { MemoryService } from './memory/service'
+import { registerMemoryHandlers } from './ipc/memory'
 import { registerVoiceHandlers } from './ipc/voice'
 import { loadQuery, type QueryFn } from './agents/claude-code/provider'
 import { DISTRIBUTION } from './build-flags'
@@ -106,8 +111,19 @@ if (!app.requestSingleInstanceLock()) {
     const applyLocale = () => setLocale(resolveLocale(settings.getAll().general.language, app.getLocale()))
     applyLocale()
     settings.onChange(applyLocale)
+    // Created once the services it reads exist; callbacks before that skip it.
+    // eslint-disable-next-line prefer-const -- assigned below, after the services it needs
+    let memory: MemoryService | undefined
     const workspace = new WorkspaceService(settings, {
-      onChanged: (info) => broadcast('workspace:changed', info),
+      onChanged: (info) => {
+        broadcast('workspace:changed', info)
+        // The open project's memory reaches its CLAUDE.md / AGENTS.md.
+        try {
+          memory?.sync()
+        } catch (err) {
+          log.warn('memory sync failed', err)
+        }
+      },
       onFsChanges: (changes) => broadcast('fs:changed', changes)
     })
     const ptys = new PtyService(
@@ -140,6 +156,11 @@ if (!app.requestSingleInstanceLock()) {
       onChanged: (list) => {
         broadcast('profiles:changed', list)
         limitsSetup.syncProfiles(list)
+        try {
+          memory?.sync()
+        } catch (err) {
+          log.warn('memory sync failed', err)
+        }
       }
     })
     const mcpStore = new McpStore(profileDb, safeStorageCipher)
@@ -149,7 +170,19 @@ if (!app.requestSingleInstanceLock()) {
     })
     // net.fetch goes through Chromium's network stack, so system proxies apply to API calls too.
     const fetch = ((input, init) => net.fetch(input as string, init)) as typeof globalThis.fetch
+    // Atelier's own small tasks go to a local model by default (Settings › Memory & context).
+    const internal = new InternalModel({
+      settings: () => settings.getAll().memory,
+      profiles: () => profiles.list(),
+      apiKey: (id) => profiles.apiKey(id),
+      createAdapter: (target) => createAdapter(target, fetch)
+    })
     const agents = new AgentManager({
+      memory: () => memory?.forPrompt() ?? '',
+      summarizeAt: () => settings.getAll().memory.summarizeAt,
+      summarize: (transcript, fallback, signal) =>
+        internal.complete({ system: SUMMARY_SYSTEM, prompt: transcript, ...(fallback ? { fallback } : {}), ...(signal ? { signal } : {}) }),
+      transcript: (id) => metrics.transcriptText(id),
       profiles,
       maxParallel: () => settings.getAll().agents.maxParallel,
       defaultModel: () => settings.getAll().agents.defaultModel,
@@ -173,6 +206,10 @@ if (!app.requestSingleInstanceLock()) {
       onLimits: (profileId, sessionId, readings) => limitsSetup.ingest(profileId, readings, sessionId),
       onSession: (info) => {
         broadcast('agent:session', info)
+        // End of a project session: the agent may propose memory changes, to review in Settings.
+        if (info.status === 'stopped' && !info.chatId && settings.getAll().memory.proposeAtSessionEnd && internal.target()) {
+          void memory?.proposeFromSession(info.id).catch((err) => log.warn('memory proposal failed', err))
+        }
         metrics.onSession(info)
         tasks.onSession(info)
       },
@@ -209,6 +246,15 @@ if (!app.requestSingleInstanceLock()) {
     tasks.recover()
     registerTaskHandlers(definitions, tasks)
 
+    // "Use my past conversations": embeddings from the first Ollama account (Settings › Memory & context).
+    const chatSearch = new ChatSearch(
+      profileDb,
+      ollamaEmbed(
+        fetch,
+        () => profiles.list().find((p) => p.kind === 'ollama' && p.usable)?.baseUrl ?? null,
+        () => settings.getAll().memory.embeddingModel
+      )
+    )
     const chat: ChatService = new ChatService({
       store: new ChatStore(profileDb),
       sessions: agents,
@@ -219,9 +265,27 @@ if (!app.requestSingleInstanceLock()) {
       defaultPermission: () => settings.getAll().agents.defaultPermission,
       onChanged: (list) => broadcast('chat:changed', list),
       onMessage: (message) => broadcast('chat:message', message),
-      onLive: (live) => broadcast('chat:live', live)
+      onLive: (live) => broadcast('chat:live', live),
+      search: () => (settings.getAll().memory.historySearch ? chatSearch : null),
+      title: async (exchange) => {
+        if (!internal.target()) return null
+        const title = await internal.complete({ system: TITLE_SYSTEM, prompt: exchange })
+        return title.replace(/^["'«\s]+|["'»\s.]+$/g, '').slice(0, 80) || null
+      }
     })
     registerChatHandlers(chat)
+    memory = new MemoryService({
+      db: profileDb,
+      userDir: join(app.getPath('userData'), 'memory'),
+      workspaceRoot: () => workspace.current()?.root ?? null,
+      profiles: () => profiles.list(),
+      configDir: (id) => profiles.configDir(id),
+      budget: () => settings.getAll().memory.coreBudget,
+      internal,
+      transcript: (id) => metrics.transcriptText(id),
+      onChanged: (state) => broadcast('memory:changed', state)
+    })
+    registerMemoryHandlers(memory)
     registerVoiceHandlers(
       new VoiceService({
         root: join(app.getPath('userData'), 'whisper'),

@@ -98,6 +98,8 @@ export class CodexTranslator {
         return []
       case 'turn/completed':
         return [this.turnEnd((params as Notifications['turn/completed']).turn)]
+      case 'thread/compacted':
+        return [{ type: 'context_compacted' }]
       case 'thread/tokenUsage/updated': {
         const usage = (params as Notifications['thread/tokenUsage/updated']).tokenUsage
         this.total = usage.total
@@ -198,7 +200,11 @@ export class CodexTranslator {
       costUsd: null,
       inputTokens: delta('inputTokens'),
       outputTokens: delta('outputTokens'),
-      durationMs: turn.durationMs ?? 0
+      durationMs: turn.durationMs ?? 0,
+      cacheReadTokens: delta('cachedInputTokens'),
+      cacheWriteTokens: delta('cacheWriteInputTokens'),
+      contextTokens: this.contextTokens,
+      contextWindow: this.contextWindow
     }
   }
 }

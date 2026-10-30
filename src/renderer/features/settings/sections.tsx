@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import {
   Bell,
   Bot,
+  Brain,
   Code,
   Database,
   Gauge,
@@ -28,6 +29,7 @@ import { McpPage } from '@/features/mcp/McpPage'
 import { PricesSection } from './PricesSection'
 import { ShortcutsEditor } from './ShortcutsEditor'
 import { DataBlock } from './DataBlock'
+import { MemoryCoreBlock, MemoryDocsBlock, MemoryProposalsBlock } from './MemoryBlocks'
 import { AboutBlock } from './AboutBlock'
 
 export interface Ctx {
@@ -634,6 +636,92 @@ export const SECTIONS: SectionSpec[] = [
         label: t('MCP servers'),
         keywords: 'tools servers import claude desktop',
         block: () => <McpPage embedded />
+      }
+    ]
+  },
+  {
+    id: 'memory',
+    label: tk('Memory & context'),
+    icon: Brain,
+    resets: 'memory',
+    entries: () => [
+      {
+        id: 'memory.proposals',
+        label: t('Proposals to review'),
+        hint: t('Changes agents proposed after their sessions. Nothing reaches the memory before you apply it.'),
+        keywords: 'diff accept review',
+        block: () => <MemoryProposalsBlock />
+      },
+      { id: 'memory.user', label: t('About you'), keywords: 'preferences global user claude.md agents.md gemini.md', block: () => <MemoryCoreBlock scope="user" /> },
+      { id: 'memory.userDocs', label: t('Notes about you'), keywords: 'docs detailed', block: () => <MemoryDocsBlock scope="user" /> },
+      { id: 'memory.project', label: t('This project'), keywords: 'repository conventions claude.md agents.md', block: () => <MemoryCoreBlock scope="project" /> },
+      { id: 'memory.projectDocs', label: t('Notes about this project'), keywords: 'docs detailed', block: () => <MemoryDocsBlock scope="project" /> },
+      {
+        id: 'memory.coreBudget',
+        label: t('Memory budget'),
+        hint: t('Tokens both cores may use together. They are sent in every session, so every token counts.'),
+        control: ({ s, set }) => (
+          <NumberField label={t('Memory budget')} min={200} max={20_000} suffix={t('tokens')} value={s.memory.coreBudget} onChange={(v) => set('memory.coreBudget', v)} />
+        )
+      },
+      {
+        id: 'memory.proposeAtSessionEnd',
+        label: t('Propose memory changes after a session'),
+        hint: t('When a project session ends, the model for Atelier’s own tasks reads it and proposes changes to review here.'),
+        control: ({ s, set }) => (
+          <Toggle label={t('Propose memory changes after a session')} checked={s.memory.proposeAtSessionEnd} onChange={(v) => set('memory.proposeAtSessionEnd', v)} />
+        )
+      },
+      {
+        id: 'memory.internalProfileId',
+        label: t('Account for Atelier’s own tasks'),
+        hint: t('Summaries, titles and memory proposals. A local Ollama model by default, so no subscription is spent on them.'),
+        keywords: 'internal ollama summary title',
+        control: ({ s, set }) => (
+          <ApiProfileSelect
+            value={s.memory.internalProfileId}
+            onChange={(v) => set('memory.internalProfileId', v)}
+            kinds={['ollama', 'openai', 'anthropic', 'gemini']}
+            empty={t('First Ollama account')}
+          />
+        )
+      },
+      {
+        id: 'memory.internalModel',
+        label: t('Model for Atelier’s own tasks'),
+        hint: t('Empty: the account’s default model.'),
+        control: ({ s, set }) => <TextField label={t('Model for Atelier’s own tasks')} value={s.memory.internalModel} placeholder="qwen2.5:7b" onChange={(v) => set('memory.internalModel', v)} />
+      },
+      {
+        id: 'memory.summarizeAt',
+        label: t('Summarize older turns past'),
+        hint: t('API sessions replace their oldest turns with a summary once the history passes this size; the last turns stay as they are. 0 turns it off.'),
+        keywords: 'rolling summary context compaction',
+        control: ({ s, set }) => (
+          <NumberField label={t('Summarize older turns past')} min={0} max={2_000_000} suffix={t('tokens')} value={s.memory.summarizeAt} onChange={(v) => set('memory.summarizeAt', v)} />
+        )
+      },
+      {
+        id: 'memory.compactSuggestPct',
+        label: t('Suggest compacting at'),
+        hint: t('A Claude Code or Codex session suggests compacting once its context is this full.'),
+        keywords: 'compact context window',
+        control: ({ s, set }) => (
+          <NumberField label={t('Suggest compacting at')} min={30} max={98} suffix="%" value={s.memory.compactSuggestPct} onChange={(v) => set('memory.compactSuggestPct', v)} />
+        )
+      },
+      {
+        id: 'memory.historySearch',
+        label: t('Search past conversations'),
+        hint: t('Chat conversations can include relevant passages of earlier ones, found with local embeddings from your first Ollama account. Turn it on per conversation.'),
+        keywords: 'embeddings rag history chat',
+        control: ({ s, set }) => <Toggle label={t('Search past conversations')} checked={s.memory.historySearch} onChange={(v) => set('memory.historySearch', v)} />
+      },
+      {
+        id: 'memory.embeddingModel',
+        label: t('Embedding model'),
+        hint: t('An Ollama embedding model; pull it first (ollama pull nomic-embed-text).'),
+        control: ({ s, set }) => <TextField label={t('Embedding model')} value={s.memory.embeddingModel} onChange={(v) => set('memory.embeddingModel', v)} />
       }
     ]
   },

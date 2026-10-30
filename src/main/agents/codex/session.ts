@@ -153,6 +153,12 @@ export class CodexSession {
     this.pump()
   }
 
+  /** Codex's own compaction (`thread/compact/start`); it reports `thread/compacted` when done. */
+  async compact(): Promise<void> {
+    if (!this.rpc || !this.threadId || this.stopped) return
+    await this.rpc.request('thread/compact/start', { threadId: this.threadId })
+  }
+
   async interrupt(): Promise<void> {
     const turnId = this.turn
     if (!this.rpc || !this.threadId || !turnId || turnId === 'starting') return

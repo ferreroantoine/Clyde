@@ -1,6 +1,6 @@
 import { t } from '@shared/i18n'
 import { randomUUID } from 'node:crypto'
-import type { AgentEventEnvelope, AgentSessionInfo, AgentStatus } from '@shared/agent'
+import type { AgentEvent, AgentEventEnvelope, AgentSessionInfo, AgentStatus, ContextBreakdown } from '@shared/agent'
 import { AppError } from '@shared/errors'
 import type { Dashboard, DailyUsage, MetricsRange, ProfileUsage, SessionRecord, SessionTranscript } from '@shared/metrics'
 import { localDay, RANGE_DAYS } from '@shared/metrics'
@@ -33,9 +33,12 @@ interface SessionRow {
   cost_usd: number
   cost_estimated: number
   billing: string
+  cache_read_tokens: number
+  context_tokens: number | null
+  context_window: number | null
 }
 
-const toRecord = (r: SessionRow, limits: SessionLimitUsage[] = []): SessionRecord => ({
+const toRecord = (r: SessionRow, limits: SessionLimitUsage[] = [], breakdown: ContextBreakdown | null = null): SessionRecord => ({
   id: r.id,
   profileId: r.profile_id,
   profileName: r.profile_name,
@@ -51,6 +54,10 @@ const toRecord = (r: SessionRow, limits: SessionLimitUsage[] = []): SessionRecor
   turns: r.turns,
   inputTokens: r.input_tokens,
   outputTokens: r.output_tokens,
+  cacheReadTokens: r.cache_read_tokens ?? 0,
+  contextTokens: r.context_tokens ?? null,
+  contextWindow: r.context_window ?? null,
+  breakdown,
   costUsd: r.cost_usd,
   costEstimated: r.cost_estimated === 1,
   billing: r.billing as Billing,
@@ -180,16 +187,23 @@ export class MetricsService {
       this.db.transaction(() => {
         this.db
           .prepare(
-            `INSERT INTO usage_events (session_id, profile_id, model, at, input_tokens, output_tokens, cost_usd, estimated)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+            `INSERT INTO usage_events (session_id, profile_id, model, at, input_tokens, output_tokens, cost_usd, estimated, cache_read_tokens, cache_write_tokens)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
           )
-          .run(sessionId, session.profile_id, session.model, at, event.inputTokens, event.outputTokens, cost, estimated ? 1 : 0)
+          .run(sessionId, session.profile_id, session.model, at, event.inputTokens, event.outputTokens, cost, estimated ? 1 : 0, event.cacheReadTokens ?? 0, event.cacheWriteTokens ?? 0)
         this.db
           .prepare(
             `UPDATE sessions SET turns = turns + 1, input_tokens = input_tokens + ?, output_tokens = output_tokens + ?,
-               cost_usd = cost_usd + ?, cost_estimated = MAX(cost_estimated, ?) WHERE id = ?`
+               cost_usd = cost_usd + ?, cost_estimated = MAX(cost_estimated, ?), cache_read_tokens = cache_read_tokens + ?,
+               context_tokens = COALESCE(?, context_tokens), context_window = COALESCE(?, context_window) WHERE id = ?`
           )
-          .run(event.inputTokens, event.outputTokens, cost ?? 0, estimated ? 1 : 0, sessionId)
+          .run(event.inputTokens, event.outputTokens, cost ?? 0, estimated ? 1 : 0, event.cacheReadTokens ?? 0, event.contextTokens ?? null, event.contextWindow ?? null, sessionId)
+        if (event.breakdown) {
+          const b = event.breakdown
+          this.db
+            .prepare('INSERT INTO turn_context (session_id, at, system, memory, tools, history, tool_results, output) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+            .run(sessionId, at, b.system, b.memory, b.tools, b.history, b.toolResults, b.output)
+        }
       })()
     } else if (event.type === 'rate_limit') {
       this.db
@@ -217,10 +231,11 @@ export class MetricsService {
         `SELECT u.profile_id, COUNT(DISTINCT u.session_id) AS sessions, SUM(u.input_tokens) AS input, SUM(u.output_tokens) AS output,
                 SUM(CASE WHEN s.billing = 'api' THEN COALESCE(u.cost_usd, 0) ELSE 0 END) AS cost,
                 MAX(CASE WHEN s.billing = 'api' THEN u.estimated ELSE 0 END) AS estimated,
-                SUM(CASE WHEN s.billing = 'api' AND u.cost_usd IS NULL THEN 1 ELSE 0 END) AS unpriced
+                SUM(CASE WHEN s.billing = 'api' AND u.cost_usd IS NULL THEN 1 ELSE 0 END) AS unpriced,
+                SUM(u.cache_read_tokens) AS cache_read
          FROM usage_events u LEFT JOIN sessions s ON s.id = u.session_id WHERE u.at >= ? GROUP BY u.profile_id`
       )
-      .all(since) as Array<{ profile_id: string; sessions: number; input: number; output: number; cost: number; estimated: number; unpriced: number }>
+      .all(since) as Array<{ profile_id: string; sessions: number; input: number; output: number; cost: number; estimated: number; unpriced: number; cache_read: number }>
     const byProfile = new Map(usage.map((u) => [u.profile_id, u]))
     const active = this.deps.activeSessions().filter((s) => !ENDED.includes(s.status))
 
@@ -238,6 +253,7 @@ export class MetricsService {
         outputTokens: u?.output ?? 0,
         costUsd: u?.cost ?? 0,
         costEstimated: (u?.estimated ?? 0) === 1 || (u?.unpriced ?? 0) > 0,
+        cacheReadTokens: u?.cache_read ?? 0,
         unpricedTurns: u?.unpriced ?? 0
       }
     })
@@ -258,8 +274,34 @@ export class MetricsService {
 
     const sessions = (
       this.db.prepare('SELECT * FROM sessions WHERE started_at >= ? ORDER BY started_at DESC LIMIT 100').all(since) as SessionRow[]
-    ).map((r) => toRecord(r, this.deps.sessionLimits?.(r.id) ?? []))
+    ).map((r) => toRecord(r, this.deps.sessionLimits?.(r.id) ?? [], this.breakdownOf(r.id)))
     return { range, generatedAt: this.now(), profiles, daily: [...daily.values()], sessions }
+  }
+
+  /** A session's tokens by part, summed over its turns (Atelier's own loop only). */
+  private breakdownOf(sessionId: string): ContextBreakdown | null {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS n, SUM(system) AS system, SUM(memory) AS memory, SUM(tools) AS tools, SUM(history) AS history,
+                SUM(tool_results) AS tool_results, SUM(output) AS output FROM turn_context WHERE session_id = ?`
+      )
+      .get(sessionId) as { n: number; system: number; memory: number; tools: number; history: number; tool_results: number; output: number }
+    if (!row.n) return null
+    return { system: row.system, memory: row.memory, tools: row.tools, history: row.history, toolResults: row.tool_results, output: row.output }
+  }
+
+  /** A session as plain text (what was asked, answered and which tools ran), for summaries and memory. */
+  transcriptText(sessionId: string): string {
+    const rows = this.db.prepare('SELECT event FROM session_events WHERE session_id = ? ORDER BY seq').all(sessionId) as Array<{ event: string }>
+    const lines: string[] = []
+    for (const row of rows) {
+      const event = JSON.parse(row.event) as AgentEvent
+      if (event.type === 'user') lines.push(`User: ${event.text}`)
+      else if (event.type === 'text') lines.push(`Assistant: ${event.text}`)
+      else if (event.type === 'tool_call') lines.push(`[tool ${event.name} ${JSON.stringify(event.input).slice(0, 200)}]`)
+      else if (event.type === 'tool_result' && event.isError) lines.push(`[tool error: ${event.content.slice(0, 300)}]`)
+    }
+    return lines.join('\n')
   }
 
   transcript(sessionId: string): SessionTranscript {

@@ -91,6 +91,16 @@ export interface ToolCallInfo {
   parentToolUseId: string | null
 }
 
+/** Tokens of one request by part, estimated from sizes and scaled to the reported input. */
+export interface ContextBreakdown {
+  system: number
+  memory: number
+  tools: number
+  history: number
+  toolResults: number
+  output: number
+}
+
 /** Everything the agent panel renders, pushed from main as `agent:event`. */
 export type AgentEvent =
   | { type: 'status'; status: AgentStatus }
@@ -122,9 +132,18 @@ export type AgentEvent =
       errors: string[]
       /** Claude Code reports the cost; null for API providers until pricing arrives. */
       costUsd: number | null
+      /** All input tokens of the turn, cached ones included. */
       inputTokens: number
       outputTokens: number
       durationMs: number
+      /** Of `inputTokens`: read from the prompt cache, and written to it. 0 when the provider does not say. */
+      cacheReadTokens?: number
+      cacheWriteTokens?: number
+      /** Size of the conversation after the turn, and the model's window, when known: the context gauge. */
+      contextTokens?: number | null
+      contextWindow?: number | null
+      /** Where the last request's tokens went; Atelier's own loop only (CLIs report totals). */
+      breakdown?: ContextBreakdown
     }
   | {
       type: 'rate_limit'
@@ -134,6 +153,9 @@ export type AgentEvent =
       limitType: string | null
     }
   | { type: 'error'; message: string }
+  /** Older turns were replaced by a summary (Atelier's loop), or the CLI compacted its context. */
+  | { type: 'context_summarized'; turns: number }
+  | { type: 'context_compacted' }
 
 export interface AgentEventEnvelope {
   sessionId: string

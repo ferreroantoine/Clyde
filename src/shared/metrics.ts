@@ -1,3 +1,4 @@
+import type { ContextBreakdown } from './agent'
 import type { AgentEventEnvelope, AgentStatus } from './agent'
 import type { ProfileKind } from './profiles'
 import type { Billing, SessionLimitUsage } from './limits'
@@ -36,6 +37,8 @@ export interface ProfileUsage {
   costUsd: number
   /** True when part of the cost is an estimate, or some turns had no known price. */
   costEstimated: boolean
+  /** Input tokens read from the prompt cache, of `inputTokens`. */
+  cacheReadTokens: number
   unpricedTurns: number
 }
 
@@ -64,6 +67,13 @@ export interface SessionRecord {
   turns: number
   inputTokens: number
   outputTokens: number
+  /** Of `inputTokens`, read from the prompt cache. */
+  cacheReadTokens: number
+  /** Size of the conversation after its last turn, and the model's window, when known. */
+  contextTokens: number | null
+  contextWindow: number | null
+  /** Where its tokens went, summed over turns; null for CLIs, which only report totals. */
+  breakdown: ContextBreakdown | null
   costUsd: number
   costEstimated: boolean
   billing: Billing

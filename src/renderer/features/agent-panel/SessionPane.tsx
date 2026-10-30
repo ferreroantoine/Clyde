@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { intlLocale, t, tk } from '@shared/i18n'
-import { ArrowUp, CircleAlert, Gauge, Square } from 'lucide-react'
+import { ArrowUp, CircleAlert, FoldVertical, Gauge, Square, StepForward } from 'lucide-react'
 import { PERMISSION_LEVEL_LABELS, type AgentStatus } from '@shared/agent'
 import { kindLabel } from '@shared/profiles'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import { SessionLimitLine } from '@/features/limits/LimitGauge'
 import { useLimits } from '@/stores/limits'
 import { ToolCard } from './ToolCard'
 import { Appear } from '@/components/Appear'
+import { useSettings } from '@/stores/settings'
 
 export const STATUS_LABELS: Record<AgentStatus, string> = {
   starting: tk('Starting'),
@@ -88,6 +89,8 @@ export function Item({
           {item.message}
         </p>
       )
+    case 'note':
+      return <p className="text-center text-[11px] text-muted-foreground italic">{item.text}</p>
   }
 }
 
@@ -96,6 +99,7 @@ export function itemKey(item: TranscriptItem): string {
     case 'user':
     case 'turn':
     case 'error':
+    case 'note':
       return `${item.kind}-${item.id}`
     case 'text':
       return `text-${item.key}`
@@ -161,6 +165,71 @@ function Composer({ view }: { view: SessionView }) {
   )
 }
 
+const compactTokens = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(n))
+
+/** How full the context is, with the ways to free it. */
+export function ContextBar({ view }: { view: SessionView }) {
+  const suggestAt = useSettings((s) => s.settings.memory.compactSuggestPct)
+  const compact = useAgents((s) => s.compact)
+  const continueWithSummary = useAgents((s) => s.continueWithSummary)
+  const starting = useAgents((s) => s.starting)
+  const [compacting, setCompacting] = useState(false)
+  const context = view.context
+  if (!context || ENDED_STATUSES.has(view.info.status)) return null
+  const pct = context.window ? Math.min(100, Math.round((context.tokens / context.window) * 100)) : null
+  const suggest = pct !== null && pct >= suggestAt
+  const busy = view.info.status === 'running' || view.info.status === 'awaiting-approval'
+  // Antigravity's /compact is not documented: only a new session with a summary is offered there.
+  const canCompact = view.info.kind !== 'antigravity'
+  return (
+    <div
+      className={cn('flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-1.5 text-[11px] text-muted-foreground', suggest && 'bg-warning/10')}
+      aria-label={t('Context of this session')}
+      data-testid="context-bar"
+    >
+      <span>{t('Context')}</span>
+      {pct !== null && (
+        <span className="h-1.5 w-20 overflow-hidden rounded-full bg-muted" role="meter" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={t('Context used')}>
+          <span className={cn('block h-full rounded-full', suggest ? 'bg-warning' : 'bg-primary/70')} style={{ width: `${pct}%` }} />
+        </span>
+      )}
+      <span className="tabular-nums">
+        {context.window
+          ? t('{used} of {window} tokens ({pct}%)', { used: compactTokens(context.tokens), window: compactTokens(context.window), pct: pct ?? 0 })
+          : t('{used} tokens', { used: compactTokens(context.tokens) })}
+      </span>
+      {suggest && <span className="text-foreground">{t('Compact to keep answers sharp and cheaper.')}</span>}
+      <span className="ml-auto flex items-center gap-1">
+        {canCompact && (
+          <Button
+            size="xs"
+            variant="ghost"
+            disabled={busy}
+            loading={compacting}
+            title={t('Replaces the conversation so far with a summary, in the same session.')}
+            onClick={() => {
+              setCompacting(true)
+              void compact(view.info.id).finally(() => setCompacting(false))
+            }}
+          >
+            <FoldVertical /> {t('Compact')}
+          </Button>
+        )}
+        <Button
+          size="xs"
+          variant="ghost"
+          disabled={busy}
+          loading={starting}
+          title={t('Ends this session and starts the same agent with a summary of it.')}
+          onClick={() => void continueWithSummary(view.info.id)}
+        >
+          <StepForward /> {t('New session with summary')}
+        </Button>
+      </span>
+    </div>
+  )
+}
+
 export function SessionPane({ view }: { view: SessionView }) {
   const profile = profileById(useProfiles((s) => s.profiles), view.info.profileId)
   const scroller = useRef<HTMLDivElement>(null)
@@ -215,6 +284,7 @@ export function SessionPane({ view }: { view: SessionView }) {
           <SessionLimitLine usage={planUse ?? []} />
         </div>
       )}
+      <ContextBar view={view} />
       <div
         ref={scroller}
         onScroll={(e) => {
