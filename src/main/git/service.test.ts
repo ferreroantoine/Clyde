@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -9,8 +9,14 @@ import { GitService } from './service'
 
 const sh = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 
+/**
+ * A temporary folder by its real path, as Clyde opens workspaces: on CI runners tmpdir() is an
+ * 8.3 short name (RUNNER~1) that git and the file system then spell out in full.
+ */
+const tempDir = (prefix: string) => realpathSync.native(mkdtempSync(join(tmpdir(), prefix)))
+
 function repo() {
-  const dir = mkdtempSync(join(tmpdir(), 'clyde-git-'))
+  const dir = tempDir('clyde-git-')
   sh(dir, 'init', '-q', '-b', 'main')
   sh(dir, 'config', 'user.email', 'me@example.com')
   sh(dir, 'config', 'user.name', 'Me')
@@ -32,7 +38,7 @@ async function service(dir: string) {
 
 describe('GitService', () => {
   it('is empty outside a repository', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'clyde-nogit-'))
+    const dir = tempDir('clyde-nogit-')
     const { git } = await service(dir)
     expect((await git.status()).isRepo).toBe(false)
     await git.init()

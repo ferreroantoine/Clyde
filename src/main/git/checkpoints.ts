@@ -113,8 +113,12 @@ export class CheckpointService {
     return this.rows(root).map((r) => ({ sessionId: r.session_id, title: r.title, profileId: r.profile_id ?? '', commit: r.commit_hash, createdAt: r.created_at }))
   }
 
-  private row(root: string, sessionId: string): Row {
-    const row = this.rows(root).find((r) => r.session_id === sessionId)
+  /**
+   * By session only: the root the caller has may be written differently from the one git gave at
+   * creation (a short 8.3 name, another case), and a session has one restore point anyway.
+   */
+  private row(_root: string, sessionId: string): Row {
+    const row = this.db.prepare('SELECT * FROM git_checkpoints WHERE session_id = ?').get(sessionId) as Row | undefined
     if (!row) throw new AppError('not_found', t('No restore point for this session'))
     return row
   }
