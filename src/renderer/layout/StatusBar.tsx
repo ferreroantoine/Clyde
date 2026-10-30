@@ -4,6 +4,7 @@ import { effectiveBindings, formatCombo } from '@shared/keybindings'
 import { isEnded } from '@shared/agent'
 import { IconButton } from '@/components/IconButton'
 import { useLayout } from '@/stores/layout'
+import { hasTextPreview } from '@/lib/viewers'
 import { useSettings } from '@/stores/settings'
 import { useWorkspace } from '@/stores/workspace'
 import { useEditor } from '@/stores/editor'
@@ -81,8 +82,13 @@ function ProfileGauges({ profileId, color }: { profileId: string; color: string 
 
 export function StatusBar() {
   const workspace = useWorkspace((s) => s.info)
-  const cursor = useEditor((s) => s.cursor)
-  const language = useEditor((s) => s.tabs.find((t) => t.path === s.active)?.language)
+  // Line, column and language belong to the code view, not to an image, a PDF or a preview.
+  const coding = useEditor((s) => {
+    const tab = s.tabs.find((t) => t.path === s.active)
+    return !!tab && tab.hasText && !(hasTextPreview(tab.viewer) && tab.mode === 'preview')
+  })
+  const cursor = useEditor((s) => (coding ? s.cursor : null))
+  const language = useEditor((s) => (coding ? s.tabs.find((t) => t.path === s.active)?.language : undefined))
   const theme = useResolvedTheme((s) => s.theme)
   const updateSetting = useSettings((s) => s.update)
   const layout = useLayout()

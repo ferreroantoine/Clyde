@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -8,6 +8,7 @@ import { Check, Copy } from 'lucide-react'
 import { t } from '@shared/i18n'
 import { monaco } from '@/lib/monaco/setup'
 import { useResolvedTheme } from '@/lib/theme'
+import { ImageViewer } from '@/components/ImageViewer'
 import { cn } from '@/lib/utils'
 
 /** Fence names models use, mapped to Monaco's language ids. */
@@ -90,7 +91,7 @@ function CodeBlock({ code, lang }: { code: string; lang: string }) {
   )
 }
 
-const components: Components = {
+const baseComponents: Components = {
   pre: ({ children }) => <>{children}</>,
   code: ({ className, children }) => {
     const match = /language-([\w+#-]+)/.exec(className ?? '')
@@ -122,16 +123,69 @@ const components: Components = {
   img: ({ alt }) => <span className="text-muted-foreground">[{alt || t('image')}]</span>
 }
 
+/** For a Markdown file shown in the editor: its images and links point at other files. */
+export interface MarkdownFileOptions {
+  /** The URL to load an image from, or null to show its alt text. */
+  imageUrl: (src: string) => string | null
+  /** Handles a click on a link; false lets it open in the browser. */
+  openLink: (href: string) => boolean
+}
+
+function fileComponents(options: MarkdownFileOptions, zoom: (src: string, alt: string) => void): Components {
+  return {
+    ...baseComponents,
+    a: ({ href, children }) => (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        onClick={(e) => {
+          if (href && options.openLink(href)) e.preventDefault()
+        }}
+        className="text-primary underline underline-offset-2 hover:no-underline"
+      >
+        {children}
+      </a>
+    ),
+    img: ({ src, alt }) => {
+      const url = typeof src === 'string' ? options.imageUrl(src) : null
+      if (!url) return <span className="text-muted-foreground">[{alt || t('image')}]</span>
+      return (
+        <img
+          src={url}
+          alt={alt ?? ''}
+          loading="lazy"
+          className="inline-block max-w-full cursor-zoom-in rounded"
+          onClick={() => zoom(url, alt ?? '')}
+        />
+      )
+    }
+  }
+}
+
 /**
  * Markdown as claude.ai shows it: GitHub tables and task lists, math with KaTeX, code with
  * syntax colors. Raw HTML in the text is not rendered.
  */
-export const Markdown = memo(function Markdown({ text, streaming = false }: { text: string; streaming?: boolean }) {
+export const Markdown = memo(function Markdown({
+  text,
+  streaming = false,
+  file,
+  className
+}: {
+  text: string
+  streaming?: boolean
+  file?: MarkdownFileOptions
+  className?: string
+}) {
+  const [zoomed, setZoomed] = useState<{ src: string; alt: string } | null>(null)
+  const components = useMemo(() => (file ? fileComponents(file, (src, alt) => setZoomed({ src, alt })) : baseComponents), [file])
   return (
-    <div className={cn('chat-prose', streaming && 'chat-streaming')}>
+    <div className={cn('chat-prose', streaming && 'chat-streaming', className)}>
       <ReactMarkdown remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }]]} rehypePlugins={[rehypeKatex]} components={components}>
         {text}
       </ReactMarkdown>
+      {file && <ImageViewer src={zoomed?.src ?? null} alt={zoomed?.alt ?? ''} onClose={() => setZoomed(null)} />}
     </div>
   )
 })

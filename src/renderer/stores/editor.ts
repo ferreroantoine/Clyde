@@ -7,6 +7,7 @@ import { notify } from './notifications'
 import { useLayout } from './layout'
 import { useExplorer } from './explorer'
 import { afterClose, ancestors, visit } from '@/lib/tab-history'
+import { hasTextPreview, isBinaryViewer, viewerFor, type ViewerKind } from '@/lib/viewers'
 
 export interface EditorTab {
   path: string
@@ -14,6 +15,14 @@ export interface EditorTab {
   language: string
   status: 'loading' | 'ready' | 'unsupported' | 'error'
   unsupported?: 'binary' | 'too-large'
+  /** Who shows it (see lib/viewers.ts). */
+  viewer: ViewerKind
+  /** The text is in a Monaco model (false for images, PDF… and tables too large for the editor). */
+  hasText: boolean
+  /** For text with a preview: which of the two is on screen. */
+  mode: 'preview' | 'code'
+  size?: number
+  mtimeMs?: number
   error?: string
   dirty: boolean
   /** Set when the file changed or vanished on disk while it has unsaved edits. */
@@ -43,6 +52,8 @@ interface EditorState {
   moved: (from: string, to: string) => void
   /** A file or folder was deleted from the explorer: its tabs without unsaved edits close. */
   removed: (path: string) => void
+  /** Switches a Markdown, SVG, table or JSON tab between its preview and the code. */
+  setMode: (path: string, mode: 'preview' | 'code') => void
   consumeReveal: () => void
   setCursor: (cursor: { line: number; column: number } | null) => void
 }
@@ -79,15 +90,25 @@ export const useEditor = create<EditorState>()((set, get) => {
   }
 
   const load = async (path: string) => {
+    const viewer = viewerFor(path)
     try {
+      // Images, PDF, media and documents: their viewer reads the bytes through clyde-file://.
+      if (isBinaryViewer(viewer)) {
+        const info = await invoke('fs:stat', { path })
+        patch(path, { status: 'ready', hasText: false, ...info })
+        return
+      }
       const file = await invoke('fs:read', { path })
+      const info = { size: file.size, mtimeMs: file.mtimeMs }
       if (file.unsupported) {
-        patch(path, { status: 'unsupported', unsupported: file.unsupported })
+        // A table too large for the editor still shows its first rows.
+        if (viewer === 'table' && file.unsupported === 'too-large') patch(path, { status: 'ready', hasText: false, ...info })
+        else patch(path, { status: 'unsupported', unsupported: file.unsupported, ...info })
         return
       }
       upsertModel(path, file.content)
       track(path)
-      patch(path, { status: 'ready', dirty: false, conflict: undefined })
+      patch(path, { status: 'ready', hasText: true, dirty: false, conflict: undefined, ...info })
     } catch (err) {
       patch(path, { status: 'error', error: err instanceof Error ? err.message : String(err) })
     }
@@ -122,8 +143,14 @@ export const useEditor = create<EditorState>()((set, get) => {
       const existing = get().tabs.find((t) => t.path === path)
       set({ active: path, reveal: reveal ? { path, ...reveal } : null })
       show(path)
-      if (existing) return
-      const tab: EditorTab = { path, name: nameOf(path), language: languageFor(path), status: 'loading', dirty: false }
+      // Going to a line (a search result, a link to a symbol) needs the code, not the preview.
+      if (existing) {
+        if (reveal && existing.mode === 'preview') patch(path, { mode: 'code' })
+        return
+      }
+      const viewer = viewerFor(path)
+      const mode = hasTextPreview(viewer) && !reveal ? 'preview' : 'code'
+      const tab: EditorTab = { path, name: nameOf(path), language: languageFor(path), status: 'loading', dirty: false, viewer, hasText: false, mode }
       set({ tabs: [...get().tabs, tab] })
       await load(path)
     },
@@ -213,7 +240,9 @@ export const useEditor = create<EditorState>()((set, get) => {
       set({
         tabs: get().tabs.map((tab) => {
           const next = map.get(tab.path)
-          return next ? { ...tab, path: next, name: nameOf(next), language: languageFor(next) } : tab
+          if (!next) return tab
+          const viewer = viewerFor(next)
+          return { ...tab, path: next, name: nameOf(next), language: languageFor(next), viewer, ...(viewer !== tab.viewer ? { mode: hasTextPreview(viewer) ? 'preview' : 'code' } : {}) }
         }),
         active: active ? (map.get(active) ?? active) : null
       })
@@ -234,6 +263,7 @@ export const useEditor = create<EditorState>()((set, get) => {
       }
     },
 
+    setMode: (path, mode) => patch(path, { mode }),
     consumeReveal: () => set({ reveal: null }),
     setCursor: (cursor) => set({ cursor })
   }
