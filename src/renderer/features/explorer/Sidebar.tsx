@@ -51,9 +51,9 @@ export function Sidebar() {
         )}
       </div>
       {tab === 'files' ? (
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <div
-            className="truncate px-3 pt-2 pb-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
+            className="shrink-0 truncate px-3 pt-2 pb-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
             title={info.root}
           >
             {info.name}

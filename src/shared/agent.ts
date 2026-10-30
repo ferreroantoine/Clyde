@@ -66,9 +66,82 @@ export const approvalAnswerSchema = z.object({
   message: z.string().max(2000).optional()
 })
 export type ApprovalAnswer = z.input<typeof approvalAnswerSchema>
+
+/** Moves a session to another account (and model): the agent goes on with what it was doing. */
+export const agentSwitchSchema = z.object({
+  sessionId: sessionIdSchema,
+  profileId: profileIdSchema,
+  model: z.string().trim().max(200).default(''),
+  effort: z.enum(REASONING_EFFORTS).or(z.literal('')).default(''),
+  /** Also tells the agent to carry on with its task. */
+  carryOn: z.boolean().default(false)
+})
+export type AgentSwitch = z.input<typeof agentSwitchSchema>
+
+/** What Clyde does when an account hits its usage limit in the middle of a task. */
+export const LIMIT_ACTIONS = ['ask', 'wait', 'switch'] as const
+export type LimitAction = (typeof LIMIT_ACTIONS)[number]
 export type ApprovalDecision = ApprovalAnswer['decision']
 
-export type AgentStatus = 'starting' | 'idle' | 'running' | 'awaiting-approval' | 'stopped' | 'error'
+/** One question an agent asks with choices: Claude Code's AskUserQuestion, or ask_user in Clyde's loop. */
+export const agentQuestionSchema = z.object({
+  question: z.string().min(1).max(2000),
+  /** A short tag shown above the question. */
+  header: z.string().max(60).default(''),
+  options: z
+    .array(z.object({ label: z.string().min(1).max(200), description: z.string().max(1000).default('') }))
+    .min(1)
+    .max(8),
+  multiSelect: z.boolean().default(false)
+})
+export type AgentQuestion = z.infer<typeof agentQuestionSchema>
+
+/** The questions of a tool call, or null when its input is not a valid list of them. */
+export function parseQuestions(input: unknown): AgentQuestion[] | null {
+  const parsed = z.array(agentQuestionSchema).min(1).max(4).safeParse((input as { questions?: unknown } | null)?.questions)
+  return parsed.success ? parsed.data : null
+}
+
+export const questionAnswerSchema = z.object({
+  sessionId: sessionIdSchema,
+  requestId: z.string().min(1).max(64),
+  /** Keyed by question text; several choices are joined with ", ". Null: the user skipped the questions. */
+  answers: z.record(z.string().max(2000), z.string().max(10_000)).nullable()
+})
+export type QuestionAnswer = z.input<typeof questionAnswerSchema>
+
+/** `interrupted`: Clyde closed (or crashed) while the agent was working; the session can be resumed. */
+export type AgentStatus = 'starting' | 'idle' | 'running' | 'awaiting-approval' | 'stopped' | 'error' | 'interrupted'
+
+/** Statuses of a session that no longer runs; it may still be resumed. */
+export const ENDED_STATUSES: ReadonlySet<AgentStatus> = new Set<AgentStatus>(['stopped', 'error', 'interrupted'])
+export const isEnded = (status: AgentStatus): boolean => ENDED_STATUSES.has(status)
+/** A session that is busy: quitting now cuts its work. */
+export const isBusy = (status: AgentStatus): boolean => status === 'running' || status === 'awaiting-approval' || status === 'starting'
+
+/** A past or live session of the agent panel's list. */
+export interface SessionSummary {
+  id: string
+  profileId: string
+  kind: ProfileKind
+  model: string
+  title: string | null
+  status: AgentStatus
+  cwd: string
+  taskId: string | null
+  startedAt: number
+  endedAt: number | null
+  /** Whether "Resume" can bring it back (Clyde knows how it was started). */
+  resumable: boolean
+}
+
+/** A session from the history, to show it in the panel before resuming it. */
+export interface StoredSession {
+  info: AgentSessionInfo
+  title: string | null
+  resumable: boolean
+  events: AgentEventEnvelope[]
+}
 
 export interface AgentSessionInfo {
   id: string
@@ -95,6 +168,18 @@ export interface ToolCallInfo {
   parentToolUseId: string | null
 }
 
+/**
+ * An image a tool returned (a screenshot, an image file it read). Sessions hand the manager
+ * its bytes (`data`, base64) or a file (`path`); the manager stores it and passes on only `id`,
+ * which `agent:media` reads back.
+ */
+export interface ToolImage {
+  mime: string
+  id?: string
+  data?: string
+  path?: string
+}
+
 /** Tokens of one request by part, estimated from sizes and scaled to the reported input. */
 export interface ContextBreakdown {
   system: number
@@ -108,14 +193,32 @@ export interface ContextBreakdown {
 /** Everything the agent panel renders, pushed from main as `agent:event`. */
 export type AgentEvent =
   | { type: 'status'; status: AgentStatus }
-  | { type: 'init'; model: string; /** Version of the CLI behind the session; empty for API agents. */ cliVersion: string; cwd: string; tools: string[] }
+  | {
+      type: 'init'
+      model: string
+      /** Version of the CLI behind the session; empty for API agents. */
+      cliVersion: string
+      cwd: string
+      tools: string[]
+      /** The CLI's own id for the conversation (Claude Code session, Codex thread, agy conversation), to resume it. */
+      resumeId?: string
+    }
+  /** The session came back after it ended; `fresh` when the agent only got a summary of what came before. */
+  | { type: 'session_resumed'; fresh: boolean }
+  /** The session goes on with another account or model; `full` when the agent kept its whole conversation. */
+  | { type: 'account_switched'; profileId: string; profileName: string; model: string; full: boolean }
+  /** The account hit a usage limit; `resetsAt` (ms) when known. The panel offers to switch or wait. */
+  | { type: 'limit_reached'; resetsAt: number | null }
   | { type: 'user'; id: string; text: string }
   /** Streaming text; `key` identifies one text block of one assistant message. */
   | { type: 'text_delta'; key: string; text: string }
   /** The complete text of a block, replacing what the deltas built. */
   | { type: 'text'; key: string; text: string }
+  /** The model's reasoning between actions (a summary for most providers), keyed like text. */
+  | { type: 'thinking_delta'; key: string; text: string }
+  | { type: 'thinking'; key: string; text: string }
   | ({ type: 'tool_call' } & ToolCallInfo)
-  | { type: 'tool_result'; toolUseId: string; content: string; isError: boolean }
+  | { type: 'tool_result'; toolUseId: string; content: string; isError: boolean; /** Screenshots and other images the tool returned. */ images?: ToolImage[] }
   /** Live output of a command, while it runs (API agents; Claude Code reports output at the end). */
   | { type: 'tool_output'; toolUseId: string; chunk: string }
   | {
@@ -127,6 +230,10 @@ export type AgentEvent =
       reason: string
     }
   | { type: 'approval_resolved'; requestId: string; decision: ApprovalDecision | 'cancelled' }
+  /** The agent asks the user to choose; the tool call waits for `agent:answerQuestion`. */
+  | { type: 'question_request'; requestId: string; toolUseId: string; questions: AgentQuestion[] }
+  /** Null when the questions were skipped or the session stopped waiting. */
+  | { type: 'question_resolved'; requestId: string; answers: Record<string, string> | null }
   | { type: 'permission_denied'; toolUseId: string; toolName: string; reason: string }
   | {
       type: 'turn_end'

@@ -1,7 +1,7 @@
 import { t } from '@shared/i18n'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import type { AgentEventEnvelope, AgentSessionInfo, AgentStart } from '@shared/agent'
+import { ENDED_STATUSES, type AgentEventEnvelope, type AgentSessionInfo, type AgentStart } from '@shared/agent'
 import { AppError } from '@shared/errors'
 import { taskInputSchema, type MergeResult, type Task, type TaskChange, type TaskFileDiff, type TaskInput, type TaskOutcome, type TaskStatus } from '@shared/tasks'
 import type { Db } from '../services/db/database'
@@ -13,6 +13,8 @@ export interface SessionControl {
   send(sessionId: string, text: string): void
   stop(sessionId: string): void
   get(sessionId: string): AgentSessionInfo | null
+  /** Brings an ended session back with its conversation; absent in tests that do not need it. */
+  resume?(sessionId: string): Promise<AgentSessionInfo>
 }
 
 interface Row {
@@ -60,7 +62,7 @@ export function taskInstructions(task: Pick<Task, 'branch' | 'baseBranch'>): str
   ].join(' ')
 }
 
-const ENDED = new Set(['stopped', 'error'])
+const ENDED: ReadonlySet<string> = ENDED_STATUSES
 
 /**
  * The Kanban board: To do → In progress → To review → Done. Each task owns a branch and a
@@ -154,6 +156,14 @@ export class TaskService {
     if (live && !ENDED.has(live.status)) {
       this.update(id, { status: 'in_progress', note: null })
       this.deps.sessions.send(live.id, message)
+      return this.get(id)
+    }
+    // The agent's own conversation, when it can be reopened: it remembers what it did.
+    const resumed = task.sessionId && this.deps.sessions.resume ? await this.deps.sessions.resume(task.sessionId).catch(() => null) : null
+    if (resumed) {
+      this.update(id, { status: 'in_progress', session_id: resumed.id, note: null })
+      await this.changed()
+      this.deps.sessions.send(resumed.id, message)
     } else {
       await this.runAgent(
         task,
@@ -212,6 +222,15 @@ export class TaskService {
 
   /** A finished turn sends the task to review; the agent keeps its session for change requests. */
   onAgentEvent(envelope: AgentEventEnvelope): void {
+    // A task's session resumed from the agent panel is working on it again.
+    if (envelope.event.type === 'user') {
+      const task = this.bySession(envelope.sessionId)
+      if (task?.status === 'review') {
+        this.update(task.id, { status: 'in_progress', note: null })
+        void this.changed()
+      }
+      return
+    }
     if (envelope.event.type !== 'turn_end') return
     const task = this.bySession(envelope.sessionId)
     if (!task || task.status !== 'in_progress') return
@@ -229,15 +248,17 @@ export class TaskService {
     void this.changed()
   }
 
-  /** At startup no session survives: tasks that were running wait for review. */
+  /**
+   * At startup no session runs: tasks that were running wait for review. They keep their
+   * session, which change requests (or the agent panel) resume with its whole conversation.
+   */
   recover(): void {
     this.db
       .prepare(
-        `UPDATE tasks SET status = 'review', session_id = NULL, note = 'Clyde was closed while the agent was working.', updated_at = ?
+        `UPDATE tasks SET status = 'review', note = 'Clyde was closed while the agent was working.', updated_at = ?
          WHERE status = 'in_progress'`
       )
       .run(Date.now())
-    this.db.prepare(`UPDATE tasks SET session_id = NULL WHERE session_id IS NOT NULL`).run()
   }
 
   private async runAgent(task: Task, prompt: string): Promise<void> {

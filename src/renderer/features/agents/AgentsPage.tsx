@@ -206,6 +206,14 @@ function NewTaskDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
   const [agentId, setAgentId] = useState('')
   const chosen = agentId || agents[0]?.id || ''
 
+  // A file sent from the explorer opens the dialog with a description to complete.
+  const draft = useBoard((s) => s.taskDraft)
+  const [usedDraft, setUsedDraft] = useState(0)
+  if (open && draft && draft.id !== usedDraft) {
+    setUsedDraft(draft.id)
+    setDescription(draft.description)
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">

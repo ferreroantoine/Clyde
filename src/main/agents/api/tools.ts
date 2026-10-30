@@ -4,6 +4,7 @@ import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { ToolRequest } from '../../permissions/engine'
 import type { ToolSpec } from './chat'
+import type { ToolImage } from '@shared/agent'
 
 export const MAX_OUTPUT_CHARS = 30_000
 const MAX_READ_BYTES = 512 * 1024
@@ -75,6 +76,40 @@ export const BASE_TOOLS: ToolSpec[] = [
   }
 ]
 
+export const ASK_USER = 'ask_user'
+
+/** Multiple-choice questions to the user, as Claude Code's AskUserQuestion; answered in the agent panel. */
+export const ASK_USER_SPEC: ToolSpec = {
+  name: ASK_USER,
+  description:
+    'Ask the user one to four multiple-choice questions when a decision is theirs to make: an approach, a library, a scope. The user can also type their own answer. Prefer this to asking in plain text when the choices are clear.',
+  inputSchema: obj(
+    {
+      questions: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 4,
+        items: obj(
+          {
+            question: { type: 'string', description: 'The full question, ending with a question mark' },
+            header: { type: 'string', description: 'A very short tag for the question, 12 characters at most' },
+            options: {
+              type: 'array',
+              minItems: 2,
+              maxItems: 4,
+              description: 'Distinct choices; do not add an "Other" choice, the user always has one',
+              items: obj({ label: { type: 'string', description: '1 to 5 words' }, description: { type: 'string', description: 'What choosing it means' } }, ['label', 'description'])
+            },
+            multiSelect: { type: 'boolean', description: 'True when several choices can be picked' }
+          },
+          ['question', 'header', 'options', 'multiSelect']
+        )
+      }
+    },
+    ['questions']
+  )
+}
+
 const str = (input: Record<string, unknown>, key: string) => (typeof input[key] === 'string' ? (input[key] as string) : '')
 
 /** Expresses a base tool call in the permission engine's terms, so every level applies unchanged. */
@@ -98,6 +133,8 @@ export function toEngineRequest(name: string, input: Record<string, unknown>, pl
 export interface ToolOutput {
   content: string
   isError: boolean
+  /** Images the tool returned (MCP screenshots), shown in the panel. */
+  images?: ToolImage[]
 }
 
 export interface Shell {

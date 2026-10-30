@@ -41,7 +41,12 @@ export const settingsMigrations: Record<number, (doc: Raw) => Raw> = {
     editor: { fontSize: v1['editorFontSize'] },
     terminal: { fontSize: v1['terminalFontSize'], shell: v1['terminalShell'] },
     cli: { claudeCodePath: v1['claudeCodePath'] }
-  })
+  }),
+  // Keeping Clyde in the tray became the default; "quit" was only the old default, not a choice.
+  2: (v2) => {
+    const general = isObject(v2['general']) ? v2['general'] : {}
+    return { ...v2, general: { ...general, closeBehavior: 'tray' } }
+  }
 }
 
 /** Brings a stored document of any known version up to the current one. */

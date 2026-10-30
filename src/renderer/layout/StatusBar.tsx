@@ -1,6 +1,7 @@
 import { Bot, FolderGit2, Moon, PanelBottom, PanelLeft, PanelRight, Sun } from 'lucide-react'
 import { t, tn } from '@shared/i18n'
 import { effectiveBindings, formatCombo } from '@shared/keybindings'
+import { isEnded } from '@shared/agent'
 import { IconButton } from '@/components/IconButton'
 import { useLayout } from '@/stores/layout'
 import { useSettings } from '@/stores/settings'
@@ -16,7 +17,7 @@ import { useLimits } from '@/stores/limits'
 
 function ActiveAgent() {
   const info = useAgents((s) => (s.activeId ? s.sessions[s.activeId]?.info : undefined))
-  const running = useAgents((s) => Object.values(s.sessions).filter((v) => !['stopped', 'error'].includes(v.info.status)).length)
+  const running = useAgents((s) => Object.values(s.sessions).filter((v) => !isEnded(v.info.status)).length)
   const profile = profileById(useProfiles((s) => s.profiles), info?.profileId)
   if (!info || !profile) {
     return (

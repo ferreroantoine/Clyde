@@ -1,6 +1,18 @@
 import { t } from '@shared/i18n'
 import { randomUUID } from 'node:crypto'
-import type { AgentEvent, AgentEventEnvelope, AgentSessionInfo, AgentStatus, ContextBreakdown } from '@shared/agent'
+import type { z } from 'zod'
+import {
+  agentStartSchema,
+  isEnded,
+  type AgentEvent,
+  type AgentEventEnvelope,
+  type AgentSessionInfo,
+  type AgentStart,
+  type AgentStatus,
+  type ContextBreakdown,
+  type SessionSummary,
+  type StoredSession
+} from '@shared/agent'
 import { AppError } from '@shared/errors'
 import type { Dashboard, DailyUsage, MetricsRange, ProfileUsage, SessionRecord, SessionTranscript } from '@shared/metrics'
 import { localDay, RANGE_DAYS } from '@shared/metrics'
@@ -11,8 +23,17 @@ import type { Db } from '../services/db/database'
 
 const DAY = 24 * 60 * 60 * 1000
 /** Streaming fragments are rebuilt from the final text, so the history skips them. */
-const NOT_STORED = new Set(['text_delta', 'tool_output'])
-const ENDED: AgentStatus[] = ['stopped', 'error']
+const NOT_STORED = new Set(['text_delta', 'thinking_delta', 'tool_output'])
+
+/** A stored session with what the agent manager needs to bring it back. */
+export interface ResumableSession {
+  info: AgentSessionInfo
+  request: z.output<typeof agentStartSchema>
+  /** The CLI's id for the conversation; null when it never reported one. */
+  resumeId: string | null
+  lastSeq: number
+  events: AgentEvent[]
+}
 
 interface SessionRow {
   id: string
@@ -144,13 +165,16 @@ export class MetricsService {
 
   onSession(info: AgentSessionInfo): void {
     const profile = this.deps.profiles().find((p) => p.id === info.profileId)
-    const ended = ENDED.includes(info.status) ? this.now() : null
+    const ended = isEnded(info.status) ? this.now() : null
+    // A resumed session runs again: its end is cleared until it ends once more. A switched one
+  // moves to its new account; each turn's usage stays with the account that ran it.
     this.db
       .prepare(
-        `INSERT INTO sessions (id, profile_id, profile_name, kind, model, agent_id, task_id, cwd, status, started_at, ended_at, billing)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO sessions (id, profile_id, profile_name, kind, model, agent_id, task_id, cwd, status, started_at, ended_at, billing, chat_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET model = excluded.model, status = excluded.status,
-           ended_at = COALESCE(sessions.ended_at, excluded.ended_at)`
+           profile_id = excluded.profile_id, profile_name = excluded.profile_name, kind = excluded.kind, billing = excluded.billing,
+           ended_at = CASE WHEN excluded.ended_at IS NULL THEN NULL ELSE COALESCE(sessions.ended_at, excluded.ended_at) END`
       )
       .run(
         info.id,
@@ -164,8 +188,91 @@ export class MetricsService {
         info.status,
         info.createdAt,
         ended,
-        profile ? billingOf(profile) : info.kind === 'ollama' ? 'local' : info.kind === 'codex' || info.kind === 'antigravity' ? 'subscription' : 'api'
+        profile ? billingOf(profile) : info.kind === 'ollama' ? 'local' : info.kind === 'codex' || info.kind === 'antigravity' ? 'subscription' : 'api',
+        info.chatId
       )
+  }
+
+  /** What started a session, to start it the same way when it is resumed. */
+  saveRequest(sessionId: string, request: AgentStart): void {
+    this.db.prepare('UPDATE sessions SET request_json = ? WHERE id = ?').run(JSON.stringify(request), sessionId)
+  }
+
+  /** A stored session with everything needed to resume it; null when it is unknown or predates resuming. */
+  resumable(sessionId: string): ResumableSession | null {
+    const row = this.db.prepare('SELECT * FROM sessions WHERE id = ?').get(sessionId) as (SessionRow & { request_json: string | null; resume_id: string | null }) | undefined
+    if (!row?.request_json) return null
+    const parsed = agentStartSchema.safeParse(JSON.parse(row.request_json))
+    if (!parsed.success) return null
+    const events = this.events(sessionId)
+    return {
+      info: this.infoOf(row),
+      request: parsed.data,
+      resumeId: row.resume_id,
+      lastSeq: events.at(-1)?.seq ?? 0,
+      events: events.map((e) => e.event)
+    }
+  }
+
+  /** A session as the agent panel shows it, with its stored events. */
+  stored(sessionId: string): StoredSession {
+    const row = this.db.prepare('SELECT * FROM sessions WHERE id = ?').get(sessionId) as (SessionRow & { request_json: string | null }) | undefined
+    if (!row) throw new AppError('not_found', t('This session is not in the history'))
+    return { info: this.infoOf(row), title: row.title, resumable: !!row.request_json, events: this.events(sessionId) }
+  }
+
+  /** Recent project sessions (no chat ones) started in `cwd`, newest first. */
+  history(cwd: string, limit = 40): SessionSummary[] {
+    const rows = this.db
+      .prepare('SELECT * FROM sessions WHERE cwd = ? AND chat_id IS NULL ORDER BY started_at DESC LIMIT ?')
+      .all(cwd, limit) as Array<SessionRow & { request_json: string | null }>
+    return rows.map((r) => ({
+      id: r.id,
+      profileId: r.profile_id,
+      kind: r.kind as ProfileKind,
+      model: r.model,
+      title: r.title,
+      status: r.status as AgentStatus,
+      cwd: r.cwd,
+      taskId: r.task_id,
+      startedAt: r.started_at,
+      endedAt: r.ended_at,
+      resumable: !!r.request_json
+    }))
+  }
+
+  /** Sessions cut by the last shutdown, newest first: resumed at startup when the user wants it. */
+  interruptedSince(since: number): string[] {
+    const rows = this.db
+      .prepare(`SELECT id FROM sessions WHERE status = 'interrupted' AND chat_id IS NULL AND request_json IS NOT NULL AND ended_at >= ? ORDER BY started_at DESC`)
+      .all(since) as Array<{ id: string }>
+    return rows.map((r) => r.id)
+  }
+
+  private events(sessionId: string): AgentEventEnvelope[] {
+    return (this.db.prepare('SELECT seq, event FROM session_events WHERE session_id = ? ORDER BY seq').all(sessionId) as Array<{ seq: number; event: string }>).map(
+      (e) => ({ sessionId, seq: e.seq, event: JSON.parse(e.event) as AgentEvent })
+    )
+  }
+
+  private infoOf(row: SessionRow & { request_json?: string | null }): AgentSessionInfo {
+    const request = row.request_json ? agentStartSchema.safeParse(JSON.parse(row.request_json)) : null
+    const req = request?.success ? request.data : null
+    return {
+      id: row.id,
+      profileId: row.profile_id,
+      kind: row.kind as ProfileKind,
+      model: row.model,
+      effort: req?.effort ?? '',
+      permissionLevel: req?.permissionLevel ?? 'validate-all',
+      cwd: row.cwd,
+      mcpTools: req?.mcpTools ?? [],
+      agentId: row.agent_id,
+      taskId: row.task_id,
+      chatId: req?.chatId ?? null,
+      status: row.status as AgentStatus,
+      createdAt: row.started_at
+    }
   }
 
   onEvent(envelope: AgentEventEnvelope): void {
@@ -178,7 +285,9 @@ export class MetricsService {
     }
     const session = this.db.prepare('SELECT * FROM sessions WHERE id = ?').get(sessionId) as SessionRow | undefined
     if (!session) return
-    if (event.type === 'user' && !session.title) {
+    if (event.type === 'init' && event.resumeId) {
+      this.db.prepare('UPDATE sessions SET resume_id = ? WHERE id = ?').run(event.resumeId, sessionId)
+    } else if (event.type === 'user' && !session.title) {
       this.db.prepare('UPDATE sessions SET title = ? WHERE id = ?').run(event.text.trim().slice(0, 120), sessionId)
     } else if (event.type === 'turn_end') {
       const reported = event.costUsd
@@ -215,11 +324,16 @@ export class MetricsService {
     }
   }
 
-  /** Sessions still marked running belong to a previous run of the app. */
+  /**
+   * Sessions still marked live belong to a previous run that did not shut down cleanly: busy ones
+   * were cut (resumable), idle ones simply stopped.
+   */
   recover(): void {
+    const now = this.now()
     this.db
-      .prepare(`UPDATE sessions SET status = 'stopped', ended_at = COALESCE(ended_at, ?) WHERE status NOT IN ('stopped', 'error')`)
-      .run(this.now())
+      .prepare(`UPDATE sessions SET status = 'interrupted', ended_at = COALESCE(ended_at, ?) WHERE status IN ('running', 'awaiting-approval', 'starting')`)
+      .run(now)
+    this.db.prepare(`UPDATE sessions SET status = 'stopped', ended_at = COALESCE(ended_at, ?) WHERE status = 'idle'`).run(now)
   }
 
   // Queries
@@ -237,7 +351,7 @@ export class MetricsService {
       )
       .all(since) as Array<{ profile_id: string; sessions: number; input: number; output: number; cost: number; estimated: number; unpriced: number; cache_read: number }>
     const byProfile = new Map(usage.map((u) => [u.profile_id, u]))
-    const active = this.deps.activeSessions().filter((s) => !ENDED.includes(s.status))
+    const active = this.deps.activeSessions().filter((s) => !isEnded(s.status))
 
     const profiles: ProfileUsage[] = this.deps.profiles().map((p) => {
       const u = byProfile.get(p.id)

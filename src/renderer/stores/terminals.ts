@@ -21,7 +21,8 @@ interface TerminalsState {
   active: string | null
   creating: boolean
   init: () => () => void
-  create: () => Promise<void>
+  /** Starts a shell in `cwd` (absolute), or in the workspace root. */
+  create: (cwd?: string) => Promise<void>
   close: (id: string) => Promise<void>
   activate: (id: string) => void
   workspaceChanged: (root: string) => Promise<void>
@@ -45,11 +46,11 @@ export const useTerminals = create<TerminalsState>()((set, get) => ({
     return () => offs.forEach((off) => off())
   },
 
-  create: async () => {
+  create: async (cwd) => {
     if (get().creating) return
     set({ creating: true })
     try {
-      const info = await invoke('pty:create', { cols: 100, rows: 24 })
+      const info = await invoke('pty:create', { cols: 100, rows: 24, ...(cwd ? { cwd } : {}) })
       terminals.create(
         info.id,
         { readOnly: false, windowsBuild: info.windowsBuild },

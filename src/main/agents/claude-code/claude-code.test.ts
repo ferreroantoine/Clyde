@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { AgentEvent } from '@shared/agent'
+import type { AgentEvent, AgentQuestion } from '@shared/agent'
 import { ApprovalBroker } from '../../permissions/broker'
 import { decide } from '../../permissions/engine'
 import { ClaudeCodeSession, checkApiKey, testConnection } from './provider'
@@ -64,6 +64,25 @@ describe('runtime helpers', () => {
 })
 
 describe('MessageTranslator', () => {
+  it('shows the reasoning summary between actions and the images tools return', () => {
+    const t = new MessageTranslator()
+    const events = [
+      sdk.stream({ type: 'message_start', message: { id: 'm2' } }),
+      sdk.stream({ type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '' } }),
+      sdk.stream({ type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'Check the ' } }),
+      sdk.stream({ type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 'x' } }),
+      sdk.assistant('m2', [{ type: 'thinking', thinking: 'Check the page.', signature: 'x' }]),
+      sdk.assistant('m2', [{ type: 'tool_use', id: 'tu2', name: 'mcp__pw__browser_take_screenshot', input: {} }]),
+      sdk.toolResult('tu2', [{ type: 'text', text: 'Took it' }, { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'iVBORw0K' } }])
+    ].flatMap((m) => t.translate(m))
+    expect(events).toEqual([
+      { type: 'thinking_delta', key: 'm2:th0', text: 'Check the ' },
+      { type: 'thinking', key: 'm2:th0', text: 'Check the page.' },
+      { type: 'tool_call', toolUseId: 'tu2', name: 'mcp__pw__browser_take_screenshot', input: {}, parentToolUseId: null },
+      { type: 'tool_result', toolUseId: 'tu2', content: 'Took it\n[image]', isError: false, images: [{ mime: 'image/png', data: 'iVBORw0K' }] }
+    ])
+  })
+
   it('keys streamed text and the complete text the same way, even when messages are split per block', () => {
     const t = new MessageTranslator()
     const events = [
@@ -85,7 +104,7 @@ describe('MessageTranslator', () => {
     ].flatMap((m) => t.translate(m))
 
     expect(events).toEqual([
-      { type: 'init', model: 'claude-sonnet-5', cliVersion: '2.1.312', cwd: '/repo', tools: ['Bash', 'Read'] },
+      { type: 'init', model: 'claude-sonnet-5', cliVersion: '2.1.312', cwd: '/repo', tools: ['Bash', 'Read'], resumeId: 'sdk-session' },
       { type: 'text_delta', key: 'm1:0', text: 'Hel' },
       { type: 'text_delta', key: 'm1:0', text: 'lo' },
       { type: 'text_delta', key: 'm1:1', text: 'Done' },
@@ -150,7 +169,7 @@ describe('MessageTranslator', () => {
   })
 })
 
-function sessionHarness(level: 'validate-all' | 'files-auto' | 'autonomous', script: Parameters<typeof fakeQuery>[0]) {
+function sessionHarness(level: 'validate-all' | 'files-auto' | 'autonomous', script: Parameters<typeof fakeQuery>[0], questions = true) {
   const events: AgentEvent[] = []
   const broker = new ApprovalBroker((_id, event) => events.push(event))
   const { query, calls } = fakeQuery(script)
@@ -160,7 +179,8 @@ function sessionHarness(level: 'validate-all' | 'files-auto' | 'autonomous', scr
       query,
       emit: (event) => events.push(event),
       decide: (tool) => decide({ level, cwd: '/repo', platform: 'linux' }, tool),
-      ask: (question, signal) => broker.ask('s1', question, signal)
+      ask: (question, signal) => broker.ask('s1', question, signal),
+      ...(questions ? { question: (toolUseId: string, list: AgentQuestion[], signal: AbortSignal) => broker.question('s1', toolUseId, list, signal) } : {})
     }
   )
   const approve = async (decision: 'allow-once' | 'deny', message?: string) => {
@@ -169,8 +189,75 @@ function sessionHarness(level: 'validate-all' | 'files-auto' | 'autonomous', scr
     if (req?.type !== 'approval_request') throw new Error('no request')
     broker.answer('s1', req.requestId, decision, message)
   }
-  return { events, session, calls, approve }
+  const reply = async (answers: Record<string, string> | null) => {
+    await vi.waitFor(() => expect(events.some((e) => e.type === 'question_request')).toBe(true))
+    const req = events.find((e) => e.type === 'question_request')
+    if (req?.type !== 'question_request') throw new Error('no question')
+    broker.answerQuestion('s1', req.requestId, answers)
+  }
+  return { events, session, calls, approve, reply }
 }
+
+const QUESTION_INPUT = {
+  questions: [
+    {
+      question: 'Which database?',
+      header: 'Storage',
+      options: [
+        { label: 'SQLite', description: 'One file' },
+        { label: 'Postgres', description: 'A server' }
+      ],
+      multiSelect: false
+    }
+  ]
+}
+
+describe('ClaudeCodeSession questions', () => {
+  it('shows AskUserQuestion and returns the answers as its input', async () => {
+    let hookResult: unknown
+    let permission: unknown
+    const { events, session, calls, reply } = sessionHarness('validate-all', async function* (ctx) {
+      await ctx.nextUser()
+      hookResult = await ctx.preToolUse('AskUserQuestion', QUESTION_INPUT, 'tu1')
+      const canUseTool = ctx.options.canUseTool
+      if (!canUseTool) throw new Error('no canUseTool')
+      permission = await canUseTool('AskUserQuestion', QUESTION_INPUT, { signal: new AbortController().signal, toolUseID: 'tu1' } as never)
+      yield sdk.result()
+    })
+    const done = session.start()
+    session.send('set up storage')
+    await reply({ 'Which database?': 'SQLite' })
+    await done
+    expect(calls[0]?.disallowedTools ?? []).not.toContain('AskUserQuestion')
+    // The hook leaves the call to canUseTool, which waits for the answers.
+    expect(hookResult).toEqual({})
+    expect(permission).toEqual({ behavior: 'allow', updatedInput: { ...QUESTION_INPUT, answers: { 'Which database?': 'SQLite' } } })
+    expect(events.find((e) => e.type === 'question_request')).toMatchObject({ toolUseId: 'tu1', questions: QUESTION_INPUT.questions })
+    expect(events.some((e) => e.type === 'approval_request')).toBe(false)
+  })
+
+  it('tells Claude when the questions were skipped', async () => {
+    let permission: unknown
+    const { session, reply } = sessionHarness('autonomous', async function* (ctx) {
+      await ctx.nextUser()
+      permission = await ctx.options.canUseTool?.('AskUserQuestion', QUESTION_INPUT, { signal: new AbortController().signal, toolUseID: 'tu1' } as never)
+      yield sdk.result()
+    })
+    const done = session.start()
+    session.send('go')
+    await reply(null)
+    await done
+    expect(permission).toMatchObject({ behavior: 'deny' })
+  })
+
+  it('keeps AskUserQuestion hidden when nobody can answer', async () => {
+    const { session, calls } = sessionHarness('validate-all', async function* () {
+      yield sdk.init()
+    }, false)
+    await session.start()
+    expect(calls[0]?.disallowedTools).toContain('AskUserQuestion')
+  })
+})
 
 describe('ClaudeCodeSession', () => {
   it('starts Claude Code with the profile, hooks and permission mode', async () => {

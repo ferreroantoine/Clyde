@@ -1,6 +1,6 @@
 import { t } from '@shared/i18n'
 import { randomUUID } from 'node:crypto'
-import type { AgentEvent, ApprovalDecision } from '@shared/agent'
+import type { AgentEvent, AgentQuestion, ApprovalDecision } from '@shared/agent'
 import { AppError } from '@shared/errors'
 
 export type ApprovalOutcome = { behavior: 'allow' } | { behavior: 'deny'; message: string }
@@ -18,6 +18,14 @@ interface Pending {
   resolve: (outcome: ApprovalOutcome) => void
 }
 
+/** Answers keyed by question text, or null when the user skipped them. */
+export type QuestionAnswers = Record<string, string> | null
+
+interface PendingQuestion {
+  sessionId: string
+  resolve: (answers: QuestionAnswers) => void
+}
+
 const SHELL_TOOLS = new Set(['Bash', 'PowerShell', 'Monitor', 'run_command'])
 
 /**
@@ -33,6 +41,7 @@ export function sessionRuleFor(toolName: string, input: Record<string, unknown>)
 export class ApprovalBroker {
   private readonly pending = new Map<string, Pending>()
   private readonly rules = new Map<string, Set<string>>()
+  private readonly questions = new Map<string, PendingQuestion>()
 
   constructor(private readonly emit: (sessionId: string, event: AgentEvent) => void) {}
 
@@ -65,19 +74,45 @@ export class ApprovalBroker {
     )
   }
 
+  /** Asks the user to choose; resolves with the answers, or null when skipped or cancelled. */
+  question(sessionId: string, toolUseId: string, questions: AgentQuestion[], signal?: AbortSignal): Promise<QuestionAnswers> {
+    const requestId = randomUUID()
+    return new Promise<QuestionAnswers>((resolve) => {
+      this.questions.set(requestId, { sessionId, resolve })
+      signal?.addEventListener('abort', () => this.settleQuestion(requestId, null), { once: true })
+      this.emit(sessionId, { type: 'question_request', requestId, toolUseId, questions })
+    })
+  }
+
+  answerQuestion(sessionId: string, requestId: string, answers: QuestionAnswers): void {
+    const entry = this.questions.get(requestId)
+    if (!entry || entry.sessionId !== sessionId) throw new AppError('not_found', t('This request was already answered'))
+    this.settleQuestion(requestId, answers)
+  }
+
   hasPending(sessionId: string): boolean {
     for (const p of this.pending.values()) if (p.sessionId === sessionId) return true
+    for (const q of this.questions.values()) if (q.sessionId === sessionId) return true
     return false
   }
 
   /** Denies everything still waiting for a session, e.g. when it is interrupted or stopped. */
   cancelSession(sessionId: string, message = t('The session was stopped')): void {
     for (const [id, p] of this.pending) if (p.sessionId === sessionId) this.cancel(id, message)
+    for (const [id, q] of this.questions) if (q.sessionId === sessionId) this.settleQuestion(id, null)
   }
 
   forgetSession(sessionId: string): void {
     this.cancelSession(sessionId)
     this.rules.delete(sessionId)
+  }
+
+  private settleQuestion(requestId: string, answers: QuestionAnswers): void {
+    const entry = this.questions.get(requestId)
+    if (!entry) return
+    this.questions.delete(requestId)
+    this.emit(entry.sessionId, { type: 'question_resolved', requestId, answers })
+    entry.resolve(answers)
   }
 
   private cancel(requestId: string, message: string): void {

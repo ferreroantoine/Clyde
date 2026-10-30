@@ -118,6 +118,7 @@ export function NewSession() {
   const workspace = useWorkspace((s) => s.info)
   const start = useAgents((s) => s.start)
   const starting = useAgents((s) => s.starting)
+  const waiting = useAgents((s) => s.drafts[''] ?? '')
   const showSettings = useLayout((s) => s.showSettings)
 
   const [profileId, setProfileId] = useState<string | null>(null)
@@ -154,7 +155,7 @@ export function NewSession() {
     >
       <div>
         <h2 className="text-sm font-semibold">{t('New agent session')}</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">{t('Choose the account explicitly; Clyde never switches it for you.')}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{t('Choose the account; at a usage limit, Clyde switches it only if Settings › Agents says so.')}</p>
       </div>
 
       <fieldset className="space-y-1.5">
@@ -250,6 +251,11 @@ export function NewSession() {
       </div>
 
       <div className="mt-auto space-y-2">
+        {waiting.trim() && (
+          <p className="rounded-md border border-dashed px-2.5 py-1.5 text-[11px] text-muted-foreground">
+            {t('Waiting for the session: {text}', { text: waiting.trim() })}
+          </p>
+        )}
         <p className="flex items-center gap-1.5 truncate text-[11px] text-muted-foreground">
           <FolderGit2 className="size-3.5 shrink-0" />
           {workspace ? <span className="truncate">{t('Works in {folder}', { folder: workspace.root })}</span> : t('Open a folder first: the agent works inside it.')}

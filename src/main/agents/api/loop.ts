@@ -1,10 +1,10 @@
 import { t } from '@shared/i18n'
-import type { AgentEvent } from '@shared/agent'
+import { parseQuestions, type AgentEvent, type AgentQuestion } from '@shared/agent'
 import type { ReasoningEffort } from '@shared/profiles'
 import type { PermissionDecision, ToolRequest } from '../../permissions/engine'
-import type { ApprovalOutcome, ApprovalQuestion } from '../../permissions/broker'
+import type { ApprovalOutcome, ApprovalQuestion, QuestionAnswers } from '../../permissions/broker'
 import type { AdapterEvent, ChatAdapter, ChatMessage, ImageInput, ToolCall, ToolResult, ToolSpec } from './chat'
-import type { ToolOutput } from './tools'
+import { ASK_USER, ASK_USER_SPEC, type ToolOutput } from './tools'
 import {
   breakdown,
   compactToolResults,
@@ -35,6 +35,8 @@ export interface ApiSessionConfig {
   /** Tool results above this many characters are shortened once the model has read them. */
   toolResultKeep?: number
   contextWindow?: number | null
+  /** The conversation so far, when the session is resumed. */
+  history?: ChatMessage[]
 }
 
 export interface ApiSessionDeps {
@@ -44,6 +46,8 @@ export interface ApiSessionDeps {
   toEngine: (call: ToolCall) => ToolRequest
   decide: (tool: ToolRequest) => PermissionDecision
   ask: (question: ApprovalQuestion, signal: AbortSignal) => Promise<ApprovalOutcome>
+  /** Shows ask_user's questions; without it the model is not offered the tool (chat sessions). */
+  question?: (toolUseId: string, questions: AgentQuestion[], signal: AbortSignal) => Promise<QuestionAnswers>
   execute: (call: ToolCall, signal: AbortSignal, onOutput: (chunk: string) => void) => Promise<ToolOutput>
   describeError: (err: unknown) => string
   /** Writes the rolling summary; a local model by default (Settings › Memory & context). */
@@ -72,7 +76,9 @@ export class ApiSession {
   constructor(
     private readonly cfg: ApiSessionConfig,
     private readonly deps: ApiSessionDeps
-  ) {}
+  ) {
+    this.history = [...(cfg.history ?? [])]
+  }
 
   async start(): Promise<void> {
     this.deps.emit({
@@ -127,7 +133,7 @@ export class ApiSession {
   }
 
   private get tools(): ToolSpec[] {
-    return [...this.cfg.tools, READ_TOOL_OUTPUT_SPEC]
+    return [...this.cfg.tools, READ_TOOL_OUTPUT_SPEC, ...(this.deps.question ? [ASK_USER_SPEC] : [])]
   }
 
   /** Shortens tool results the model already read; keeps the full text for read_tool_output. */
@@ -177,6 +183,8 @@ export class ApiSession {
           break
         }
         const key = `t${turn}s${step}:0`
+        const thinkingKey = `t${turn}s${step}:th`
+        let thinking = ''
         let done: Extract<AdapterEvent, { type: 'done' }> | null = null
         this.shortenToolResults()
         const request = { system: this.system, history: this.history, tools: this.tools }
@@ -189,8 +197,12 @@ export class ApiSession {
           ...(this.cfg.effort ? { effort: this.cfg.effort } : {})
         })) {
           if (event.type === 'text_delta') this.deps.emit({ type: 'text_delta', key, text: event.text })
-          else done = event
+          else if (event.type === 'thinking_delta') {
+            thinking += event.text
+            this.deps.emit({ type: 'thinking_delta', key: thinkingKey, text: event.text })
+          } else done = event
         }
+        if (thinking.trim()) this.deps.emit({ type: 'thinking', key: thinkingKey, text: thinking })
         if (!done) throw new Error(t('The model stream ended without a reply'))
         totals.inputTokens += done.usage.inputTokens
         totals.outputTokens += done.usage.outputTokens
@@ -214,9 +226,10 @@ export class ApiSession {
         try {
           for (const call of done.toolCalls) {
             this.deps.emit({ type: 'tool_call', toolUseId: call.id, name: call.name, input: call.input, parentToolUseId: null })
-            const output = await this.runTool(call, signal)
+            const { images, ...output } = await this.runTool(call, signal)
+            // Images are for the panel; the history keeps the text, which every adapter can send.
             results.push({ toolCallId: call.id, name: call.name, ...output })
-            this.deps.emit({ type: 'tool_result', toolUseId: call.id, ...output })
+            this.deps.emit({ type: 'tool_result', toolUseId: call.id, ...output, ...(images?.length ? { images } : {}) })
           }
         } finally {
           // Every call needs a result in the history, or the next request is rejected.
@@ -236,6 +249,10 @@ export class ApiSession {
         subtype = 'error_during_execution'
         const message = this.deps.describeError(err)
         errors.push(message)
+        // Out of quota or rate limited: the limit guard may switch accounts or wait.
+        if ((err as { status?: number }).status === 429) {
+          this.deps.emit({ type: 'rate_limit', status: 'rejected', resetsAt: null, utilization: null, limitType: null })
+        }
         this.deps.emit({ type: 'error', message })
       }
     } finally {
@@ -258,7 +275,7 @@ export class ApiSession {
     })
   }
 
-  private async runTool(call: ToolCall, signal: AbortSignal): Promise<{ content: string; isError: boolean }> {
+  private async runTool(call: ToolCall, signal: AbortSignal): Promise<ToolOutput> {
     // Reading back a shortened output needs no permission: it is the session's own history.
     if (call.name === READ_TOOL_OUTPUT) {
       const id = String(call.input['id'] ?? '')
@@ -268,6 +285,16 @@ export class ApiSession {
       const part = full.slice(offset, offset + 30_000)
       const rest = full.length - offset - part.length
       return { content: rest > 0 ? `${part}\n… [${rest} more characters: call again with offset ${offset + part.length}]` : part, isError: false }
+    }
+    // A question changes nothing, so it needs no permission; the user answers it in the panel.
+    const ask = this.deps.question
+    if (call.name === ASK_USER && ask) {
+      const questions = parseQuestions(call.input)
+      if (!questions) return { content: 'Invalid questions: give 1 to 4, each with a question and 1 to 8 options with a label.', isError: true }
+      const answers = await ask(call.id, questions, signal)
+      if (signal.aborted) throw Object.assign(new Error('Interrupted'), { name: 'AbortError' })
+      if (!answers) return { content: 'The user did not answer. Ask in a message instead, or go on with your best judgment.', isError: false }
+      return { content: questions.map((q) => `${q.question}\n→ ${answers[q.question] ?? '(no answer)'}`).join('\n\n'), isError: false }
     }
     const request = this.deps.toEngine(call)
     const verdict = this.deps.decide(request)
