@@ -39,6 +39,7 @@ import { presetInstallSchema, userPresetInputSchema, type McpPreset, type McpPro
 import {
   agentStartSchema,
   approvalAnswerSchema,
+  questionAnswerSchema,
   sessionIdSchema,
   type AgentEventEnvelope,
   type AgentSessionInfo
@@ -118,6 +119,7 @@ export const requestSchemas = {
   'memory:reject': z.object({ id: z.uuid() }),
   'memory:open': z.object({ scope: z.enum(['user', 'project']) }),
   'agent:approve': approvalAnswerSchema,
+  'agent:answerQuestion': questionAnswerSchema,
   'mcp:list': z.undefined(),
   'mcp:create': mcpServerInputSchema,
   'mcp:update': mcpServerUpdateSchema,
@@ -236,6 +238,7 @@ export interface InvokeResponses {
   'memory:reject': MemoryState
   'memory:open': null
   'agent:approve': null
+  'agent:answerQuestion': null
   'mcp:list': McpServer[]
   'mcp:create': McpServer[]
   'mcp:update': McpServer[]

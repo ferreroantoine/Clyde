@@ -55,6 +55,7 @@ export const INVOKE_CHANNELS = [
   'memory:reject',
   'memory:open',
   'agent:approve',
+  'agent:answerQuestion',
   'mcp:list',
   'mcp:create',
   'mcp:update',

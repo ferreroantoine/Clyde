@@ -8,10 +8,10 @@ import type {
   SDKUserMessage,
   query as sdkQuery
 } from '@anthropic-ai/claude-agent-sdk'
-import type { AgentEvent } from '@shared/agent'
+import { parseQuestions, type AgentEvent, type AgentQuestion } from '@shared/agent'
 import type { ConnectionResult, ModelOption } from '@shared/profiles'
 import type { PermissionDecision, ToolRequest } from '../../permissions/engine'
-import type { ApprovalOutcome, ApprovalQuestion } from '../../permissions/broker'
+import type { ApprovalOutcome, ApprovalQuestion, QuestionAnswers } from '../../permissions/broker'
 import { MessageTranslator } from './translate'
 import { parseClaudeUsage, type LimitReading } from '@shared/limits'
 import { authStatus as runAuthStatus, type AuthStatus } from './runtime'
@@ -26,8 +26,8 @@ export async function loadQuery(): Promise<QueryFn> {
 /** Approvals can wait for the user far longer than the 600 s default hook timeout. */
 const APPROVAL_TIMEOUT_S = 24 * 60 * 60
 
-/** Tools whose answers need UI Clyde does not have yet. */
-const DISALLOWED_TOOLS = ['AskUserQuestion']
+/** Claude Code's multiple-choice questions; hidden from sessions that have nobody to answer them. */
+const ASK_TOOL = 'AskUserQuestion'
 
 /** A prompt stream that never sends anything, for control requests only. */
 async function* idlePrompt(signal: AbortSignal): AsyncGenerator<SDKUserMessage> {
@@ -193,6 +193,8 @@ export interface SessionDeps {
   onLimits?: (readings: LimitReading[]) => void
   decide: (tool: ToolRequest) => PermissionDecision
   ask: (question: ApprovalQuestion, signal: AbortSignal) => Promise<ApprovalOutcome>
+  /** Shows AskUserQuestion to the user; without it the tool stays hidden (chat sessions). */
+  question?: (toolUseId: string, questions: AgentQuestion[], signal: AbortSignal) => Promise<QuestionAnswers>
   log?: (line: string) => void
 }
 
@@ -276,6 +278,8 @@ export class ClaudeCodeSession {
   private options(): Options {
     const preToolUse: HookCallback = async (input, _toolUseId, { signal }) => {
       if (input.hook_event_name !== 'PreToolUse') return {}
+      // A question changes nothing: canUseTool shows it and waits for the answers.
+      if (input.tool_name === ASK_TOOL && this.deps.question) return {}
       const tool = { name: input.tool_name, input: (input.tool_input ?? {}) as Record<string, unknown> }
       const verdict = this.deps.decide(tool)
       let outcome: ApprovalOutcome
@@ -299,6 +303,15 @@ export class ClaudeCodeSession {
 
     // Reached only for calls that settings "ask" rules or Claude Code's own checks still hold back.
     const canUseTool: CanUseTool = async (toolName, input, opts) => {
+      const question = this.deps.question
+      if (toolName === ASK_TOOL && question) {
+        const questions = parseQuestions(input)
+        if (!questions) return { behavior: 'deny', message: 'The questions are malformed.' }
+        const answers = await question(opts.toolUseID, questions, opts.signal)
+        return answers
+          ? { behavior: 'allow', updatedInput: { ...input, answers } }
+          : { behavior: 'deny', message: 'The user did not answer. Ask in a message instead, or go on with your best judgment.' }
+      }
       if (this.approved.has(opts.toolUseID)) return { behavior: 'allow', updatedInput: input }
       const outcome = await this.deps.ask(
         {
@@ -327,7 +340,7 @@ export class ClaudeCodeSession {
       settingSources: ['user', 'project', 'local'],
       permissionMode: 'default',
       includePartialMessages: true,
-      disallowedTools: [...DISALLOWED_TOOLS, ...(this.cfg.disallowedTools ?? [])],
+      disallowedTools: [...(this.deps.question ? [] : [ASK_TOOL]), ...(this.cfg.disallowedTools ?? [])],
       ...(this.cfg.mcpServers && Object.keys(this.cfg.mcpServers).length ? { mcpServers: this.cfg.mcpServers } : {}),
       hooks: { PreToolUse: [{ hooks: [preToolUse], timeout: APPROVAL_TIMEOUT_S }] },
       canUseTool,

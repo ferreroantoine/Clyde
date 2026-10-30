@@ -375,6 +375,18 @@ export const fr: Record<string, string> = {
   'Starting {cli}…': 'Démarrage de {cli}…',
   'Ask something to start.': 'Posez une question pour commencer.',
   'Working…': 'Au travail…',
+  // renderer/features/agent-panel/QuestionCard.tsx
+  'Several answers possible': 'Plusieurs réponses possibles',
+  'Other…': 'Autre…',
+  'Your answer': 'Votre réponse',
+  'Questions skipped': 'Questions ignorées',
+  'Your answers': 'Vos réponses',
+  'Questions from the agent': 'Questions de l’agent',
+  'The agent has {count} questions': 'L’agent a {count} questions',
+  'The agent has a question': 'L’agent a une question',
+  'Skip': 'Ignorer',
+  // renderer/lib/transcript.ts
+  'Questions for you': 'Questions pour vous',
   // renderer/features/agent-panel/ToolCard.tsx
   'Allowed once': 'Autorisé une fois',
   'Allowed for this session': 'Autorisé pour cette session',

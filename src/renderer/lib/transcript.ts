@@ -1,10 +1,18 @@
-import type { AgentEvent, AgentEventEnvelope, AgentSessionInfo, ApprovalDecision } from '@shared/agent'
+import type { AgentEvent, AgentEventEnvelope, AgentQuestion, AgentSessionInfo, ApprovalDecision } from '@shared/agent'
 import { t, tn } from '@shared/i18n'
 
 export interface Approval {
   requestId: string
   reason: string
   state: 'pending' | ApprovalDecision | 'cancelled'
+}
+
+/** Multiple-choice questions a tool call waits on; `answers` is null when skipped or cancelled. */
+export interface Questions {
+  requestId: string
+  questions: AgentQuestion[]
+  state: 'pending' | 'answered' | 'skipped'
+  answers: Record<string, string> | null
 }
 
 export type TranscriptItem =
@@ -19,6 +27,7 @@ export type TranscriptItem =
       result: { content: string; isError: boolean } | null
       denied: string | null
       approval: Approval | null
+      questions: Questions | null
     }
   | {
       kind: 'turn'
@@ -76,7 +85,7 @@ function updateTool(items: TranscriptItem[], toolUseId: string, patch: (t: ToolI
 }
 
 function newTool(toolUseId: string, name: string, input: Record<string, unknown>): ToolItem {
-  return { kind: 'tool', toolUseId, name, input, parentToolUseId: null, result: null, denied: null, approval: null }
+  return { kind: 'tool', toolUseId, name, input, parentToolUseId: null, result: null, denied: null, approval: null, questions: null }
 }
 
 /** Folds one event into the session view. Pure; duplicate or stale events are ignored by `seq`. */
@@ -144,6 +153,23 @@ function reduce(view: SessionView, event: AgentEvent, seq: number): SessionView 
       next[index] = { ...tool, approval: tool.approval && { ...tool.approval, state: event.decision } }
       return { ...view, items: next }
     }
+    case 'question_request': {
+      const questions: Questions = { requestId: event.requestId, questions: event.questions, state: 'pending', answers: null }
+      const patched = updateTool(items, event.toolUseId, (t) => ({ ...t, questions }))
+      if (patched) return { ...view, items: patched }
+      return { ...view, items: [...items, { ...newTool(event.toolUseId, 'AskUserQuestion', {}), questions }] }
+    }
+    case 'question_resolved': {
+      const index = items.findIndex((i) => i.kind === 'tool' && i.questions?.requestId === event.requestId)
+      if (index < 0) return view
+      const tool = items[index] as ToolItem
+      const next = items.slice()
+      next[index] = {
+        ...tool,
+        questions: tool.questions && { ...tool.questions, state: event.answers ? 'answered' : 'skipped', answers: event.answers }
+      }
+      return { ...view, items: next }
+    }
     case 'tool_output':
       // Shown in the agent's read-only terminal, not in the transcript.
       return view
@@ -184,7 +210,9 @@ function withoutType<T extends { type: string }>(event: T): Omit<T, 'type'> {
 
 /** True while a tool runs: no result yet, not denied, not waiting for the user. */
 export function toolState(tool: ToolItem, sessionEnded: boolean): 'running' | 'done' | 'error' | 'denied' | 'awaiting' {
-  if (tool.approval?.state === 'pending') return 'awaiting'
+  if (tool.approval?.state === 'pending' || tool.questions?.state === 'pending') return 'awaiting'
+  // Skipped questions come back as a refused call, but nothing went wrong.
+  if (tool.questions) return 'done'
   if (tool.denied || tool.approval?.state === 'deny' || tool.approval?.state === 'cancelled') return 'denied'
   if (tool.result) return tool.result.isError ? 'error' : 'done'
   return sessionEnded ? 'error' : 'running'
@@ -229,6 +257,11 @@ export function describeTool(name: string, input: Record<string, unknown>, cwd: 
       return str('description') || str('prompt')
     case 'TodoWrite':
       return t('Update the to-do list')
+    case 'AskUserQuestion':
+    case 'ask_user': {
+      const questions = Array.isArray(input['questions']) ? (input['questions'] as Array<{ question?: unknown }>) : []
+      return typeof questions[0]?.question === 'string' ? questions[0].question : t('Questions for you')
+    }
     default: {
       const first = Object.values(input).find((v) => typeof v === 'string')
       return typeof first === 'string' ? first : ''

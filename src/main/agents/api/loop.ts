@@ -1,10 +1,10 @@
 import { t } from '@shared/i18n'
-import type { AgentEvent } from '@shared/agent'
+import { parseQuestions, type AgentEvent, type AgentQuestion } from '@shared/agent'
 import type { ReasoningEffort } from '@shared/profiles'
 import type { PermissionDecision, ToolRequest } from '../../permissions/engine'
-import type { ApprovalOutcome, ApprovalQuestion } from '../../permissions/broker'
+import type { ApprovalOutcome, ApprovalQuestion, QuestionAnswers } from '../../permissions/broker'
 import type { AdapterEvent, ChatAdapter, ChatMessage, ImageInput, ToolCall, ToolResult, ToolSpec } from './chat'
-import type { ToolOutput } from './tools'
+import { ASK_USER, ASK_USER_SPEC, type ToolOutput } from './tools'
 import {
   breakdown,
   compactToolResults,
@@ -44,6 +44,8 @@ export interface ApiSessionDeps {
   toEngine: (call: ToolCall) => ToolRequest
   decide: (tool: ToolRequest) => PermissionDecision
   ask: (question: ApprovalQuestion, signal: AbortSignal) => Promise<ApprovalOutcome>
+  /** Shows ask_user's questions; without it the model is not offered the tool (chat sessions). */
+  question?: (toolUseId: string, questions: AgentQuestion[], signal: AbortSignal) => Promise<QuestionAnswers>
   execute: (call: ToolCall, signal: AbortSignal, onOutput: (chunk: string) => void) => Promise<ToolOutput>
   describeError: (err: unknown) => string
   /** Writes the rolling summary; a local model by default (Settings › Memory & context). */
@@ -127,7 +129,7 @@ export class ApiSession {
   }
 
   private get tools(): ToolSpec[] {
-    return [...this.cfg.tools, READ_TOOL_OUTPUT_SPEC]
+    return [...this.cfg.tools, READ_TOOL_OUTPUT_SPEC, ...(this.deps.question ? [ASK_USER_SPEC] : [])]
   }
 
   /** Shortens tool results the model already read; keeps the full text for read_tool_output. */
@@ -268,6 +270,16 @@ export class ApiSession {
       const part = full.slice(offset, offset + 30_000)
       const rest = full.length - offset - part.length
       return { content: rest > 0 ? `${part}\n… [${rest} more characters: call again with offset ${offset + part.length}]` : part, isError: false }
+    }
+    // A question changes nothing, so it needs no permission; the user answers it in the panel.
+    const ask = this.deps.question
+    if (call.name === ASK_USER && ask) {
+      const questions = parseQuestions(call.input)
+      if (!questions) return { content: 'Invalid questions: give 1 to 4, each with a question and 1 to 8 options with a label.', isError: true }
+      const answers = await ask(call.id, questions, signal)
+      if (signal.aborted) throw Object.assign(new Error('Interrupted'), { name: 'AbortError' })
+      if (!answers) return { content: 'The user did not answer. Ask in a message instead, or go on with your best judgment.', isError: false }
+      return { content: questions.map((q) => `${q.question}\n→ ${answers[q.question] ?? '(no answer)'}`).join('\n\n'), isError: false }
     }
     const request = this.deps.toEngine(call)
     const verdict = this.deps.decide(request)

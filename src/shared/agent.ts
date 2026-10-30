@@ -68,6 +68,33 @@ export const approvalAnswerSchema = z.object({
 export type ApprovalAnswer = z.input<typeof approvalAnswerSchema>
 export type ApprovalDecision = ApprovalAnswer['decision']
 
+/** One question an agent asks with choices: Claude Code's AskUserQuestion, or ask_user in Clyde's loop. */
+export const agentQuestionSchema = z.object({
+  question: z.string().min(1).max(2000),
+  /** A short tag shown above the question. */
+  header: z.string().max(60).default(''),
+  options: z
+    .array(z.object({ label: z.string().min(1).max(200), description: z.string().max(1000).default('') }))
+    .min(1)
+    .max(8),
+  multiSelect: z.boolean().default(false)
+})
+export type AgentQuestion = z.infer<typeof agentQuestionSchema>
+
+/** The questions of a tool call, or null when its input is not a valid list of them. */
+export function parseQuestions(input: unknown): AgentQuestion[] | null {
+  const parsed = z.array(agentQuestionSchema).min(1).max(4).safeParse((input as { questions?: unknown } | null)?.questions)
+  return parsed.success ? parsed.data : null
+}
+
+export const questionAnswerSchema = z.object({
+  sessionId: sessionIdSchema,
+  requestId: z.string().min(1).max(64),
+  /** Keyed by question text; several choices are joined with ", ". Null: the user skipped the questions. */
+  answers: z.record(z.string().max(2000), z.string().max(10_000)).nullable()
+})
+export type QuestionAnswer = z.input<typeof questionAnswerSchema>
+
 export type AgentStatus = 'starting' | 'idle' | 'running' | 'awaiting-approval' | 'stopped' | 'error'
 
 export interface AgentSessionInfo {
@@ -127,6 +154,10 @@ export type AgentEvent =
       reason: string
     }
   | { type: 'approval_resolved'; requestId: string; decision: ApprovalDecision | 'cancelled' }
+  /** The agent asks the user to choose; the tool call waits for `agent:answerQuestion`. */
+  | { type: 'question_request'; requestId: string; toolUseId: string; questions: AgentQuestion[] }
+  /** Null when the questions were skipped or the session stopped waiting. */
+  | { type: 'question_resolved'; requestId: string; answers: Record<string, string> | null }
   | { type: 'permission_denied'; toolUseId: string; toolName: string; reason: string }
   | {
       type: 'turn_end'

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { AgentEvent } from '@shared/agent'
+import type { AgentEvent, AgentQuestion } from '@shared/agent'
 import { ApprovalBroker } from '../../permissions/broker'
 import { decide } from '../../permissions/engine'
 import { ClaudeCodeSession, checkApiKey, testConnection } from './provider'
@@ -150,7 +150,7 @@ describe('MessageTranslator', () => {
   })
 })
 
-function sessionHarness(level: 'validate-all' | 'files-auto' | 'autonomous', script: Parameters<typeof fakeQuery>[0]) {
+function sessionHarness(level: 'validate-all' | 'files-auto' | 'autonomous', script: Parameters<typeof fakeQuery>[0], questions = true) {
   const events: AgentEvent[] = []
   const broker = new ApprovalBroker((_id, event) => events.push(event))
   const { query, calls } = fakeQuery(script)
@@ -160,7 +160,8 @@ function sessionHarness(level: 'validate-all' | 'files-auto' | 'autonomous', scr
       query,
       emit: (event) => events.push(event),
       decide: (tool) => decide({ level, cwd: '/repo', platform: 'linux' }, tool),
-      ask: (question, signal) => broker.ask('s1', question, signal)
+      ask: (question, signal) => broker.ask('s1', question, signal),
+      ...(questions ? { question: (toolUseId: string, list: AgentQuestion[], signal: AbortSignal) => broker.question('s1', toolUseId, list, signal) } : {})
     }
   )
   const approve = async (decision: 'allow-once' | 'deny', message?: string) => {
@@ -169,8 +170,75 @@ function sessionHarness(level: 'validate-all' | 'files-auto' | 'autonomous', scr
     if (req?.type !== 'approval_request') throw new Error('no request')
     broker.answer('s1', req.requestId, decision, message)
   }
-  return { events, session, calls, approve }
+  const reply = async (answers: Record<string, string> | null) => {
+    await vi.waitFor(() => expect(events.some((e) => e.type === 'question_request')).toBe(true))
+    const req = events.find((e) => e.type === 'question_request')
+    if (req?.type !== 'question_request') throw new Error('no question')
+    broker.answerQuestion('s1', req.requestId, answers)
+  }
+  return { events, session, calls, approve, reply }
 }
+
+const QUESTION_INPUT = {
+  questions: [
+    {
+      question: 'Which database?',
+      header: 'Storage',
+      options: [
+        { label: 'SQLite', description: 'One file' },
+        { label: 'Postgres', description: 'A server' }
+      ],
+      multiSelect: false
+    }
+  ]
+}
+
+describe('ClaudeCodeSession questions', () => {
+  it('shows AskUserQuestion and returns the answers as its input', async () => {
+    let hookResult: unknown
+    let permission: unknown
+    const { events, session, calls, reply } = sessionHarness('validate-all', async function* (ctx) {
+      await ctx.nextUser()
+      hookResult = await ctx.preToolUse('AskUserQuestion', QUESTION_INPUT, 'tu1')
+      const canUseTool = ctx.options.canUseTool
+      if (!canUseTool) throw new Error('no canUseTool')
+      permission = await canUseTool('AskUserQuestion', QUESTION_INPUT, { signal: new AbortController().signal, toolUseID: 'tu1' } as never)
+      yield sdk.result()
+    })
+    const done = session.start()
+    session.send('set up storage')
+    await reply({ 'Which database?': 'SQLite' })
+    await done
+    expect(calls[0]?.disallowedTools ?? []).not.toContain('AskUserQuestion')
+    // The hook leaves the call to canUseTool, which waits for the answers.
+    expect(hookResult).toEqual({})
+    expect(permission).toEqual({ behavior: 'allow', updatedInput: { ...QUESTION_INPUT, answers: { 'Which database?': 'SQLite' } } })
+    expect(events.find((e) => e.type === 'question_request')).toMatchObject({ toolUseId: 'tu1', questions: QUESTION_INPUT.questions })
+    expect(events.some((e) => e.type === 'approval_request')).toBe(false)
+  })
+
+  it('tells Claude when the questions were skipped', async () => {
+    let permission: unknown
+    const { session, reply } = sessionHarness('autonomous', async function* (ctx) {
+      await ctx.nextUser()
+      permission = await ctx.options.canUseTool?.('AskUserQuestion', QUESTION_INPUT, { signal: new AbortController().signal, toolUseID: 'tu1' } as never)
+      yield sdk.result()
+    })
+    const done = session.start()
+    session.send('go')
+    await reply(null)
+    await done
+    expect(permission).toMatchObject({ behavior: 'deny' })
+  })
+
+  it('keeps AskUserQuestion hidden when nobody can answer', async () => {
+    const { session, calls } = sessionHarness('validate-all', async function* () {
+      yield sdk.init()
+    }, false)
+    await session.start()
+    expect(calls[0]?.disallowedTools).toContain('AskUserQuestion')
+  })
+})
 
 describe('ClaudeCodeSession', () => {
   it('starts Claude Code with the profile, hooks and permission mode', async () => {

@@ -4,6 +4,7 @@ import {
   agentStartSchema,
   type AgentEvent,
   type AgentEventEnvelope,
+  type AgentQuestion,
   type AgentSessionInfo,
   type AgentStart,
   type AgentStatus,
@@ -12,7 +13,7 @@ import {
 import { AppError } from '@shared/errors'
 import { isApiKind, type Profile } from '@shared/profiles'
 import type { ProfilesService } from '../services/profiles'
-import { ApprovalBroker } from '../permissions/broker'
+import { ApprovalBroker, type QuestionAnswers } from '../permissions/broker'
 import { decide, type PermissionDecision, type ToolRequest } from '../permissions/engine'
 import type { McpHub } from '../mcp/hub'
 import { ClaudeCodeSession, type QueryFn } from './claude-code/provider'
@@ -192,7 +193,9 @@ export class AgentManager {
     const common = {
       emit: (event: AgentEvent) => this.emit(id, event),
       decide: gate,
-      ask: (question: Parameters<ApprovalBroker['ask']>[1], signal: AbortSignal) => this.broker.ask(id, question, signal)
+      ask: (question: Parameters<ApprovalBroker['ask']>[1], signal: AbortSignal) => this.broker.ask(id, question, signal),
+      // The chat never waits for the user: no questions there.
+      ...(chat ? {} : { question: (toolUseId: string, questions: AgentQuestion[], signal: AbortSignal) => this.broker.question(id, toolUseId, questions, signal) })
     }
 
     // CLI agents keep their own system prompt; in chat they get the chat guidance on top of it.
@@ -230,7 +233,7 @@ export class AgentManager {
     info: AgentSessionInfo,
     systemPrompt: string,
     allowed: ReadonlySet<string>,
-    common: Pick<ConstructorParameters<typeof ClaudeCodeSession>[1], 'emit' | 'decide' | 'ask'>,
+    common: Pick<ConstructorParameters<typeof ClaudeCodeSession>[1], 'emit' | 'decide' | 'ask' | 'question'>,
     disallowed: string[] = []
   ): Promise<AgentSession> {
     const binary = resolveClaudeBinary(this.deps.claudeCodePath())
@@ -352,7 +355,7 @@ export class AgentManager {
     systemPrompt: string,
     allowed: ReadonlySet<string>,
     platform: NodeJS.Platform,
-    common: Pick<ConstructorParameters<typeof ApiSession>[1], 'emit' | 'decide' | 'ask'>
+    common: Pick<ConstructorParameters<typeof ApiSession>[1], 'emit' | 'decide' | 'ask' | 'question'>
   ): Promise<AgentSession> {
     if (!isApiKind(profile.kind)) throw new Error('not an API profile')
     const target: ApiTarget = { kind: profile.kind, apiKey, baseUrl: profile.baseUrl }
@@ -454,6 +457,11 @@ export class AgentManager {
     this.setStatus(sessionId, 'stopped')
   }
 
+  answerQuestion(sessionId: string, requestId: string, answers: QuestionAnswers): void {
+    this.require(sessionId)
+    this.broker.answerQuestion(sessionId, requestId, answers)
+  }
+
   answer(sessionId: string, requestId: string, decision: ApprovalDecision, message?: string): void {
     this.require(sessionId)
     this.broker.answer(sessionId, requestId, decision, message)
@@ -498,9 +506,11 @@ export class AgentManager {
         }
         break
       case 'approval_request':
+      case 'question_request':
         this.setStatus(sessionId, 'awaiting-approval')
         break
       case 'approval_resolved':
+      case 'question_resolved':
         if (!this.broker.hasPending(sessionId) && entry.info.status === 'awaiting-approval') {
           this.setStatus(sessionId, 'running')
         }

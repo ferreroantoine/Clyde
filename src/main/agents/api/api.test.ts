@@ -315,6 +315,7 @@ function loopHarness(level: 'validate-all' | 'autonomous', replies: Parameters<t
       toEngine: (call) => toEngineRequest(call.name, call.input, 'linux'),
       decide: (tool) => decide({ level, cwd: '/repo', platform: 'linux' }, tool),
       ask: (q, signal) => broker.ask('s', q, signal),
+      question: (toolUseId, questions, signal) => broker.question('s', toolUseId, questions, signal),
       execute,
       describeError: (err) => `failed: ${(err as Error).message}`
     }
@@ -326,8 +327,57 @@ function loopHarness(level: 'validate-all' | 'autonomous', replies: Parameters<t
     const req = [...events].reverse().find((e) => e.type === 'approval_request')
     if (req?.type === 'approval_request') broker.answer('s', req.requestId, decision, message)
   }
-  return { events, session, calls, execute, running, turnEnds, answer }
+  const reply = async (answers: Record<string, string> | null) => {
+    await vi.waitFor(() => expect(events.some((e) => e.type === 'question_request')).toBe(true))
+    const req = [...events].reverse().find((e) => e.type === 'question_request')
+    if (req?.type === 'question_request') broker.answerQuestion('s', req.requestId, answers)
+  }
+  return { events, session, calls, execute, running, turnEnds, answer, reply }
 }
+
+const ASK = {
+  questions: [
+    { question: 'Which database?', header: 'Storage', options: [{ label: 'SQLite' }, { label: 'Postgres' }] },
+    { question: 'Which extras?', options: [{ label: 'Backups' }, { label: 'Metrics' }], multiSelect: true }
+  ]
+}
+
+describe('ApiSession ask_user', () => {
+  it('shows the questions without a permission check and returns the answers', async () => {
+    const h = loopHarness('validate-all', [done('', [{ id: 'c1', name: 'ask_user', input: ASK }]), done('Going with SQLite.')])
+    h.session.send('set up storage')
+    await h.reply({ 'Which database?': 'SQLite', 'Which extras?': 'Backups, Metrics' })
+    await vi.waitFor(() => expect(h.turnEnds()).toHaveLength(1))
+    expect(h.execute).not.toHaveBeenCalled()
+    expect(h.events.some((e) => e.type === 'approval_request')).toBe(false)
+    expect(h.events.find((e) => e.type === 'question_request')).toMatchObject({
+      toolUseId: 'c1',
+      questions: [{ header: 'Storage', multiSelect: false, options: [{ label: 'SQLite', description: '' }, { label: 'Postgres', description: '' }] }, {}]
+    })
+    expect(h.calls[1]?.at(-1)).toMatchObject({
+      role: 'tool',
+      results: [{ content: 'Which database?\n→ SQLite\n\nWhich extras?\n→ Backups, Metrics', isError: false }]
+    })
+    h.session.stop()
+  })
+
+  it('tells the model when the user skipped the questions', async () => {
+    const h = loopHarness('autonomous', [done('', [{ id: 'c1', name: 'ask_user', input: ASK }]), done('OK.')])
+    h.session.send('go')
+    await h.reply(null)
+    await vi.waitFor(() => expect(h.turnEnds()).toHaveLength(1))
+    expect(h.calls[1]?.at(-1)).toMatchObject({ role: 'tool', results: [{ content: expect.stringContaining('did not answer'), isError: false }] })
+    h.session.stop()
+  })
+
+  it('returns malformed questions to the model as an error', async () => {
+    const h = loopHarness('autonomous', [done('', [{ id: 'c1', name: 'ask_user', input: { questions: [] } }]), done('OK.')])
+    h.session.send('go')
+    await vi.waitFor(() => expect(h.turnEnds()).toHaveLength(1))
+    expect(h.calls[1]?.at(-1)).toMatchObject({ role: 'tool', results: [{ isError: true }] })
+    h.session.stop()
+  })
+})
 
 describe('ApiSession', () => {
   it('runs tools the engine allows and feeds results back', async () => {

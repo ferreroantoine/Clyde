@@ -11,6 +11,7 @@ import {
   Globe,
   ListTodo,
   LoaderCircle,
+  MessageCircleQuestion,
   Search,
   ShieldQuestion,
   SquareTerminal,
@@ -24,6 +25,7 @@ import { describeTool, toolState, type ToolItem } from "@/lib/transcript";
 import { useAgents } from "@/stores/agents";
 import { cn } from "@/lib/utils";
 import { attention, duration, ease, iconSwap, shake } from "@/lib/motion";
+import { QuestionCard } from "./QuestionCard";
 
 const ICONS: Record<string, LucideIcon> = {
   Bash: SquareTerminal,
@@ -46,6 +48,8 @@ const ICONS: Record<string, LucideIcon> = {
   write_file: FilePen,
   edit_file: FilePen,
   list_files: Search,
+  AskUserQuestion: MessageCircleQuestion,
+  ask_user: MessageCircleQuestion,
 };
 
 const DECISION_LABEL = {
@@ -141,15 +145,18 @@ function displayName(name: string): string {
   return mcp ? `${mcp[1]} › ${mcp[2]}` : name;
 }
 
-export function ToolCard({
-  tool,
-  cwd,
-  ended,
-}: {
-  tool: ToolItem;
-  cwd: string;
-  ended: boolean;
-}) {
+type ToolCardProps = { tool: ToolItem; cwd: string; ended: boolean };
+
+/** A tool call, or the questions it asks the user. */
+export function ToolCard(props: ToolCardProps) {
+  return props.tool.questions ? (
+    <QuestionCard tool={props.tool} />
+  ) : (
+    <ToolCallCard {...props} />
+  );
+}
+
+function ToolCallCard({ tool, cwd, ended }: ToolCardProps) {
   const state = toolState(tool, ended);
   const [open, setOpen] = useState(false);
   const Icon = ICONS[tool.name] ?? Wrench;
