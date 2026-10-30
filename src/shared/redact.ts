@@ -25,3 +25,13 @@ export function redactArgs(args: string[]): string[] {
     return redact(arg)
   })
 }
+
+/**
+ * Masks only values shaped like credentials (API keys, GitHub tokens, bearer tokens), for
+ * prose such as memory files where "token: use JWT" must stay readable.
+ */
+export function redactSecrets(text: string): string {
+  let out = text
+  for (const [re, replacement] of PATTERNS.slice(0, 4)) out = out.replace(re, replacement)
+  return out.replace(/(bearer\s+)[A-Za-z0-9._~+/=-]{16,}/gi, '$1***')
+}

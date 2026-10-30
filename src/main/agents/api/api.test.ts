@@ -104,11 +104,11 @@ describe('AnthropicAdapter', () => {
         text: 'Look',
         toolCalls: [{ id: 'tu1', name: 'read_file', input: { path: 'a.ts' } }],
         stopReason: 'tool_use',
-        usage: { inputTokens: 15, outputTokens: 20 }
+        usage: { inputTokens: 15, outputTokens: 20, cacheReadTokens: 5, cacheWriteTokens: 0 }
       }
     ])
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'm', system: 'sys', stream: true, tools: [expect.objectContaining({ name: 'read_file' })] }),
+      expect.objectContaining({ model: 'm', system: [{ type: 'text', text: 'sys', cache_control: { type: 'ephemeral' } }], stream: true, tools: [expect.objectContaining({ name: 'read_file' })] }),
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     )
   })
@@ -139,7 +139,7 @@ describe('OpenAICompatAdapter', () => {
       text: 'Hi',
       toolCalls: [{ id: 'call_1', name: 'run_command', input: { command: 'ls' } }],
       stopReason: 'tool_use',
-      usage: { inputTokens: 30, outputTokens: 7 }
+      usage: { inputTokens: 30, outputTokens: 7, cacheReadTokens: 0 }
     })
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ stream_options: { include_usage: true } }), expect.anything())
   })

@@ -4,14 +4,34 @@ import type { PermissionDecision, ToolRequest } from '../../permissions/engine'
 import type { ApprovalOutcome, ApprovalQuestion } from '../../permissions/broker'
 import type { AdapterEvent, ChatAdapter, ChatMessage, ImageInput, ToolCall, ToolResult, ToolSpec } from './chat'
 import type { ToolOutput } from './tools'
+import {
+  breakdown,
+  compactToolResults,
+  estimateRequestTokens,
+  READ_TOOL_OUTPUT,
+  READ_TOOL_OUTPUT_SPEC,
+  splitForSummary,
+  TOOL_RESULT_KEEP,
+  transcriptText,
+  withSummary
+} from '../../context/history'
 
 export const MAX_STEPS = 50
 
 export interface ApiSessionConfig {
   model: string
   system: string
+  /** The memory core, after the system prompt: same order every request, so it stays in the prompt cache. */
+  memory?: string
   tools: ToolSpec[]
   maxSteps?: number
+  /** Above this many tokens of history, older turns are replaced by a summary (0: never). */
+  summarizeAt?: number
+  /** Turns kept as they are when summarizing. */
+  keepTurns?: number
+  /** Tool results above this many characters are shortened once the model has read them. */
+  toolResultKeep?: number
+  contextWindow?: number | null
 }
 
 export interface ApiSessionDeps {
@@ -23,6 +43,8 @@ export interface ApiSessionDeps {
   ask: (question: ApprovalQuestion, signal: AbortSignal) => Promise<ApprovalOutcome>
   execute: (call: ToolCall, signal: AbortSignal, onOutput: (chunk: string) => void) => Promise<ToolOutput>
   describeError: (err: unknown) => string
+  /** Writes the rolling summary; a local model by default (Settings › Memory & context). */
+  summarize?: (transcript: string, signal: AbortSignal) => Promise<string>
 }
 
 function isAbort(err: unknown, signal: AbortSignal): boolean {
@@ -35,7 +57,9 @@ function isAbort(err: unknown, signal: AbortSignal): boolean {
  * back, and repeat until the model stops calling tools, a step limit, or an interrupt.
  */
 export class ApiSession {
-  private readonly history: ChatMessage[] = []
+  private history: ChatMessage[] = []
+  /** Full outputs shortened in the history, for read_tool_output. */
+  private readonly fullOutputs = new Map<string, string>()
   private readonly queue: Array<{ text: string; images: ImageInput[] }> = []
   private wake: (() => void) | null = null
   private closed = false
@@ -77,6 +101,13 @@ export class ApiSession {
     this.turn?.abort()
   }
 
+  /** "Compact" between turns: summarizes the older turns now, whatever the threshold. */
+  async compact(): Promise<void> {
+    if (this.turn || !this.deps.summarize) return
+    const controller = new AbortController()
+    await this.summarizeIfNeeded(controller.signal, true)
+  }
+
   stop(): void {
     this.closed = true
     this.turn?.abort()
@@ -88,18 +119,54 @@ export class ApiSession {
     return this.history
   }
 
+  private get system(): string {
+    return this.cfg.memory ? `${this.cfg.system}\n\n${this.cfg.memory}` : this.cfg.system
+  }
+
+  private get tools(): ToolSpec[] {
+    return [...this.cfg.tools, READ_TOOL_OUTPUT_SPEC]
+  }
+
+  /** Shortens tool results the model already read; keeps the full text for read_tool_output. */
+  private shortenToolResults(): void {
+    const { history, cut } = compactToolResults(this.history, this.cfg.toolResultKeep ?? TOOL_RESULT_KEEP)
+    for (const [id, text] of cut) this.fullOutputs.set(id, text)
+    this.history = history
+  }
+
+  /** Replaces older turns by a summary when the history grows past the threshold. */
+  private async summarizeIfNeeded(signal: AbortSignal, force = false): Promise<void> {
+    const limit = this.cfg.summarizeAt ?? 0
+    if (!this.deps.summarize || (!force && !limit)) return
+    if (!force && estimateRequestTokens(this.system, this.tools, this.history) < limit) return
+    const split = splitForSummary(this.history, this.cfg.keepTurns ?? 2)
+    if (!split) return
+    try {
+      const summary = await this.deps.summarize(transcriptText(split.older), signal)
+      if (summary.trim()) {
+        this.history = withSummary(summary, split.recent)
+        this.deps.emit({ type: 'context_summarized', turns: split.older.filter((m) => m.role === 'user').length })
+      }
+    } catch (err) {
+      // Not fatal: the turn goes on with the full history.
+      if (isAbort(err, signal)) throw err
+    }
+  }
+
   private async runTurn(text: string, images: ImageInput[]): Promise<void> {
     const controller = new AbortController()
     this.turn = controller
     const signal = controller.signal
     const turn = ++this.turnCount
     const started = Date.now()
-    const totals = { inputTokens: 0, outputTokens: 0 }
+    const totals = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }
+    let last: { input: number; output: number; parts: Parameters<typeof breakdown>[0] } | null = null
     let subtype = 'success'
     const errors: string[] = []
-    this.history.push(images.length ? { role: 'user', text, images } : { role: 'user', text })
 
     try {
+      await this.summarizeIfNeeded(signal)
+      this.history.push(images.length ? { role: 'user', text, images } : { role: 'user', text })
       for (let step = 0; ; step++) {
         if (step >= (this.cfg.maxSteps ?? MAX_STEPS)) {
           subtype = 'error_max_turns'
@@ -108,11 +175,13 @@ export class ApiSession {
         }
         const key = `t${turn}s${step}:0`
         let done: Extract<AdapterEvent, { type: 'done' }> | null = null
+        this.shortenToolResults()
+        const request = { system: this.system, history: this.history, tools: this.tools }
         for await (const event of this.deps.adapter.stream({
           model: this.cfg.model,
-          system: this.cfg.system,
-          messages: this.history,
-          tools: this.cfg.tools,
+          system: request.system,
+          messages: request.history,
+          tools: request.tools,
           signal
         })) {
           if (event.type === 'text_delta') this.deps.emit({ type: 'text_delta', key, text: event.text })
@@ -121,6 +190,13 @@ export class ApiSession {
         if (!done) throw new Error(t('The model stream ended without a reply'))
         totals.inputTokens += done.usage.inputTokens
         totals.outputTokens += done.usage.outputTokens
+        totals.cacheReadTokens += done.usage.cacheReadTokens ?? 0
+        totals.cacheWriteTokens += done.usage.cacheWriteTokens ?? 0
+        last = {
+          input: done.usage.inputTokens,
+          output: done.usage.outputTokens,
+          parts: { system: this.cfg.system, memory: this.cfg.memory ?? '', tools: request.tools, history: request.history }
+        }
         if (done.text) this.deps.emit({ type: 'text', key, text: done.text })
         this.history.push({ role: 'assistant', text: done.text, toolCalls: done.toolCalls })
         if (done.toolCalls.length === 0) {
@@ -169,11 +245,26 @@ export class ApiSession {
       costUsd: null,
       inputTokens: totals.inputTokens,
       outputTokens: totals.outputTokens,
-      durationMs: Date.now() - started
+      durationMs: Date.now() - started,
+      cacheReadTokens: totals.cacheReadTokens,
+      cacheWriteTokens: totals.cacheWriteTokens,
+      contextTokens: last ? last.input + last.output : null,
+      contextWindow: this.cfg.contextWindow ?? null,
+      ...(last ? { breakdown: breakdown(last.parts, last.input, last.output) } : {})
     })
   }
 
   private async runTool(call: ToolCall, signal: AbortSignal): Promise<{ content: string; isError: boolean }> {
+    // Reading back a shortened output needs no permission: it is the session's own history.
+    if (call.name === READ_TOOL_OUTPUT) {
+      const id = String(call.input['id'] ?? '')
+      const full = this.fullOutputs.get(id)
+      if (full === undefined) return { content: `No shortened output with id "${id}".`, isError: true }
+      const offset = Math.max(0, Number(call.input['offset']) || 0)
+      const part = full.slice(offset, offset + 30_000)
+      const rest = full.length - offset - part.length
+      return { content: rest > 0 ? `${part}\n… [${rest} more characters: call again with offset ${offset + part.length}]` : part, isError: false }
+    }
     const request = this.deps.toEngine(call)
     const verdict = this.deps.decide(request)
     if (verdict.decision === 'deny') {

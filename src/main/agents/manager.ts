@@ -64,6 +64,14 @@ export interface AgentManagerDeps {
   /** Plan limits a session read (subscription accounts). */
   onLimits?: (profileId: string, sessionId: string, readings: LimitReading[]) => void
   onSession: (info: AgentSessionInfo) => void
+  /** The memory for API agents' system prompt (Settings › Memory & context). */
+  memory?: () => string
+  /** History size past which API agents summarize older turns (0: never). */
+  summarizeAt?: () => number
+  /** Writes a summary: the internal model, else the session's own account (`fallback`). */
+  summarize?: (transcript: string, fallback: { profileId: string; model: string } | undefined, signal?: AbortSignal) => Promise<string>
+  /** A session's transcript as text, for "New session with a summary". */
+  transcript?: (sessionId: string) => string
   clientApp: string
   baseEnv?: NodeJS.ProcessEnv
   platform?: NodeJS.Platform
@@ -76,12 +84,16 @@ interface AgentSession {
   send(text: string, images?: ImageInput[]): void
   interrupt(): Promise<void>
   stop(): void
+  /** The provider's own way to shrink the context; Antigravity has none Atelier can drive. */
+  compact?(): Promise<void>
 }
 
 interface Entry {
   info: AgentSessionInfo
   session: AgentSession | null
   seq: number
+  /** What started it, to start it again with a summary. */
+  request: AgentStart
 }
 
 const ENDED: AgentStatus[] = ['stopped', 'error']
@@ -196,7 +208,7 @@ export class AgentManager {
       session = this.antigravitySession(profile, info, cliPrompt, allowed, platform, common.emit)
     }
 
-    const entry: Entry = { info, session, seq: 0 }
+    const entry: Entry = { info, session, seq: 0, request }
     this.sessions.set(id, entry)
     this.deps.onSession(info)
     const log = this.deps.log
@@ -357,9 +369,12 @@ export class AgentManager {
       withoutAccountVars(this.deps.baseEnv ?? process.env)
     )
     const chat = info.chatId !== null
+    const summarize = this.deps.summarize
     return new ApiSession(
       {
         model: info.model,
+        memory: this.deps.memory?.() ?? '',
+        summarizeAt: this.deps.summarizeAt?.() ?? 0,
         system: chat ? chatSystemPrompt(systemPrompt) : apiSystemPrompt(info.cwd, platform, systemPrompt),
         tools: [...(chat ? BASE_TOOLS.filter((tool) => CHAT_API_TOOLS.has(tool.name)) : BASE_TOOLS), ...mcpTools.map(({ qualifiedName: _q, ...spec }) => spec)]
       },
@@ -374,9 +389,41 @@ export class AgentManager {
           const mcpName = qualified.get(call.name)
           return mcpName ? this.deps.mcp.callTool(mcpName, call.input, signal) : executor.run(call.name, call.input, signal, onOutput)
         },
-        describeError: (err) => describeApiError(err, target)
+        describeError: (err) => describeApiError(err, target),
+        ...(summarize ? { summarize: (text: string, signal: AbortSignal) => summarize(text, { profileId: profile.id, model: info.model }, signal) } : {})
       }
     )
+  }
+
+  /** The provider's own compaction (Claude Code `/compact`, Codex compact, a summary for API agents). */
+  async compact(sessionId: string): Promise<void> {
+    const entry = this.require(sessionId)
+    if (ENDED.includes(entry.info.status)) throw new AppError('not_allowed', t('This session has ended. Start a new one.'))
+    if (!entry.session?.compact) throw new AppError('not_allowed', t('This agent cannot compact its conversation; start a new session with a summary instead.'))
+    await entry.session.compact()
+  }
+
+  /**
+   * Stops this session and starts the same agent again with a summary of it as background. The summary comes from the internal model; without one, the end of the
+   * transcript is passed as is.
+   */
+  async continueWithSummary(sessionId: string): Promise<AgentSessionInfo> {
+    const entry = this.require(sessionId)
+    const transcript = this.deps.transcript?.(sessionId) ?? ''
+    let summary = ''
+    if (this.deps.summarize && transcript.trim()) {
+      const fallback = isApiKind(entry.info.kind) ? { profileId: entry.info.profileId, model: entry.info.model } : undefined
+      summary = await this.deps.summarize(transcript.slice(-60_000), fallback).catch(() => '')
+    }
+    const context = summary
+      ? `Summary of the previous session with this user, to continue from:\n${summary}`
+      : transcript
+        ? `End of the previous session with this user, to continue from:\n${transcript.slice(-12_000)}`
+        : ''
+    const request = agentStartSchema.parse(entry.request)
+    // Stopped first, so the new one does not count against the limit of agents running at once.
+    if (!ENDED.includes(entry.info.status)) this.stop(sessionId)
+    return this.start({ ...request, systemPrompt: [request.systemPrompt, context].filter(Boolean).join('\n\n') })
   }
 
   /** `images` reach API models directly; CLI agents read attachments from their folder instead. */

@@ -66,7 +66,8 @@ export class AgyTranslator {
             costUsd: null,
             inputTokens: (usage.input_tokens ?? 0) + (usage.cache_read_tokens ?? 0),
             outputTokens: (usage.output_tokens ?? 0) + (usage.thinking_tokens ?? 0),
-            durationMs: Math.round((event.duration_seconds ?? 0) * 1000)
+            durationMs: Math.round((event.duration_seconds ?? 0) * 1000),
+            cacheReadTokens: usage.cache_read_tokens ?? 0
           }
         ]
       }

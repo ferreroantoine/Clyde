@@ -379,5 +379,53 @@ export const migrations: Migration[] = [
         created_at  INTEGER NOT NULL
       );
     `
+  },
+  {
+    version: 13,
+    name: 'memory and context',
+    sql: `
+      -- Memory changes an agent proposed, waiting for the user: nothing is written without them.
+      CREATE TABLE memory_proposals (
+        id           TEXT PRIMARY KEY,
+        scope        TEXT NOT NULL,
+        project_root TEXT,
+        session_id   TEXT,
+        kind         TEXT NOT NULL,
+        before       TEXT NOT NULL,
+        after        TEXT NOT NULL,
+        reason       TEXT NOT NULL DEFAULT '',
+        status       TEXT NOT NULL DEFAULT 'pending',
+        created_at   INTEGER NOT NULL
+      );
+      -- Prompt cache use, per turn and per session.
+      ALTER TABLE usage_events ADD COLUMN cache_read_tokens INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE usage_events ADD COLUMN cache_write_tokens INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE sessions ADD COLUMN cache_read_tokens INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE sessions ADD COLUMN context_tokens INTEGER;
+      ALTER TABLE sessions ADD COLUMN context_window INTEGER;
+      -- Where the last request of each turn spent its tokens (Atelier's loop; CLIs give totals only).
+      CREATE TABLE turn_context (
+        session_id   TEXT NOT NULL,
+        at           INTEGER NOT NULL,
+        system       INTEGER NOT NULL,
+        memory       INTEGER NOT NULL,
+        tools        INTEGER NOT NULL,
+        history      INTEGER NOT NULL,
+        tool_results INTEGER NOT NULL,
+        output       INTEGER NOT NULL
+      );
+      CREATE INDEX turn_context_session ON turn_context(session_id, at);
+      -- Chat history search: passages of past conversations and their local embeddings.
+      CREATE TABLE chat_chunks (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        message_id      TEXT NOT NULL,
+        text            TEXT NOT NULL,
+        model           TEXT NOT NULL,
+        embedding       BLOB NOT NULL
+      );
+      CREATE INDEX chat_chunks_conversation ON chat_chunks(conversation_id);
+      ALTER TABLE conversations ADD COLUMN use_history INTEGER NOT NULL DEFAULT 0;
+    `
   }
 ]

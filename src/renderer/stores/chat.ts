@@ -48,7 +48,7 @@ interface ChatState {
   stop: () => Promise<void>
   regenerate: () => Promise<void>
   edit: (messageId: string, text: string) => Promise<void>
-  update: (id: string, fields: Partial<Pick<Conversation, 'title' | 'pinned' | 'agentId' | 'profileId' | 'model' | 'toolsEnabled'>>) => Promise<void>
+  update: (id: string, fields: Partial<Pick<Conversation, 'title' | 'pinned' | 'agentId' | 'profileId' | 'model' | 'toolsEnabled' | 'useHistory'>>) => Promise<void>
   remove: (id: string) => Promise<void>
   search: (query: string) => Promise<void>
   loadUsage: (id: string) => Promise<void>

@@ -6,7 +6,8 @@ import type { Billing, LimitDiagnostic } from '@shared/limits'
 import { LimitGauge, SessionLimitLine, useNow } from '@/features/limits/LimitGauge'
 import { useLimits } from '@/stores/limits'
 import { daysIn, type Dashboard, type MetricsRange, type ProfileUsage, type SessionRecord } from '@shared/metrics'
-import { kindLabel } from '@shared/profiles'
+import { isApiKind, kindLabel } from '@shared/profiles'
+import type { ContextBreakdown } from '@shared/agent'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { EmptyState } from '@/components/EmptyState'
@@ -134,6 +135,11 @@ function ProfileCard({ usage, onDiagnose }: { usage: ProfileUsage; onDiagnose: (
           </div>
         )}
       </dl>
+      {usage.cacheReadTokens > 0 && usage.inputTokens > 0 && (
+        <p className="text-[11px] text-muted-foreground tabular-nums" title={t('Input tokens read from the provider’s prompt cache, billed at a fraction of the price.')}>
+          {t('Cache: {pct}% of input tokens ({count})', { pct: Math.round((usage.cacheReadTokens / usage.inputTokens) * 100), count: tokens(usage.cacheReadTokens) })}
+        </p>
+      )}
       {usage.unpricedTurns > 0 && (
         <p className="flex items-start gap-1 text-[11px] text-muted-foreground">
           <CircleAlert className="mt-px size-3 shrink-0" />
@@ -142,6 +148,63 @@ function ProfileCard({ usage, onDiagnose }: { usage: ProfileUsage; onDiagnose: (
       )}
       {usage.billing === 'subscription' && <PlanLimits usage={usage} onDiagnose={onDiagnose} />}
     </article>
+  )
+}
+
+const BREAKDOWN_PARTS: Array<{ key: keyof ContextBreakdown; label: string; color: string }> = [
+  { key: 'system', label: tk('Instructions'), color: '#64748b' },
+  { key: 'memory', label: tk('Memory'), color: '#a855f7' },
+  { key: 'tools', label: tk('Tool definitions'), color: '#0ea5e9' },
+  { key: 'history', label: tk('Conversation'), color: '#6366f1' },
+  { key: 'toolResults', label: tk('Tool results'), color: '#f97316' },
+  { key: 'output', label: tk('Answers'), color: '#22c55e' }
+]
+
+/** "Where my tokens go": the parts of every request, summed over the sessions Atelier's loop ran. */
+function TokenBreakdown({ sessions }: { sessions: SessionRecord[] }) {
+  const measured = sessions.filter((s) => s.breakdown)
+  const cli = sessions.filter((s) => !isApiKind(s.kind)).length
+  const sums = BREAKDOWN_PARTS.map((part) => ({ ...part, value: measured.reduce((n, s) => n + (s.breakdown?.[part.key] ?? 0), 0) }))
+  const total = sums.reduce((n, p) => n + p.value, 0)
+  return (
+    <section className="space-y-3 rounded-xl border bg-card p-4 shadow-xs" aria-label={t('Where the tokens go')} data-testid="token-breakdown">
+      <div>
+        <h2 className="text-xs font-medium">{t('Where the tokens go')}</h2>
+        <p className="text-[11px] text-muted-foreground">
+          {t('Each request resends the instructions, memory, tool definitions and conversation so far: the biggest part is where saving pays.')}
+        </p>
+      </div>
+      {total > 0 ? (
+        <>
+          <div className="flex h-3 overflow-hidden rounded-full bg-muted" role="img" aria-label={sums.map((p) => `${t(p.label)} ${Math.round((p.value / total) * 100)}%`).join(', ')}>
+            {sums.map((p) => p.value > 0 && <span key={p.key} style={{ width: `${(p.value / total) * 100}%`, backgroundColor: p.color }} title={t(p.label)} />)}
+          </div>
+          <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] sm:grid-cols-3">
+            {sums.map((p) => (
+              <li key={p.key} className="flex items-center gap-1.5">
+                <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
+                <span className="text-muted-foreground">{t(p.label)}</span>
+                <span className="ml-auto tabular-nums">
+                  {tokens(p.value)} · {Math.round((p.value / total) * 100)}%
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="text-[11px] text-muted-foreground">{t('No API or Ollama session in this period.')}</p>
+      )}
+      {cli > 0 && (
+        <p className="flex items-start gap-1 text-[11px] text-muted-foreground">
+          <CircleAlert className="mt-px size-3 shrink-0" />
+          {tn(
+            '{count} CLI session not included: Claude Code, Codex and Antigravity report totals only (not reported).',
+            '{count} CLI sessions not included: Claude Code, Codex and Antigravity report totals only (not reported).',
+            cli
+          )}
+        </p>
+      )}
+    </section>
   )
 }
 
@@ -495,6 +558,7 @@ export function SupervisionPage() {
                   <EmptyState icon={Gauge} title={t('No usage in this period')} description={t('Charts appear once an agent has finished a turn.')} />
                 </div>
               )}
+              {dashboard.sessions.length > 0 && <TokenBreakdown sessions={dashboard.sessions} />}
               <section className="rounded-xl border bg-card shadow-xs" aria-label={t('History')}>
                 <h2 className="flex items-center gap-1.5 border-b px-4 py-2.5 text-xs font-medium">
                   <History className="size-3.5" /> {' '}{t('History')}<span className="font-normal text-muted-foreground">{t('· click a session to read it')}</span>

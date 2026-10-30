@@ -7,6 +7,7 @@ import { useApplyTheme, useResolvedTheme } from '@/lib/theme'
 import { terminals } from '@/lib/terminal/registry'
 import { useTerminals } from '@/stores/terminals'
 import { useDictationShortcut, useShortcuts, type Shortcut } from '@/lib/shortcuts'
+import { useMemory } from '@/stores/memory'
 import { useVoice } from '@/stores/voice'
 import { effectiveBindings } from '@shared/keybindings'
 import { useLayout } from '@/stores/layout'
@@ -85,6 +86,7 @@ export function App() {
     const offLimits = useLimits.getState().init()
     const offChat = useChat.getState().init()
     const offVoice = useVoice.getState().init()
+    const offMemory = useMemory.getState().init()
     void invoke('app:notices')
       .then((notices) => {
         for (const n of notices) useNotifications.getState().push({ level: 'info', persistent: true, ...describeNotice(n) })
@@ -92,6 +94,7 @@ export function App() {
       .catch(() => undefined)
     return () => {
       offBoard()
+      offMemory()
       offLimits()
       offChat()
       offVoice()

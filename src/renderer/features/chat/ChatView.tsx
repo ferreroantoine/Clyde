@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { FolderInput, MessagesSquare, Plug } from 'lucide-react'
+import { FolderInput, History, MessagesSquare, Plug } from 'lucide-react'
 import { t, tk } from '@shared/i18n'
 import { Button } from '@/components/ui/button'
 import { Toggle } from '@/features/settings/controls'
@@ -10,6 +10,7 @@ import { useBoard } from '@/stores/board'
 import { useChat, type ChatTarget } from '@/stores/chat'
 import { useProfiles } from '@/stores/profiles'
 import { useWorkspace } from '@/stores/workspace'
+import { useSettings } from '@/stores/settings'
 import { enter, swap } from '@/lib/motion'
 import { ConversationList } from './ConversationList'
 import { Composer } from './Composer'
@@ -38,6 +39,29 @@ function UsageLine({ conversationId }: { conversationId: string }) {
         {usage.billing === 'local' ? '' : '· '}
         {t('{count} tokens', { count: tokens(usage.inputTokens + usage.outputTokens) })}
       </span>
+    </span>
+  )
+}
+
+/** How full the model's context is in this conversation, as last reported. */
+function ContextLine({ conversationId }: { conversationId: string }) {
+  const context = useChat((s) => {
+    const sessionId = s.live[conversationId]?.sessionId
+    return sessionId ? s.streams[sessionId]?.context : undefined
+  })
+  if (!context?.window) return null
+  const pct = Math.min(100, Math.round((context.tokens / context.window) * 100))
+  return (
+    <span
+      className="flex items-center gap-1.5 text-[11px] text-muted-foreground tabular-nums"
+      title={t('{used} of {window} tokens of context', { used: tokens(context.tokens), window: tokens(context.window) })}
+      data-testid="chat-context"
+    >
+      {t('Context')}
+      <span className="h-1.5 w-14 overflow-hidden rounded-full bg-muted" role="meter" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={t('Context used')}>
+        <span className={pct >= 80 ? 'block h-full rounded-full bg-warning' : 'block h-full rounded-full bg-primary/70'} style={{ width: `${pct}%` }} />
+      </span>
+      {pct}%
     </span>
   )
 }
@@ -82,6 +106,7 @@ export function ChatView() {
     if (conversation) void update(conversation.id, { toolsEnabled: on })
     else if (draftTarget) setDraftTarget({ ...draftTarget, toolsEnabled: on })
   }
+  const historySearch = useSettings((s) => s.settings.memory.historySearch)
   const empty = !activeId || messages?.length === 0
   const noAccount = !profiles.some((p) => p.usable)
 
@@ -98,7 +123,15 @@ export function ChatView() {
               <Toggle checked={toolsEnabled} onChange={setTools} label={t('MCP tools')} />
             </label>
           )}
+          {historySearch && conversation && (
+            <label className="flex items-center gap-2 text-xs text-muted-foreground" title={t('Adds relevant passages of your earlier conversations to each message, found on this computer.')}>
+              <History className="size-3.5" />
+              {t('Past conversations')}
+              <Toggle checked={conversation.useHistory} onChange={(on) => void update(conversation.id, { useHistory: on })} label={t('Past conversations')} />
+            </label>
+          )}
           <div className="ml-auto flex items-center gap-3">
+            {conversation && <ContextLine conversationId={conversation.id} />}
             {conversation && <UsageLine conversationId={conversation.id} />}
             {conversation && (
               <Button

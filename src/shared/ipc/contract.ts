@@ -19,6 +19,7 @@ import type { Dashboard, SessionTranscript } from '../metrics'
 import type { AppNotice } from '../notices'
 import type { CliStatus } from '../cli'
 import type { VoiceProgress, VoiceStatus } from '../voice'
+import { memorySaveCoreSchema, memorySaveDocSchema, type MemoryState } from '../memory'
 import { WHISPER_MODEL_IDS } from '../settings'
 import {
   chatEditSchema,
@@ -98,6 +99,17 @@ export const requestSchemas = {
   'agent:send': z.object({ sessionId: sessionIdSchema, text: z.string().trim().min(1).max(100_000) }),
   'agent:interrupt': z.object({ sessionId: sessionIdSchema }),
   'agent:stop': z.object({ sessionId: sessionIdSchema }),
+  'agent:compact': z.object({ sessionId: sessionIdSchema }),
+  'agent:continueWithSummary': z.object({ sessionId: sessionIdSchema }),
+  'memory:state': z.undefined(),
+  'memory:saveCore': memorySaveCoreSchema,
+  'memory:saveDoc': memorySaveDocSchema,
+  'memory:deleteDoc': z.object({ scope: z.enum(['user', 'project']), name: z.string().regex(/^[\w.-]+\.md$/) }),
+  'memory:propose': z.object({ sessionId: sessionIdSchema }),
+  'memory:consolidate': z.object({ scope: z.enum(['user', 'project']) }),
+  'memory:accept': z.object({ id: z.uuid(), text: z.string().max(200_000).optional() }),
+  'memory:reject': z.object({ id: z.uuid() }),
+  'memory:open': z.object({ scope: z.enum(['user', 'project']) }),
   'agent:approve': approvalAnswerSchema,
   'mcp:list': z.undefined(),
   'mcp:create': mcpServerInputSchema,
@@ -197,6 +209,18 @@ export interface InvokeResponses {
   'agent:send': null
   'agent:interrupt': null
   'agent:stop': null
+  'agent:compact': null
+  'agent:continueWithSummary': AgentSessionInfo
+  'memory:state': MemoryState
+  'memory:saveCore': MemoryState
+  'memory:saveDoc': MemoryState
+  'memory:deleteDoc': MemoryState
+  /** How many proposals the session produced. */
+  'memory:propose': number
+  'memory:consolidate': boolean
+  'memory:accept': MemoryState
+  'memory:reject': MemoryState
+  'memory:open': null
   'agent:approve': null
   'mcp:list': McpServer[]
   'mcp:create': McpServer[]
@@ -275,6 +299,7 @@ export interface EventPayloads {
   'chat:message': ChatMessage
   'chat:live': ChatLive
   'voice:progress': VoiceProgress
+  'memory:changed': MemoryState
   'limits:changed': ProfileLimits
   'limits:sessionChanged': { sessionId: string; usage: SessionLimitUsage[] }
   'limits:alert': LimitAlert

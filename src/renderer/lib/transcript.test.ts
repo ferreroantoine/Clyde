@@ -81,7 +81,7 @@ describe('applyEvent', () => {
       { type: 'rate_limit', status: 'allowed_warning', resetsAt: 123, utilization: 0.8, limitType: 'five_hour' },
       { type: 'init', model: 'claude-opus-5', cliVersion: '2.1.312', cwd: '/', tools: [] }
     ])
-    expect(view.totals).toEqual({ costUsd: 1, inputTokens: 20, outputTokens: 10 })
+    expect(view.totals).toEqual({ costUsd: 1, inputTokens: 20, outputTokens: 10, cacheReadTokens: 0 })
     expect(view.rateLimit).toMatchObject({ status: 'allowed_warning', utilization: 0.8 })
     expect(view.info).toMatchObject({ status: 'running', model: 'claude-opus-5' })
     expect(view.cliVersion).toBe('2.1.312')

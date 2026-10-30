@@ -108,12 +108,14 @@ export class OpenAICompatAdapter implements ChatAdapter {
     )
     let text = ''
     let reason: StopReason = 'other'
-    const usage = { inputTokens: 0, outputTokens: 0 }
+    const usage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 }
     const calls = new Map<number, { id: string; name: string; args: string; extra?: Record<string, unknown> }>()
     for await (const chunk of stream) {
       if (chunk.usage) {
         usage.inputTokens = chunk.usage.prompt_tokens ?? 0
         usage.outputTokens = chunk.usage.completion_tokens ?? 0
+        // OpenAI caches long prefixes by itself; Gemini's compatible endpoint reports its implicit cache the same way.
+        usage.cacheReadTokens = chunk.usage.prompt_tokens_details?.cached_tokens ?? 0
       }
       const choice = chunk.choices[0]
       if (!choice) continue

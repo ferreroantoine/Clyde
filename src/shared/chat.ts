@@ -20,6 +20,8 @@ export interface Conversation {
   model: string
   /** The agent's allowed MCP tools are offered to the model. */
   toolsEnabled: boolean
+  /** Relevant passages of past conversations are added to each message (local embeddings). */
+  useHistory: boolean
   createdAt: number
   updatedAt: number
 }
@@ -98,7 +100,8 @@ export const conversationUpdateSchema = z.object({
   agentId: z.uuid().nullable().optional(),
   profileId: profileIdSchema.optional(),
   model: z.string().trim().max(200).optional(),
-  toolsEnabled: z.boolean().optional()
+  toolsEnabled: z.boolean().optional(),
+  useHistory: z.boolean().optional()
 })
 export type ConversationUpdate = z.input<typeof conversationUpdateSchema>
 

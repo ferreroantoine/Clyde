@@ -113,6 +113,23 @@ export const settingsSchema = z.object({
     whisperPath: path.default(''),
     useGpu: z.boolean().default(true)
   }),
+  /** Memory shared by all agents, and how the context is kept small. */
+  memory: section({
+    /** Tokens the memory core may use; past it, Settings › Memory warns. */
+    coreBudget: z.number().int().min(200).max(20_000).default(1_500),
+    /** Atelier's loop summarizes older turns past this many tokens of history (0: never). */
+    summarizeAt: z.number().int().min(0).max(2_000_000).default(80_000),
+    /** CLI sessions suggest compacting past this share of the context window. */
+    compactSuggestPct: z.number().int().min(30).max(98).default(80),
+    /** The account for Atelier's own small tasks (summaries, titles, memory proposals). Empty: the first Ollama account. */
+    internalProfileId: z.string().max(64).default(''),
+    internalModel: z.string().trim().max(200).default(''),
+    /** At the end of a session, the agent proposes memory changes to review. */
+    proposeAtSessionEnd: z.boolean().default(true),
+    /** Chat: find relevant passages of past conversations with local embeddings (Ollama). */
+    historySearch: z.boolean().default(false),
+    embeddingModel: z.string().trim().max(200).default('nomic-embed-text')
+  }),
   /** Executables of the coding CLIs. Empty means the bundled one (Claude Code) or the one on PATH. */
   cli: section({
     claudeCodePath: path.default(''),
