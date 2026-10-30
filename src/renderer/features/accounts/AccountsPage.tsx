@@ -171,7 +171,7 @@ function ProfileCard({
 
 const CLI_NAMES: Record<CliStatus['kind'], string> = { 'claude-code': 'Claude Code', codex: 'Codex', antigravity: 'Antigravity' }
 
-/** Which coding CLIs Atelier found, with their versions. */
+/** Which coding CLIs Clyde found, with their versions. */
 function CliLine() {
   const [status, setStatus] = useState<CliStatus[] | null>(null)
   const [checking, setChecking] = useState(true)
@@ -233,7 +233,7 @@ export function AccountsPage({ embedded = false }: { embedded?: boolean } = {}) 
           <div>
             {!embedded && <h1 className="text-lg font-semibold tracking-tight">{t('Accounts')}</h1>}
             <p className="mt-1 text-sm text-muted-foreground">
-              {t('Each account has its own color and label, shown wherever it works. Atelier never switches accounts on its own.')}</p>
+              {t('Each account has its own color and label, shown wherever it works. Clyde never switches accounts on its own.')}</p>
           </div>
           <Button size="sm" onClick={() => setEditing('new')}>
             <Plus /> {' '}{t('Add account')}</Button>
@@ -265,7 +265,7 @@ export function AccountsPage({ embedded = false }: { embedded?: boolean } = {}) 
 
         <p className="mt-8 text-xs leading-relaxed text-muted-foreground">
           {t(
-            'Subscription accounts sign in through each CLI’s own login (Claude Code, Codex, Antigravity) and are meant for personal use: Atelier never sees the credentials, and Anthropic does not allow third-party products to offer claude.ai login without approval.'
+            'Subscription accounts sign in through each CLI’s own login (Claude Code, Codex, Antigravity) and are meant for personal use: Clyde never sees the credentials, and Anthropic does not allow third-party products to offer claude.ai login without approval.'
           )}
           {distribution && ` ${t('This build only allows API key accounts.')}`}
         </p>
@@ -288,7 +288,7 @@ export function AccountsPage({ embedded = false }: { embedded?: boolean } = {}) 
           <DialogHeader>
             <DialogTitle>{t('Delete {name}?', { name: deleting?.name ?? '' })}</DialogTitle>
             <DialogDescription>
-              {t('This removes the account from Atelier, its stored key, and its Claude Code folder, including the sign-in.')}</DialogDescription>
+              {t('This removes the account from Clyde, its stored key, and its Claude Code folder, including the sign-in.')}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDeleting(null)}>

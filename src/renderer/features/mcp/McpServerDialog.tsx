@@ -90,7 +90,7 @@ function ServerForm({ server, close }: { server?: McpServer; close: () => void }
       <DialogHeader>
         <DialogTitle>{editing ? t('Edit {name}', { name: server.name }) : t('Add an MCP server')}</DialogTitle>
         <DialogDescription>
-          {t('Atelier connects to the server and lists its tools. Each agent only sees the tools you allow when you start it.')}</DialogDescription>
+          {t('Clyde connects to the server and lists its tools. Each agent only sees the tools you allow when you start it.')}</DialogDescription>
       </DialogHeader>
       <form
         className="grid gap-4"
@@ -103,7 +103,7 @@ function ServerForm({ server, close }: { server?: McpServer; close: () => void }
           <div className="grid grid-cols-2 gap-2" role="group" aria-label={t('Transport')}>
             {(
               [
-                ['stdio', SquareTerminal, t('Local command'), t('Atelier starts the server (stdio).')],
+                ['stdio', SquareTerminal, t('Local command'), t('Clyde starts the server (stdio).')],
                 ['http', Globe, t('Remote URL'), t('Streamable HTTP, or SSE for older servers.')]
               ] as const
             ).map(([value, Icon, title, description]) => (

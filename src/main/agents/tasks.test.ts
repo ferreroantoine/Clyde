@@ -17,10 +17,12 @@ vi.mock('electron', () => ({ app: { getPath: () => { throw new Error('no electro
 const sh = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 
 function setup() {
-  const repo = mkdtempSync(join(tmpdir(), 'atelier-board-'))
+  const repo = mkdtempSync(join(tmpdir(), 'clyde-board-'))
   sh(repo, 'init', '-q', '-b', 'main')
   sh(repo, 'config', 'user.email', 'me@example.com')
   sh(repo, 'config', 'user.name', 'Me')
+  // Git for Windows checks files out with CRLF by default; the assertions compare exact bytes.
+  sh(repo, 'config', 'core.autocrlf', 'false')
   writeFileSync(join(repo, 'README.md'), '# demo\n')
   sh(repo, 'add', '.')
   sh(repo, 'commit', '-qm', 'init')
@@ -29,7 +31,7 @@ function setup() {
   db.pragma('foreign_keys = ON')
   migrate(db)
   const profiles = new ProfilesService(db, new SecretsService(db, { available: () => false, encrypt: () => Buffer.alloc(0), decrypt: () => '' }), {
-    dataRoot: mkdtempSync(join(tmpdir(), 'atelier-p-')),
+    dataRoot: mkdtempSync(join(tmpdir(), 'clyde-p-')),
     distribution: false
   })
   const profile = profiles.create({ kind: 'ollama', name: 'Local', color: '#64748b', auth: 'none' })
@@ -55,7 +57,7 @@ function setup() {
   }
   const changed = vi.fn()
   const tasks = new TaskService(db, {
-    worktrees: new WorktreeService(mkdtempSync(join(tmpdir(), 'atelier-wts-'))),
+    worktrees: new WorktreeService(mkdtempSync(join(tmpdir(), 'clyde-wts-'))),
     agents,
     sessions: control,
     workspaceRoot: () => repo,
@@ -74,7 +76,7 @@ describe('TaskService', () => {
   it('runs a task through the board and merges it into the base branch', async () => {
     const h = setup()
     const task = await h.tasks.create({ title: 'Add a license', description: 'Add an MIT LICENSE file.', agentId: h.agent.id })
-    expect(task).toMatchObject({ status: 'todo', baseBranch: 'main', branch: expect.stringMatching(/^atelier\/add-a-license-/) })
+    expect(task).toMatchObject({ status: 'todo', baseBranch: 'main', branch: expect.stringMatching(/^clyde\/add-a-license-/) })
     expect(existsSync(task.worktreePath)).toBe(true)
     expect(await h.tasks.list()).toHaveLength(1)
 
@@ -146,7 +148,7 @@ describe('TaskService', () => {
     const abandoned = await h.tasks.abandon(a.id)
     expect(abandoned).toMatchObject({ status: 'done', outcome: 'abandoned' })
     expect(existsSync(a.worktreePath)).toBe(false)
-    expect(sh(h.repo, 'branch', '--list', 'atelier/*')).toBe('')
+    expect(sh(h.repo, 'branch', '--list', 'clyde/*')).toBe('')
 
     const b = await h.tasks.create({ title: 'B', description: 'b', agentId: h.agent.id })
     await h.tasks.start(b.id)
@@ -190,9 +192,9 @@ describe('TaskService', () => {
 
   it('needs a git repository', async () => {
     const h = setup()
-    const plain = mkdtempSync(join(tmpdir(), 'atelier-plain-'))
+    const plain = mkdtempSync(join(tmpdir(), 'clyde-plain-'))
     const tasks = new TaskService(h.db, {
-      worktrees: new WorktreeService(mkdtempSync(join(tmpdir(), 'atelier-wts-'))),
+      worktrees: new WorktreeService(mkdtempSync(join(tmpdir(), 'clyde-wts-'))),
       agents: h.agents,
       sessions: { start: vi.fn(), send: vi.fn(), stop: vi.fn(), get: vi.fn() },
       workspaceRoot: () => plain,

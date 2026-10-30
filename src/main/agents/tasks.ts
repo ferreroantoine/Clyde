@@ -233,7 +233,7 @@ export class TaskService {
   recover(): void {
     this.db
       .prepare(
-        `UPDATE tasks SET status = 'review', session_id = NULL, note = 'Atelier was closed while the agent was working.', updated_at = ?
+        `UPDATE tasks SET status = 'review', session_id = NULL, note = 'Clyde was closed while the agent was working.', updated_at = ?
          WHERE status = 'in_progress'`
       )
       .run(Date.now())

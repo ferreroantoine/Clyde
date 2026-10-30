@@ -5,7 +5,7 @@ import { t, tk, tn } from './i18n'
  * them, and how a window's growth is split between the sessions that caused it. Pure, tested.
  */
 
-/** official: the CLI reported it. estimated: Atelier computed it. unavailable: nothing to show. */
+/** official: the CLI reported it. estimated: Clyde computed it. unavailable: nothing to show. */
 export type LimitBadge = 'official' | 'estimated' | 'unavailable'
 
 export type LimitSource = 'claude-usage' | 'claude-statusline' | 'codex' | 'antigravity'
@@ -173,7 +173,7 @@ const codexLengthLabel = (minutes: number): string =>
       ? tn('{count}-hour window', '{count}-hour window', minutes / 60)
       : tn('{count}-minute window', '{count}-minute window', minutes)
 
-/** Which of Atelier's windows a Codex window is, from its length: 5 hours, a week, or another. */
+/** Which of Clyde's windows a Codex window is, from its length: 5 hours, a week, or another. */
 function codexWindowId(minutes: number | null, fallback: string): { window: string; label: string } {
   if (minutes !== null && Math.abs(minutes - 300) <= 5) return { window: FIVE_HOUR, label: WINDOW_LABELS[FIVE_HOUR] as string }
   if (minutes !== null && Math.abs(minutes - 10_080) <= 60) return { window: SEVEN_DAY, label: WINDOW_LABELS[SEVEN_DAY] as string }

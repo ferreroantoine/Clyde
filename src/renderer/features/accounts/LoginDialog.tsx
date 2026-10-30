@@ -22,16 +22,16 @@ const CLI_NAMES: Partial<Record<ProfileKind, string>> = { 'claude-code': 'Claude
 function signInHelp(kind: ProfileKind, cli: string): string {
   if (kind === 'antigravity') {
     return t(
-      'Antigravity starts below and opens your browser to sign in. It keeps the sign-in in the Windows credential store; Atelier never sees it. Close this window once Antigravity shows its prompt.'
+      'Antigravity starts below and opens your browser to sign in. It keeps the sign-in in the Windows credential store; Clyde never sees it. Close this window once Antigravity shows its prompt.'
     )
   }
-  return t('{cli}’s own login runs below and opens your browser. Atelier never sees your credentials; they stay in this account’s folder.', { cli })
+  return t('{cli}’s own login runs below and opens your browser. Clyde never sees your credentials; they stay in this account’s folder.', { cli })
 }
 
 /**
  * Runs the CLI's own login for one profile in an embedded terminal (`claude auth login`,
  * `codex login`, or `agy` itself). The CLI handles the whole flow and stores the credentials;
- * Atelier only relays keystrokes.
+ * Clyde only relays keystrokes.
  */
 export function LoginDialog({ profile, onClose }: { profile: Profile | null; onClose: () => void }) {
   const test = useProfiles((s) => s.test)

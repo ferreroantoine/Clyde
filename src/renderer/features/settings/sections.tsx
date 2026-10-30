@@ -171,7 +171,7 @@ export const SECTIONS: SectionSpec[] = [
       {
         id: 'general.startView',
         label: t('Start view'),
-        hint: t('What Atelier shows when it starts.'),
+        hint: t('What Clyde shows when it starts.'),
         control: ({ s, set }) => (
           <Select
             label={t('Start view')}
@@ -328,7 +328,7 @@ export const SECTIONS: SectionSpec[] = [
       {
         id: 'cli.claudeCodePath',
         label: t('Claude Code executable'),
-        hint: t('Leave empty to use the one bundled with Atelier.'),
+        hint: t('Leave empty to use the one bundled with Clyde.'),
         control: ({ s, set }) => (
           <PathField kind="file" label={t('Claude Code executable')} placeholder={t('bundled')} value={s.cli.claudeCodePath} onChange={(v) => set('cli.claudeCodePath', v)} />
         )
@@ -390,7 +390,7 @@ export const SECTIONS: SectionSpec[] = [
       {
         id: 'agents.worktreesFolder',
         label: t('Worktrees folder'),
-        hint: t('Where board tasks get their git worktree. Empty means %LOCALAPPDATA%\\Atelier\\worktrees.'),
+        hint: t('Where board tasks get their git worktree. Empty means %LOCALAPPDATA%\\Clyde\\worktrees.'),
         control: ({ s, set }) => (
           <PathField label={t('Worktrees folder')} placeholder={t('default')} value={s.agents.worktreesFolder} onChange={(v) => set('agents.worktreesFolder', v)} />
         )
@@ -595,7 +595,7 @@ export const SECTIONS: SectionSpec[] = [
       {
         id: 'voice.whisperPath',
         label: t('whisper-cli executable'),
-        hint: t('Leave empty to use the one Atelier downloads. Point to your own build to use Vulkan or CUDA.'),
+        hint: t('Leave empty to use the one Clyde downloads. Point to your own build to use Vulkan or CUDA.'),
         control: ({ s, set }) => <PathField kind="file" label={t('whisper-cli executable')} value={s.voice.whisperPath} onChange={(v) => set('voice.whisperPath', v)} />
       },
       {
@@ -667,14 +667,14 @@ export const SECTIONS: SectionSpec[] = [
       {
         id: 'memory.proposeAtSessionEnd',
         label: t('Propose memory changes after a session'),
-        hint: t('When a project session ends, the model for Atelier’s own tasks reads it and proposes changes to review here.'),
+        hint: t('When a project session ends, the model for Clyde’s own tasks reads it and proposes changes to review here.'),
         control: ({ s, set }) => (
           <Toggle label={t('Propose memory changes after a session')} checked={s.memory.proposeAtSessionEnd} onChange={(v) => set('memory.proposeAtSessionEnd', v)} />
         )
       },
       {
         id: 'memory.internalProfileId',
-        label: t('Account for Atelier’s own tasks'),
+        label: t('Account for Clyde’s own tasks'),
         hint: t('Summaries, titles and memory proposals. A local Ollama model by default, so no subscription is spent on them.'),
         keywords: 'internal ollama summary title',
         control: ({ s, set }) => (
@@ -688,9 +688,9 @@ export const SECTIONS: SectionSpec[] = [
       },
       {
         id: 'memory.internalModel',
-        label: t('Model for Atelier’s own tasks'),
+        label: t('Model for Clyde’s own tasks'),
         hint: t('Empty: the account’s default model.'),
-        control: ({ s, set }) => <TextField label={t('Model for Atelier’s own tasks')} value={s.memory.internalModel} placeholder="qwen2.5:7b" onChange={(v) => set('memory.internalModel', v)} />
+        control: ({ s, set }) => <TextField label={t('Model for Clyde’s own tasks')} value={s.memory.internalModel} placeholder="qwen2.5:7b" onChange={(v) => set('memory.internalModel', v)} />
       },
       {
         id: 'memory.summarizeAt',
@@ -741,7 +741,7 @@ export const SECTIONS: SectionSpec[] = [
       {
         id: 'notifications.agentDone',
         label: t('When an agent finishes'),
-        hint: t('A desktop notification, when Atelier is in the background.'),
+        hint: t('A desktop notification, when Clyde is in the background.'),
         control: ({ s, set }) => (
           <Toggle label={t('When an agent finishes')} checked={s.notifications.agentDone} onChange={(v) => set('notifications.agentDone', v)} />
         )

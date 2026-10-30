@@ -51,7 +51,7 @@ describe('listFiles', () => {
     const { tmpdir } = await import('node:os')
     const { join } = await import('node:path')
     const { listFiles } = await import('./search')
-    const root = mkdtempSync(join(tmpdir(), 'atelier-files-'))
+    const root = mkdtempSync(join(tmpdir(), 'clyde-files-'))
     mkdirSync(join(root, 'src'))
     mkdirSync(join(root, '.git'))
     writeFileSync(join(root, '.git', 'HEAD'), 'x')

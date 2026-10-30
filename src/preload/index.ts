@@ -1,11 +1,11 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { EVENT_CHANNELS, INVOKE_CHANNELS } from '@shared/ipc/channels'
-import type { AtelierApi } from '@shared/ipc/api'
+import type { ClydeApi } from '@shared/ipc/api'
 
 const invokeAllowed = new Set<string>(INVOKE_CHANNELS)
 const eventAllowed = new Set<string>(EVENT_CHANNELS)
 
-const api: AtelierApi = {
+const api: ClydeApi = {
   platform: process.platform,
   invoke: (channel, ...args) => {
     if (!invokeAllowed.has(channel)) return Promise.reject(new Error(`Unknown channel ${channel}`))
@@ -21,4 +21,4 @@ const api: AtelierApi = {
   }
 }
 
-contextBridge.exposeInMainWorld('atelier', api)
+contextBridge.exposeInMainWorld('clyde', api)

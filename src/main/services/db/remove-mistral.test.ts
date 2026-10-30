@@ -24,7 +24,7 @@ function v6WithMistral() {
   agent.run('a-2', 'Builder', 'p-openai')
   db.prepare(
     `INSERT INTO tasks (id, title, description, agent_id, repo_root, base_branch, branch, worktree_path, status, created_at, updated_at)
-     VALUES ('t-1', 'Fix', '', 'a-1', '/r', 'main', 'atelier/fix', '/w', 'todo', 1, 1)`
+     VALUES ('t-1', 'Fix', '', 'a-1', '/r', 'main', 'clyde/fix', '/w', 'todo', 1, 1)`
   ).run()
   db.prepare(
     `INSERT INTO sessions (id, profile_id, profile_name, kind, cwd, status, started_at) VALUES ('as-1', 'p-mistral', 'Le Chat pro', 'mistral', '/r', 'stopped', 1)`

@@ -73,7 +73,7 @@ class FakeCodex implements CliProcess {
   }
 }
 
-const INIT = { userAgent: 'atelier/0.165.0 (Windows 11; x86_64) windows (atelier; 0.1.0)', codexHome: 'C:\\h', platformFamily: 'windows', platformOs: 'windows' }
+const INIT = { userAgent: 'clyde/0.165.0 (Windows 11; x86_64) windows (clyde; 0.1.0)', codexHome: 'C:\\h', platformFamily: 'windows', platformOs: 'windows' }
 const THREAD = { thread: { id: 'th-1' }, model: 'gpt-6.1-sol', cwd: '/repo' }
 
 function standardAnswers(msg: Msg): unknown {

@@ -55,7 +55,7 @@ describe('insertDictation', () => {
 
 describe('VoiceService', () => {
   const setup = (voice: Partial<Settings['voice']> = {}) => {
-    const root = mkdtempSync(join(tmpdir(), 'atelier-voice-'))
+    const root = mkdtempSync(join(tmpdir(), 'clyde-voice-'))
     const calls: Array<{ file: string; args: string[] }> = []
     const progress: VoiceProgress[] = []
     const settings = { ...settingsSchema.parse({}).voice, ...voice }
@@ -122,7 +122,7 @@ describe('download and extract', () => {
     (async () => new Response(new Blob([new Uint8Array(body)]), { headers: { 'content-length': String(body.length) } })) as unknown as typeof globalThis.fetch
 
   it('checks the SHA-256 and moves the file in place', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'atelier-dl-'))
+    const dir = mkdtempSync(join(tmpdir(), 'clyde-dl-'))
     const body = Buffer.from('model bytes')
     const sha = createHash('sha256').update(body).digest('hex')
     const states: string[] = []
@@ -135,7 +135,7 @@ describe('download and extract', () => {
   })
 
   it('unpacks a tar.gz and makes the programs executable', async () => {
-    const src = mkdtempSync(join(tmpdir(), 'atelier-tar-'))
+    const src = mkdtempSync(join(tmpdir(), 'clyde-tar-'))
     mkdirSync(join(src, 'whisper-bin-ubuntu-x64'))
     writeFileSync(join(src, 'whisper-bin-ubuntu-x64', 'whisper-cli'), '#!/bin/sh\necho hi\n')
     const archive = join(src, 'w.tar.gz')

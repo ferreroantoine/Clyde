@@ -2,6 +2,9 @@ import { useEffect } from 'react'
 import { t } from '@shared/i18n'
 import { notify } from '@/stores/notifications'
 
+/** Browser warnings that reach window.onerror but are not failures (Monaco's layout triggers this one). */
+const BENIGN = /^ResizeObserver loop (completed with undelivered notifications|limit exceeded)/
+
 const REPEAT_MS = 5000
 
 /** Turns uncaught renderer errors into toasts, once per message every few seconds. */
@@ -15,7 +18,10 @@ export function useGlobalErrorToasts(): void {
       seen.set(message, now)
       notify.error(title, err)
     }
-    const onError = (e: ErrorEvent) => report(t('Something went wrong'), e.error ?? e.message)
+    const onError = (e: ErrorEvent) => {
+      if (!e.error && BENIGN.test(e.message)) return
+      report(t('Something went wrong'), e.error ?? e.message)
+    }
     const onRejection = (e: PromiseRejectionEvent) => report(t('An action failed'), e.reason)
     window.addEventListener('error', onError)
     window.addEventListener('unhandledrejection', onRejection)

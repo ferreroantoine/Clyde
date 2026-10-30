@@ -4,15 +4,15 @@ import { parseClaudeStatusLine, type LimitReading } from '@shared/limits'
 
 /**
  * Claude Code gives `rate_limits` (5-hour and weekly use) only to the status line script.
- * Atelier installs a small bridge as each Claude profile's status line: it saves that input
+ * Clyde installs a small bridge as each Claude profile's status line: it saves that input
  * next to the profile's settings, then runs the status line the profile had before, if any,
  * so its output is unchanged. Docs: code.claude.com/docs/en/statusline.
  */
-export const BRIDGE_JSON = 'atelier-statusline.json'
-export const BRIDGE_PREVIOUS = 'atelier-statusline.previous'
-const MARK = 'atelier-statusline'
+export const BRIDGE_JSON = 'clyde-statusline.json'
+export const BRIDGE_PREVIOUS = 'clyde-statusline.previous'
+const MARK = 'clyde-statusline'
 
-const PS1 = `# Written by Atelier. Saves the status line input (usage limits) for Atelier,
+const PS1 = `# Written by Clyde. Saves the status line input (usage limits) for Clyde,
 # then runs the status line this profile had before, if any. Safe to delete with the profile.
 $ErrorActionPreference = 'SilentlyContinue'
 $dir = $PSScriptRoot
@@ -34,7 +34,7 @@ if (Test-Path -LiteralPath $prev) {
 `
 
 const SH = `#!/bin/sh
-# Written by Atelier. Saves the status line input (usage limits) for Atelier,
+# Written by Clyde. Saves the status line input (usage limits) for Clyde,
 # then runs the status line this profile had before, if any. Safe to delete with the profile.
 dir=$(dirname "$0")
 input=$(cat)
@@ -56,7 +56,7 @@ export function bridgeCommand(configDir: string, platform: NodeJS.Platform): str
 
 /**
  * Installs or refreshes the bridge in a Claude profile folder. A status line that is not
- * Atelier's is kept, chained after the bridge. Returns false when settings.json cannot be read,
+ * Clyde's is kept, chained after the bridge. Returns false when settings.json cannot be read,
  * so that a user's file is never overwritten.
  */
 export function installBridge(configDir: string, platform: NodeJS.Platform = process.platform): boolean {

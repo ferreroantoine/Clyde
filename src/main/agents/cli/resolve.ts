@@ -67,7 +67,7 @@ const CODEX_TRIPLES: Record<string, string> = {
 /**
  * The native binary inside an npm install of `@openai/codex`, given the package folder.
  * npm's own launcher (`bin/codex.js`) does the same lookup; running the binary directly
- * avoids a Node wrapper (and, on Windows, a .cmd shim) between Atelier and Codex.
+ * avoids a Node wrapper (and, on Windows, a .cmd shim) between Clyde and Codex.
  */
 export function codexNativeBinary(packageDir: string, ctx: ResolveContext): string | null {
   const triple = CODEX_TRIPLES[`${ctx.platform}-${ctx.arch}`]
@@ -106,7 +106,7 @@ export function resolveCodexBinary(override: string, ctx: ResolveContext = defau
   if (override.trim()) {
     if (!ctx.fs.exists(override)) throw new AppError('cli_missing', t('Codex was not found at {override}', { override }))
     const native = fromShim(override)
-    if (!native) throw new AppError('cli_missing', t('{override} is not a Codex executable Atelier can start. Point to codex.exe.', { override }))
+    if (!native) throw new AppError('cli_missing', t('{override} is not a Codex executable Clyde can start. Point to codex.exe.', { override }))
     return native
   }
   const names = ctx.platform === 'win32' ? ['codex.exe', 'codex.cmd'] : ['codex']

@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/Skeleton'
 
 /** Drag data type of a workspace-relative file path dragged from the Explorer. */
-export const EXPLORER_PATH_TYPE = 'application/x-atelier-path'
+export const EXPLORER_PATH_TYPE = 'application/x-clyde-path'
 import { FileIcon } from './FileIcon'
 
 const INDENT = 12

@@ -44,7 +44,7 @@ export function setupLimits(deps: LimitsSetupDeps) {
       if (Notification.isSupported()) {
         new Notification({
           title: t('{account}: {window} at {pct}%', { account: alert.profileName, window: windowLabel(alert.window, alert.label), pct: Math.round(alert.usedPct) }),
-          body: alert.resetsAt ? t('Resets {date}.', { date: new Date(alert.resetsAt).toLocaleString(intlLocale()) }) : t('Atelier will tell you when it resets.')
+          body: alert.resetsAt ? t('Resets {date}.', { date: new Date(alert.resetsAt).toLocaleString(intlLocale()) }) : t('Clyde will tell you when it resets.')
         }).show()
       }
     }
@@ -138,7 +138,7 @@ export function setupLimits(deps: LimitsSetupDeps) {
         })
       ]
     }
-    return [{ source: t('API account'), ok: true, output: t('API accounts have no plan limits; Atelier shows their cost instead.') }]
+    return [{ source: t('API account'), ok: true, output: t('API accounts have no plan limits; Clyde shows their cost instead.') }]
   }
 
   return {

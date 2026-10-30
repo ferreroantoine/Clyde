@@ -68,7 +68,7 @@ function CodeBlock({ code, lang }: { code: string; lang: string }) {
     let alive = true
     // Monaco injects its token colors with the theme; set it so colorize() output is styled
     // even before an editor exists.
-    monaco.editor.setTheme(theme === 'dark' ? 'atelier-dark' : 'atelier-light')
+    monaco.editor.setTheme(theme === 'dark' ? 'clyde-dark' : 'clyde-light')
     void monaco.editor.colorize(code, id, { tabSize: 2 }).then((out) => alive && setHtml(out))
     return () => {
       alive = false

@@ -74,7 +74,7 @@ function canDrop(from: TaskStatus, to: TaskStatus): boolean {
   return from === to || `${from}>${to}` in DROP_ACTIONS
 }
 
-const DRAG_TYPE = 'application/x-atelier-task'
+const DRAG_TYPE = 'application/x-clyde-task'
 
 function TaskCard({ task, dragging, onDragStart, onDragEnd }: { task: Task; dragging: boolean; onDragStart: () => void; onDragEnd: () => void }) {
   const agents = useBoard((s) => s.agents)
@@ -149,7 +149,7 @@ function TaskCard({ task, dragging, onDragStart, onDragEnd }: { task: Task; drag
         <span className="truncate">{agent?.name ?? t('No agent')}</span>
         <span className="flex items-center gap-1 font-mono">
           <GitBranch className="size-3" />
-          {task.branch.replace(/^atelier\//, '')}
+          {task.branch.replace(/^clyde\//, '')}
         </span>
         <span>· {relativeTime(task.updatedAt)}</span>
       </div>
@@ -211,7 +211,7 @@ function NewTaskDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{t('New task')}</DialogTitle>
-          <DialogDescription>{t('Atelier creates a branch and a git worktree for it, from the branch checked out now.')}</DialogDescription>
+          <DialogDescription>{t('Clyde creates a branch and a git worktree for it, from the branch checked out now.')}</DialogDescription>
         </DialogHeader>
         <form
           className="grid gap-4"

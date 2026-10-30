@@ -65,7 +65,7 @@ const CHOICES: Choice[] = [
     auth: 'api-key',
     icon: Sparkles,
     title: tk('Anthropic API'),
-    description: tk('Claude models in Atelier’s own agent loop.'),
+    description: tk('Claude models in Clyde’s own agent loop.'),
     keyPlaceholder: 'sk-ant-…'
   },
   {
@@ -75,7 +75,7 @@ const CHOICES: Choice[] = [
     title: tk('ChatGPT subscription'),
     description: tk('Codex CLI, signed in with your ChatGPT plan. Personal use.')
   },
-  { kind: 'openai', auth: 'api-key', icon: Bot, title: tk('OpenAI API'), description: tk('GPT models in Atelier’s own loop.'), keyPlaceholder: 'sk-…' },
+  { kind: 'openai', auth: 'api-key', icon: Bot, title: tk('OpenAI API'), description: tk('GPT models in Clyde’s own loop.'), keyPlaceholder: 'sk-…' },
   {
     kind: 'antigravity',
     auth: 'subscription',
@@ -102,9 +102,9 @@ function kindDescription(kind: ProfileKind): string {
     case 'codex':
       return t('Each Codex account gets its own CODEX_HOME folder, so several ChatGPT accounts can work side by side.')
     case 'antigravity':
-      return t('Antigravity keeps its sign-in in the Windows credential store, once per Windows user, so Atelier allows one Antigravity account.')
+      return t('Antigravity keeps its sign-in in the Windows credential store, once per Windows user, so Clyde allows one Antigravity account.')
     default:
-      return t('Runs Atelier’s own agent loop: read, write, list files and run commands, plus the MCP tools you allow.')
+      return t('Runs Clyde’s own agent loop: read, write, list files and run commands, plus the MCP tools you allow.')
   }
 }
 
@@ -316,7 +316,7 @@ function ProfileForm({
         )}
 
         {kind === 'ollama' && (
-          <Field label={t('Server URL')} hint={t('Where Ollama listens. Atelier talks to its OpenAI-compatible /v1 API.')}>
+          <Field label={t('Server URL')} hint={t('Where Ollama listens. Clyde talks to its OpenAI-compatible /v1 API.')}>
             <Input
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}

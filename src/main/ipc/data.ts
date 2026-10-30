@@ -11,7 +11,7 @@ import licenses from '../licenses.json'
 
 export function dataPaths(): DataPaths {
   const userData = app.getPath('userData')
-  return { userData, database: join(userData, 'atelier.db'), logs: join(userData, 'logs') }
+  return { userData, database: join(userData, 'clyde.db'), logs: join(userData, 'logs') }
 }
 
 export function registerDataHandlers(data: DataService, settings: SettingsService): void {
@@ -23,7 +23,7 @@ export function registerDataHandlers(data: DataService, settings: SettingsServic
     const win = windowOf(event.sender)
     const options = {
       title: t('Export configuration'),
-      defaultPath: `atelier-config-${new Date().toISOString().slice(0, 10)}.json`,
+      defaultPath: `clyde-config-${new Date().toISOString().slice(0, 10)}.json`,
       filters: [{ name: 'JSON', extensions: ['json'] }]
     }
     const result = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options)
@@ -42,7 +42,7 @@ export function registerDataHandlers(data: DataService, settings: SettingsServic
     try {
       doc = JSON.parse(await readFile(file, 'utf8'))
     } catch {
-      throw new AppError('invalid_request', t('This file is not an Atelier configuration export.'))
+      throw new AppError('invalid_request', t('This file is not a Clyde configuration export.'))
     }
     return data.importConfig(doc)
   })

@@ -13,7 +13,7 @@ import type { VoiceProgress } from '@shared/voice'
 const run = promisify(execFile)
 
 /**
- * whisper.cpp builds Atelier downloads. Upstream publishes binaries on its `b<build>` releases
+ * whisper.cpp builds Clyde downloads. Upstream publishes binaries on its `b<build>` releases
  * (the `v1.9.x` tags carry source only); these are pinned with their SHA-256, measured on
  * release b5454 (whisper.cpp 1.9.5). There is no official macOS binary (Homebrew has one) and
  * no official Windows Vulkan build: a whisper-cli built with Vulkan can be set in Settings.

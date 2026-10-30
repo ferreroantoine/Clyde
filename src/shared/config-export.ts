@@ -5,7 +5,7 @@ import { z } from 'zod'
  * prices the user entered. Never a secret: no API key, no MCP environment value or header
  * value (only their names), and command arguments go through redaction.
  */
-export const CONFIG_FORMAT = 'atelier-config'
+export const CONFIG_FORMAT = 'clyde-config'
 
 export const configExportSchema = z.object({
   format: z.literal(CONFIG_FORMAT),

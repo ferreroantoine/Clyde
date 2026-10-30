@@ -6,7 +6,7 @@ export interface CliStatus {
   installed: boolean
   path: string | null
   version: string | null
-  /** True for the Claude Code binary that ships with Atelier. */
+  /** True for the Claude Code binary that ships with Clyde. */
   bundled: boolean
   /** Why it is missing or failed to answer. */
   detail: string | null

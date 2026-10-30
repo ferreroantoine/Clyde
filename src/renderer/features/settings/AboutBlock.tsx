@@ -13,7 +13,7 @@ export function AboutBlock() {
   }, [])
   return (
     <div>
-      <Row label="Atelier" hint={t('Agent-centric IDE, multi-account and multi-provider.')}>
+      <Row label="Clyde" hint={t('Agent-centric IDE, multi-account and multi-provider.')}>
         <span className="font-mono text-xs tabular-nums">{info?.version}</span>
       </Row>
       <Row label={t('Runtime')}>

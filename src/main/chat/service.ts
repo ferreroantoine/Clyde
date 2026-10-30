@@ -209,7 +209,7 @@ export class ChatService {
       .join('\n\n')
     if (transcript.length > HANDOFF_CHARS) transcript = `…\n${transcript.slice(-HANDOFF_CHARS)}`
     const context = [
-      `The user continues here a conversation from Atelier's chat, titled "${conversation.title}". It is background for the work in this folder:`,
+      `The user continues here a conversation from Clyde's chat, titled "${conversation.title}". It is background for the work in this folder:`,
       '<conversation>',
       transcript,
       '</conversation>',

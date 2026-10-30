@@ -50,10 +50,12 @@ import { DISTRIBUTION } from './build-flags'
 
 const log = createLogger('main')
 
-app.setName('Atelier')
-app.setAppUserModelId('dev.atelier.app')
-// Lets scripts and tests run against a throwaway profile.
-const userDataOverride = process.env['ATELIER_USER_DATA']
+app.setName('Clyde')
+app.setAppUserModelId('dev.clyde.app')
+// CLYDE_USER_DATA lets scripts and tests run against a throwaway profile. The portable build
+// (electron-builder sets PORTABLE_EXECUTABLE_DIR) keeps its data in a folder next to the exe.
+const portableDir = process.env['PORTABLE_EXECUTABLE_DIR']
+const userDataOverride = process.env['CLYDE_USER_DATA'] || (portableDir ? join(portableDir, 'Clyde-data') : undefined)
 if (userDataOverride) app.setPath('userData', userDataOverride)
 
 let queryFn: Promise<QueryFn> | null = null
@@ -61,7 +63,7 @@ const query = () => (queryFn ??= loadQuery())
 
 /** Opens and migrates the app database; on failure the app still starts, with settings kept in memory. */
 function openAppDatabase(): Db | null {
-  const file = join(app.getPath('userData'), 'atelier.db')
+  const file = join(app.getPath('userData'), 'clyde.db')
   try {
     const db = openDatabase(file)
     const version = migrate(db)
@@ -70,17 +72,17 @@ function openAppDatabase(): Db | null {
   } catch (err) {
     log.error('could not open the database', err)
     dialog.showErrorBox(
-      t('Atelier could not open its database'),
+      t('Clyde could not open its database'),
       t('{message}\n\nFile: {file}\n\nSettings will not be saved during this session.', { message: (err as Error).message, file })
     )
     return null
   }
 }
 
-/** %LOCALAPPDATA%\\Atelier\\worktrees on Windows (not roaming), the app data folder elsewhere. */
+/** %LOCALAPPDATA%\\Clyde\\worktrees on Windows (not roaming), the app data folder elsewhere. */
 function worktreesRoot(): string {
   const local = process.env['LOCALAPPDATA']
-  if (process.platform === 'win32' && local && !userDataOverride) return join(local, 'Atelier', 'worktrees')
+  if (process.platform === 'win32' && local && !userDataOverride) return join(local, 'Clyde', 'worktrees')
   return join(app.getPath('userData'), 'worktrees')
 }
 
@@ -137,7 +139,7 @@ if (!app.requestSingleInstanceLock()) {
     registerWorkspaceHandlers(workspace, () => settings.getAll().general.projectsFolder)
     registerTerminalHandlers(ptys, workspace)
 
-    const clientApp = `atelier/${app.getVersion()}`
+    const clientApp = `clyde/${app.getVersion()}`
     const claudeCodePath = () => settings.getAll().cli.claudeCodePath
     const codexPath = () => settings.getAll().cli.codexPath
     const antigravityPath = () => settings.getAll().cli.antigravityPath
@@ -170,7 +172,7 @@ if (!app.requestSingleInstanceLock()) {
     })
     // net.fetch goes through Chromium's network stack, so system proxies apply to API calls too.
     const fetch = ((input, init) => net.fetch(input as string, init)) as typeof globalThis.fetch
-    // Atelier's own small tasks go to a local model by default (Settings › Memory & context).
+    // Clyde's own small tasks go to a local model by default (Settings › Memory & context).
     const internal = new InternalModel({
       settings: () => settings.getAll().memory,
       profiles: () => profiles.list(),

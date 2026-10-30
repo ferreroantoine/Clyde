@@ -127,5 +127,5 @@ export function decide(ctx: EngineContext, tool: ToolRequest): PermissionDecisio
     return level === 'autonomous' ? { decision: 'allow' } : { decision: 'ask', reason: t('MCP tools need your approval') }
   }
 
-  return { decision: 'ask', reason: t('{name} is not a tool Atelier knows, so it needs your approval', { name: tool.name }) }
+  return { decision: 'ask', reason: t('{name} is not a tool Clyde knows, so it needs your approval', { name: tool.name }) }
 }

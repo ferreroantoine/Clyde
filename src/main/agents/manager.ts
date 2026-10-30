@@ -78,13 +78,13 @@ export interface AgentManagerDeps {
   log: Logger
 }
 
-/** What the manager drives: a Claude Code session or Atelier's own loop. */
+/** What the manager drives: a Claude Code session or Clyde's own loop. */
 interface AgentSession {
   start(): Promise<void>
   send(text: string, images?: ImageInput[]): void
   interrupt(): Promise<void>
   stop(): void
-  /** The provider's own way to shrink the context; Antigravity has none Atelier can drive. */
+  /** The provider's own way to shrink the context; Antigravity has none Clyde can drive. */
   compact?(): Promise<void>
 }
 
@@ -102,7 +102,7 @@ const ENDED: AgentStatus[] = ['stopped', 'error']
 export function apiSystemPrompt(cwd: string, platform: NodeJS.Platform, extra: string): string {
   const os = platform === 'win32' ? 'Windows (commands run in PowerShell)' : platform === 'darwin' ? 'macOS' : 'Linux'
   return [
-    `You are a coding agent working inside Atelier, in the folder ${cwd} on ${os}.`,
+    `You are a coding agent working inside Clyde, in the folder ${cwd} on ${os}.`,
     'Use the tools to read and change files and to run commands. Paths are relative to that folder.',
     'Read a file before editing it, and prefer edit_file for small changes. Keep replies short and say what you changed.',
     'Some tool calls wait for the user to approve them. When one is denied, follow the user’s message instead of retrying.',
@@ -123,7 +123,7 @@ const CHAT_REFUSAL = () => t('The chat cannot change files or run commands. Use 
 /** API agents' system prompt in the chat view. */
 export function chatSystemPrompt(extra: string): string {
   return [
-    'You are a helpful assistant in the chat of Atelier, a desktop IDE. Answer in Markdown: headings, lists, tables and fenced code blocks with a language render well; LaTeX math goes between $…$ or $$…$$.',
+    'You are a helpful assistant in the chat of Clyde, a desktop IDE. Answer in Markdown: headings, lists, tables and fenced code blocks with a language render well; LaTeX math goes between $…$ or $$…$$.',
     'Files the user attaches are in your working folder; read them with your tools when the message mentions them.',
     extra.trim()
   ]

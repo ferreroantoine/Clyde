@@ -11,7 +11,7 @@ import { describeAgyFailure } from './translate'
 
 /**
  * Environment for agy. HOME (USERPROFILE on Windows) points at the profile's folder, so the
- * settings and MCP config Atelier writes there apply to Atelier's runs only and the user's own
+ * settings and MCP config Clyde writes there apply to Clyde's runs only and the user's own
  * ~/.gemini stays untouched. The sign-in itself is in the OS credential store, per OS user.
  */
 export function buildAgyEnv(base: NodeJS.ProcessEnv, home: string, platform: NodeJS.Platform = process.platform): Record<string, string> {
@@ -47,7 +47,7 @@ export function agyPermissions(level: PermissionLevel, mcpTools: string[]): { al
   }
 }
 
-/** `server/tool` names for Antigravity's rules, from Atelier's `mcp__server__tool`. */
+/** `server/tool` names for Antigravity's rules, from Clyde's `mcp__server__tool`. */
 export function agyMcpToolNames(servers: AgentMcpServer[]): string[] {
   return servers.flatMap((s) => s.tools.map((t) => `${s.slug}/${t}`))
 }

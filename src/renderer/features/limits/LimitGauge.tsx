@@ -16,7 +16,7 @@ export function useNow(intervalMs = 30_000): number {
 const BADGE_TEXT: Record<Badge, string> = { official: tk('Official'), estimated: tk('Estimated'), unavailable: tk('Unavailable') }
 const BADGE_HINT: Record<Badge, string> = {
   official: tk('Reported by the CLI'),
-  estimated: tk('Computed by Atelier: several sessions shared the account'),
+  estimated: tk('Computed by Clyde: several sessions shared the account'),
   unavailable: tk('The CLI does not report this value')
 }
 

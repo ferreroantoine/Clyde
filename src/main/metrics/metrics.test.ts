@@ -18,7 +18,8 @@ function setup() {
     profile('p-claude', 'claude-code', 'Claude key'),
     profile('p-api', 'anthropic', 'API'),
     profile('p-oai', 'openai', 'OpenAI'),
-    profile('p-sub', 'claude-code', 'Claude perso', 'subscription')
+    profile('p-sub', 'claude-code', 'Claude perso', 'subscription'),
+    profile('p-local', 'ollama', 'Local')
   ]
   const metrics = new MetricsService(db, {
     profiles: () => profiles,
@@ -73,6 +74,9 @@ describe('MetricsService', () => {
     const oai = h.session('as-3', 'p-oai', 'openai', 'gpt-unknown')
     h.metrics.onSession(oai)
     h.emit('as-3', h.turn(null, 1000, 100))
+    const local = h.session('as-4', 'p-local', 'ollama', 'qwen3-coder:30b')
+    h.metrics.onSession(local)
+    h.emit('as-4', h.turn(null, 2000, 200))
 
     const d = h.metrics.dashboard('7d')
     const by = Object.fromEntries(d.profiles.map((p) => [p.profileId, p]))
@@ -81,7 +85,8 @@ describe('MetricsService', () => {
     expect(by['p-api']?.costUsd).toBeCloseTo(6) // 1M in at $4 + 100k out at $20
     expect(by['p-api']?.costEstimated).toBe(true)
     expect(by['p-oai']).toMatchObject({ costUsd: 0, unpricedTurns: 1, costEstimated: true })
-    expect(d.sessions.map((s) => s.id).sort()).toEqual(['as-1', 'as-2', 'as-3'])
+    expect(by['p-local']).toMatchObject({ inputTokens: 2000, costUsd: 0, unpricedTurns: 0, costEstimated: false })
+    expect(d.sessions.map((s) => s.id).sort()).toEqual(['as-1', 'as-2', 'as-3', 'as-4'])
     expect(d.sessions.find((s) => s.id === 'as-1')).toMatchObject({ title: 'Fix the login bug', turns: 1, costUsd: 0.04 })
     expect(d.daily).toContainEqual({ day: localDay(new Date(2026, 9, 28).getTime()), profileId: 'p-claude', inputTokens: 10_000, outputTokens: 500, costUsd: 0.04 })
 

@@ -74,7 +74,7 @@ export function parseProposal(reply: string): { user: string | null; project: st
 }
 
 /**
- * The memory shared by every agent. Atelier's Markdown files are the source of truth; each
+ * The memory shared by every agent. Clyde's Markdown files are the source of truth; each
  * provider gets them its own way: CLAUDE.md / AGENTS.md / GEMINI.md for the CLIs, the system
  * prompt for API accounts. Agents propose changes; only the user applies them.
  */

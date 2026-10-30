@@ -142,7 +142,7 @@ export type AgentEvent =
       /** Size of the conversation after the turn, and the model's window, when known: the context gauge. */
       contextTokens?: number | null
       contextWindow?: number | null
-      /** Where the last request's tokens went; Atelier's own loop only (CLIs report totals). */
+      /** Where the last request's tokens went; Clyde's own loop only (CLIs report totals). */
       breakdown?: ContextBreakdown
     }
   | {
@@ -153,7 +153,7 @@ export type AgentEvent =
       limitType: string | null
     }
   | { type: 'error'; message: string }
-  /** Older turns were replaced by a summary (Atelier's loop), or the CLI compacted its context. */
+  /** Older turns were replaced by a summary (Clyde's loop), or the CLI compacted its context. */
   | { type: 'context_summarized'; turns: number }
   | { type: 'context_compacted' }
 

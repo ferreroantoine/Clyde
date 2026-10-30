@@ -97,7 +97,7 @@ Je travaille dans un conteneur Linux sans compte Claude Pro/Max, ChatGPT ou Goog
 ### Chantier 2 — fait
 - Numérotation : les paramètres v2 migrent dans `SettingsService` (pas de migration SQL) ; la migration SQL 7 retire Mistral (+ table `app_notices`), la 8 ajoute les prix OpenAI/Gemini. Les numéros de la section 2 se décalent d'autant.
 - Mistral : agents enregistrés liés supprimés avec le compte (message unique au démarrage).
-- Codex : piloté via `codex app-server` (vérifié sur Codex CLI 0.165.0 : bindings `generate-ts` + exécution réelle sans compte). Approbations commandes / fichiers / permissions passées au moteur de permissions d'Atelier.
+- Codex : piloté via `codex app-server` (vérifié sur Codex CLI 0.165.0 : bindings `generate-ts` + exécution réelle sans compte). Approbations commandes / fichiers / permissions passées au moteur de permissions de Clyde.
 - Antigravity : `agy -p` en pty, un processus par message, `--conversation` pour enchaîner. **Non vérifié avec `agy --help`** (installation refusée dans mon conteneur) : flags tirés de la doc officielle. Identifiants dans le trousseau Windows → un seul compte Antigravity. Pas d'approbation possible en headless → niveaux traduits en règles (`permissions` dans le `settings.json` du HOME du profil).
 - Gemini API : endpoint OpenAI-compatible ; `extra_content` des appels d'outils (signatures de pensée Gemini 3) conservé et renvoyé.
 - Coût : Codex et Antigravity comptés à 0 $ (abonnement) en attendant le chantier 1.
@@ -115,7 +115,7 @@ Je travaille dans un conteneur Linux sans compte Claude Pro/Max, ChatGPT ou Goog
 - i18n : clé = texte anglais, `t()` / `tn()` (pluriel français : 0 et 1 au singulier) / `tk()` ; dictionnaire `shared/i18n/fr.ts` complet (≈850 chaînes, interface + messages d'erreur du processus principal) ; un test vérifie que chaque chaîne utilisée a sa traduction. Les prompts et descriptions d'outils envoyés aux modèles restent en anglais.
 - Export de configuration sans aucun secret (clés, jetons, variables MCP chiffrées non exportées, arguments masqués par `redactArgs`), import qui ajoute ce qui manque, purge de l'historique.
 - Raccourcis : tous modifiables, conflits signalés (commandes entre elles et touches de l'éditeur Monaco).
-- Barre d'état système (fermer = réduire, si choisi), notifications de bureau quand Atelier est en arrière-plan, sons.
+- Barre d'état système (fermer = réduire, si choisi), notifications de bureau quand Clyde est en arrière-plan, sons.
 
 ### Chantier 3 — fait
 - `motion` 14.2 (API `motion/react` vérifiée dans ses types : `MotionConfig reducedMotion/skipAnimations`, `AnimatePresence`, `LayoutGroup`, `layoutId`).
@@ -137,7 +137,7 @@ Je travaille dans un conteneur Linux sans compte Claude Pro/Max, ChatGPT ou Goog
 - Vérifié de bout en bout avec un faux serveur compatible OpenAI : streaming, tableau, code, formule, pièces jointes (image envoyée en `image_url`), continuer dans le projet.
 
 ### Chantier 6 — fait
-- **Vérifié, à savoir** : les tags `v1.9.x` de whisper.cpp n'ont que les sources ; les binaires officiels sont sur les releases `b<build>` (b5454 = 1.9.5). Il y a `whisper-bin-x64.zip` (CPU, Windows), des builds CUDA (272 et 653 Mo) et `whisper-bin-ubuntu-x64.tar.gz`, mais **aucune version Vulkan officielle pour Windows et aucun binaire macOS**. Atelier télécharge donc la version CPU (SHA-256 épinglés, mesurés ici) ; pour Vulkan/CUDA, Paramètres › Voix accepte le chemin d'un `whisper-cli` compilé à part (le GPU est utilisé automatiquement s'il est compilé dedans, `-ng` sinon) ; sur macOS : `brew install whisper-cpp` (trouvé dans le PATH).
+- **Vérifié, à savoir** : les tags `v1.9.x` de whisper.cpp n'ont que les sources ; les binaires officiels sont sur les releases `b<build>` (b5454 = 1.9.5). Il y a `whisper-bin-x64.zip` (CPU, Windows), des builds CUDA (272 et 653 Mo) et `whisper-bin-ubuntu-x64.tar.gz`, mais **aucune version Vulkan officielle pour Windows et aucun binaire macOS**. Clyde télécharge donc la version CPU (SHA-256 épinglés, mesurés ici) ; pour Vulkan/CUDA, Paramètres › Voix accepte le chemin d'un `whisper-cli` compilé à part (le GPU est utilisé automatiquement s'il est compilé dedans, `-ng` sinon) ; sur macOS : `brew install whisper-cpp` (trouvé dans le PATH).
 - `whisper-cli --help` lu sur le binaire réel : `-m`, `-f`, `-l` (`auto` possible), `-nt`, `-np`, `-ng`, `-t`. Transcription testée sur `jfk.wav` avec le modèle tiny.
 - Modèles : `ggml-*.bin` de huggingface.co/ggerganov/whisper.cpp, taille et SHA-256 relevés sur Hugging Face, vérifiés après téléchargement. Extraction par le `tar` du système (bsdtar sous Windows 10+ lit les .zip).
 - Capture : Web Audio (PCM) rééchantillonné en WAV 16 kHz mono ; `ScriptProcessorNode` (déprécié mais sans fichier de worklet à servir sous la CSP). Permission micro : seul l'audio est accordé à la fenêtre ; sur macOS, `askForMediaAccess`.
@@ -154,7 +154,7 @@ Je travaille dans un conteneur Linux sans compte Claude Pro/Max, ChatGPT ou Goog
   - Docker : **pas de serveur officiel de gestion des conteneurs** (Docker publie une passerelle MCP, pas ce serveur) ; ajouté le serveur communautaire maintenu `uvx mcp-server-docker` (ckreiling, 0.3.0, août 2026), signalé comme tel sur la carte.
   - **SQLite non ajouté** : `mcp-server-sqlite` archivé, dernière version avril 2025.
 - Coût en contexte = taille JSON de `{name, description, inputSchema}` par outil ÷ 4, mesuré sur les serveurs réels pour les cartes, recalculé sur les outils connectés ensuite. Avertissement au-delà de 15 000 tokens ou 40 outils pour un agent.
-- Les CLI (Claude Code, Codex, Antigravity) lancent `npx`/`uvx` via `cmd /c` sous Windows (fichiers .cmd) ; le client d'Atelier passe aussi les variables de proxy/certificats aux serveurs stdio (sans elles, `npx` ne télécharge rien derrière un proxy — trouvé en testant ici).
+- Les CLI (Claude Code, Codex, Antigravity) lancent `npx`/`uvx` via `cmd /c` sous Windows (fichiers .cmd) ; le client de Clyde passe aussi les variables de proxy/certificats aux serveurs stdio (sans elles, `npx` ne télécharge rien derrière un proxy — trouvé en testant ici).
 - Migration SQL 12 : `mcp_servers.preset_id`, `mcp_presets` (presets de l'utilisateur, sans valeurs secrètes).
 
 ### Chantier 8 — fait
@@ -162,7 +162,7 @@ Je travaille dans un conteneur Linux sans compte Claude Pro/Max, ChatGPT ou Goog
 - Mesure : `turn_end` porte lecture/écriture de cache, taille du contexte, fenêtre (Claude Code par `modelUsage`, Codex par ses notifications) et répartition par partie pour la boucle API. Migration SQL 13 : colonnes de cache et de contexte, `turn_context`, `memory_proposals`, `chat_chunks`, `conversations.use_history`.
 - Boucle API : `cache_control` Anthropic sur le préfixe et la fin de l'historique ; `cached_tokens` lus chez OpenAI/Gemini ; résultats d'outils déjà lus réduits (4 000 caractères gardés, début et fin) avec l'outil `read_tool_output` pour relire le texte complet ; résumé glissant au-delà de `summarizeAt`, derniers tours intacts.
 - CLI : « Compacter » = `/compact` (Claude Code, fin signalée par `compact_boundary`) et `thread/compact/start` (Codex, `thread/compacted`) ; « Nouvelle session avec résumé » partout. **Antigravity : pas de bouton Compacter**, `/compact` non documenté.
-- Mémoire : fichiers Markdown d'Atelier = source de vérité ; bloc géré entre marqueurs dans `CLAUDE.md`/`AGENTS.md` (créés) et `GEMINI.md` (mis à jour seulement s'il existe : fichier hérité, prioritaire chez Antigravity) ; mémoire utilisateur dans le fichier global de chaque compte CLI. **Non vérifié** : que `agy` lise `~/.gemini/GEMINI.md` dans son home (seules des sources tierces le disent). Secrets masqués à l'écriture (`redactSecrets`, testé). Propositions en fin de session et consolidation, toujours soumises à validation (diff ligne à ligne).
+- Mémoire : fichiers Markdown de Clyde = source de vérité ; bloc géré entre marqueurs dans `CLAUDE.md`/`AGENTS.md` (créés) et `GEMINI.md` (mis à jour seulement s'il existe : fichier hérité, prioritaire chez Antigravity) ; mémoire utilisateur dans le fichier global de chaque compte CLI. **Non vérifié** : que `agy` lise `~/.gemini/GEMINI.md` dans son home (seules des sources tierces le disent). Secrets masqués à l'écriture (`redactSecrets`, testé). Propositions en fin de session et consolidation, toujours soumises à validation (diff ligne à ligne).
 - Modèle interne (`InternalModel`) : premier compte Ollama par défaut, ou celui choisi ; sinon le compte de la tâche pour les résumés, et rien pour les titres/propositions.
 - Chat : titres générés par le modèle interne (remplacent seulement le titre automatique) ; recherche dans les conversations passées par embeddings Ollama (`/api/embed`, cosinus en SQLite sans extension native), activable par conversation.
 - Supervision : taux de cache par compte, « Où vont les tokens » (sessions API ; CLI marqués non communiqués).

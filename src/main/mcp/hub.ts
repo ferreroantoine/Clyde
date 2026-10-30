@@ -77,7 +77,7 @@ export function networkEnv(env: NodeJS.ProcessEnv): Record<string, string> {
 /** The SDK client over stdio, or streamable HTTP with an SSE fallback for older servers. */
 export const connectWithSdk: ConnectFn = async (server) => {
   const open = async (transport: Transport) => {
-    const client = new Client({ name: 'atelier', version: '0.1.0' })
+    const client = new Client({ name: 'clyde', version: '0.1.0' })
     await client.connect(transport, { timeout: CONNECT_TIMEOUT_MS })
     return client
   }
@@ -145,7 +145,7 @@ export function definitionChars(tool: { name: string; description: string; input
 
 /**
  * On Windows, `npx`, `uvx` and friends are .cmd scripts that CLIs (Claude Code, Codex,
- * Antigravity) cannot start without a shell; they run through `cmd /c`. Atelier's own client
+ * Antigravity) cannot start without a shell; they run through `cmd /c`. Clyde's own client
  * finds them by itself (cross-spawn).
  */
 export function cliCommand(command: string, args: string[], platform: NodeJS.Platform): { command: string; args: string[] } {

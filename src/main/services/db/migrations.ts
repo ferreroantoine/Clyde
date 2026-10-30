@@ -403,7 +403,7 @@ export const migrations: Migration[] = [
       ALTER TABLE sessions ADD COLUMN cache_read_tokens INTEGER NOT NULL DEFAULT 0;
       ALTER TABLE sessions ADD COLUMN context_tokens INTEGER;
       ALTER TABLE sessions ADD COLUMN context_window INTEGER;
-      -- Where the last request of each turn spent its tokens (Atelier's loop; CLIs give totals only).
+      -- Where the last request of each turn spent its tokens (Clyde's loop; CLIs give totals only).
       CREATE TABLE turn_context (
         session_id   TEXT NOT NULL,
         at           INTEGER NOT NULL,
