@@ -24,6 +24,8 @@ export interface AntigravitySessionConfig {
   instructions: string
   servers: AgentMcpServer[]
   cliVersion: string
+  /** A conversation to continue (`--conversation`); its first message already carried the instructions. */
+  conversationId?: string
 }
 
 export interface AntigravitySessionDeps {
@@ -54,6 +56,10 @@ export class AntigravitySession {
     private readonly deps: AntigravitySessionDeps
   ) {
     this.reportedModel = cfg.model
+    if (cfg.conversationId) {
+      this.conversationId = cfg.conversationId
+      this.turns = 1
+    }
   }
 
   /** Resolves when the session is stopped; each message starts its own agy run. */
@@ -143,7 +149,10 @@ export class AntigravitySession {
     proc.onExit((code) => {
       emitAll(reader.flush())
       this.current = null
-      if (translator.conversationId) this.conversationId = translator.conversationId
+      if (translator.conversationId && translator.conversationId !== this.conversationId) {
+        this.conversationId = translator.conversationId
+        this.deps.emit({ type: 'init', model: this.reportedModel, cliVersion: this.cfg.cliVersion, cwd: this.cfg.cwd, tools: [], resumeId: this.conversationId })
+      }
       if (!translator.sawResult && !this.stopped) {
         const last = notices.filter((l) => l.trim()).at(-1) ?? ''
         if (this.interrupted) this.turnEnd('interrupted', [])

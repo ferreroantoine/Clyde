@@ -62,6 +62,8 @@ export interface SessionView {
   totals: { costUsd: number; inputTokens: number; outputTokens: number; cacheReadTokens: number }
   /** Size of the conversation after the last turn, and the model's window when known. */
   context: { tokens: number; window: number | null } | null
+  /** Whether "Resume" can bring it back once it ended. */
+  resumable: boolean
 }
 
 export function emptyView(info: AgentSessionInfo): SessionView {
@@ -72,7 +74,8 @@ export function emptyView(info: AgentSessionInfo): SessionView {
     cliVersion: null,
     rateLimit: null,
     totals: { costUsd: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0 },
-    context: null
+    context: null,
+    resumable: true
   }
 }
 
@@ -200,6 +203,18 @@ function reduce(view: SessionView, event: AgentEvent, seq: number): SessionView 
       }
     case 'context_compacted':
       return { ...view, items: [...items, { kind: 'note', id: `note-${seq}`, text: t('The conversation was compacted.') }], context: view.context ? { ...view.context, tokens: 0 } : null }
+    case 'session_resumed':
+      return {
+        ...view,
+        items: [
+          ...items,
+          {
+            kind: 'note',
+            id: `note-${seq}`,
+            text: event.fresh ? t('Session resumed. The agent could not reopen its conversation: it got the end of this transcript instead.') : t('Session resumed.')
+          }
+        ]
+      }
   }
 }
 

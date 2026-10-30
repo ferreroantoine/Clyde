@@ -5,7 +5,7 @@ import { z } from 'zod'
  * Adding a field with a default needs no bump: missing fields fall back to their defaults.
  * Each bump comes with a step in `settingsMigrations` (main/services/settings.ts).
  */
-export const SETTINGS_VERSION = 2
+export const SETTINGS_VERSION = 3
 
 const path = z.string().max(4096)
 
@@ -38,7 +38,8 @@ export const settingsSchema = z.object({
     reopenLastProject: z.boolean().default(true),
     /** Where "Open folder" starts. Empty means the user's home. */
     projectsFolder: path.default(''),
-    closeBehavior: z.enum(['quit', 'tray']).default('quit'),
+    /** Closing the window keeps Clyde and its agents running in the system tray, or quits. */
+    closeBehavior: z.enum(['quit', 'tray']).default('tray'),
     recentWorkspaces: z.array(path).max(20).default([])
   }),
   appearance: section({
@@ -56,7 +57,9 @@ export const settingsSchema = z.object({
     maxParallel: z.number().int().min(1).max(16).default(4),
     /** Empty means %LOCALAPPDATA%\\Clyde\\worktrees. */
     worktreesFolder: path.default(''),
-    deleteMergedWorktrees: z.boolean().default(true)
+    deleteMergedWorktrees: z.boolean().default(true),
+    /** At startup, sessions cut by the last shutdown are resumed and told to carry on. */
+    resumeOnStart: z.boolean().default(false)
   }),
   editor: section({
     fontFamily: z.string().trim().max(300).default(DEFAULT_MONO),

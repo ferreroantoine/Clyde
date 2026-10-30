@@ -24,6 +24,13 @@ export interface ThreadStartParams {
   ephemeral?: boolean | null
 }
 
+/** `thread/resume`: the same overrides as `thread/start`, plus the thread to read back. */
+export interface ThreadResumeParams extends ThreadStartParams {
+  threadId: string
+  /** Only the thread's metadata: Clyde already shows its turns. */
+  excludeTurns?: boolean
+}
+
 export interface ThreadStartResponse {
   thread: { id: string }
   model: string

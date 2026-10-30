@@ -35,6 +35,8 @@ export interface ApiSessionConfig {
   /** Tool results above this many characters are shortened once the model has read them. */
   toolResultKeep?: number
   contextWindow?: number | null
+  /** The conversation so far, when the session is resumed. */
+  history?: ChatMessage[]
 }
 
 export interface ApiSessionDeps {
@@ -74,7 +76,9 @@ export class ApiSession {
   constructor(
     private readonly cfg: ApiSessionConfig,
     private readonly deps: ApiSessionDeps
-  ) {}
+  ) {
+    this.history = [...(cfg.history ?? [])]
+  }
 
   async start(): Promise<void> {
     this.deps.emit({

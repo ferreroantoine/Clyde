@@ -85,7 +85,7 @@ describe('MessageTranslator', () => {
     ].flatMap((m) => t.translate(m))
 
     expect(events).toEqual([
-      { type: 'init', model: 'claude-sonnet-5', cliVersion: '2.1.312', cwd: '/repo', tools: ['Bash', 'Read'] },
+      { type: 'init', model: 'claude-sonnet-5', cliVersion: '2.1.312', cwd: '/repo', tools: ['Bash', 'Read'], resumeId: 'sdk-session' },
       { type: 'text_delta', key: 'm1:0', text: 'Hel' },
       { type: 'text_delta', key: 'm1:0', text: 'lo' },
       { type: 'text_delta', key: 'm1:1', text: 'Done' },

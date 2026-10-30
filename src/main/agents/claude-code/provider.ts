@@ -184,6 +184,8 @@ export interface SessionConfig extends ProbeTarget {
   mcpServers?: Record<string, McpServerConfig>
   /** Extra tools to hide, e.g. MCP tools outside the agent's allow-list. */
   disallowedTools?: string[]
+  /** A Claude Code session id to continue (its file lives in the profile's config folder). */
+  resume?: string
 }
 
 export interface SessionDeps {
@@ -331,6 +333,7 @@ export class ClaudeCodeSession {
       pathToClaudeCodeExecutable: this.cfg.binary,
       ...(this.cfg.model ? { model: this.cfg.model } : {}),
       ...(isClaudeEffort(this.cfg.effort) ? { effort: this.cfg.effort } : {}),
+      ...(this.cfg.resume ? { resume: this.cfg.resume } : {}),
       systemPrompt: {
         type: 'preset',
         preset: 'claude_code',
