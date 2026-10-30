@@ -76,3 +76,14 @@
 Parseurs Git (status v2, log graphe, diff hunks), migration des paramètres v3, statut `interrupted` et reprise (faux SDK / faux app-server), copie de session Claude Code entre comptes, planification de reprise (horloge simulée), réducteur du transcript (réflexion, images, regroupement).
 
 ## Journal
+
+### Chantier 1 — fait
+- Fermer la fenêtre la cache dans la barre système (nouveau défaut ; paramètres v3 : un `quit` enregistré devient `tray` une fois). Icône présente dès le démarrage, menu avec le nombre d'agents au travail ; notification la première fois ; quitter pendant que des agents travaillent demande confirmation (icône, ou fermeture en mode « Quitter »). Une deuxième instance de Clyde réaffiche la fenêtre cachée.
+- Statut `interrupted` (partagé : `ENDED_STATUSES`, `isBusy`) : à la sortie, les sessions occupées sont interrompues, les autres arrêtées ; après un plantage, `recover()` fait la même chose.
+- Migration SQL 15 : `sessions.request_json`, `resume_id`, `chat_id`. L'identifiant CLI arrive dans l'événement `init` (`resumeId`) : `session_id` Claude Code, thread Codex, conversation agy (émis à la fin du premier tour).
+- `AgentManager.resume(id)` : même identifiant Clyde, `seq` qui continue, préfixe `r<seq>-` sur les clés de texte et identifiants d'outils de la nouvelle exécution (la boucle API et agy renumérotent à partir de 1). Claude Code : `resume` du SDK si le fichier `projects/*/<id>.jsonl` existe dans le dossier du compte ; Codex : `thread/resume` (schéma vérifié avec `codex app-server generate-ts`, 0.165.0) ; agy : `--conversation` ; boucle API : historique reconstruit depuis les événements (appels coupés → résultat « interrompu »). Sinon : fin du transcript dans le prompt système, signalé dans le fil.
+- Événements d'une ancienne exécution du même identifiant ignorés (entrée comparée par identité).
+- Panneau agent : sessions récentes du projet dans le sélecteur ; une session terminée s'ouvre avec son transcript, un bandeau propose « Reprendre » (et « Reprendre et continuer » si elle a été interrompue) ; écrire dans une session terminée la reprend d'abord. Paramètres › Agents : reprise automatique au démarrage (sessions interrompues de moins de 24 h).
+- Tâches du tableau : la session est gardée au redémarrage ; une demande de modifications reprend la conversation de l'agent au lieu d'en démarrer une nouvelle.
+- Vérifié dans l'app avec un faux serveur Ollama : agent occupé → quitter → relancer → session « Interrompue » dans la liste → « Reprendre et continuer » → le modèle reçoit l'historique puis la consigne de continuer.
+- Non vérifié avec de vrais comptes : la reprise Claude Code, Codex et agy (testée sur faux SDK / schéma seulement).

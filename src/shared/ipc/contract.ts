@@ -42,7 +42,9 @@ import {
   questionAnswerSchema,
   sessionIdSchema,
   type AgentEventEnvelope,
-  type AgentSessionInfo
+  type AgentSessionInfo,
+  type SessionSummary,
+  type StoredSession
 } from '../agent'
 import type {
   AppInfo,
@@ -109,6 +111,11 @@ export const requestSchemas = {
   'agent:stop': z.object({ sessionId: sessionIdSchema }),
   'agent:compact': z.object({ sessionId: sessionIdSchema }),
   'agent:continueWithSummary': z.object({ sessionId: sessionIdSchema }),
+  /** Recent sessions started in this folder (the open project when absent). */
+  'agent:history': z.object({ cwd: z.string().max(4096).optional() }),
+  'agent:load': z.object({ sessionId: sessionIdSchema }),
+  /** Brings an ended session back; `continue` also tells it to finish what it was doing. */
+  'agent:resume': z.object({ sessionId: sessionIdSchema, continue: z.boolean().default(false) }),
   'memory:state': z.undefined(),
   'memory:saveCore': memorySaveCoreSchema,
   'memory:saveDoc': memorySaveDocSchema,
@@ -227,6 +234,9 @@ export interface InvokeResponses {
   'agent:stop': null
   'agent:compact': null
   'agent:continueWithSummary': AgentSessionInfo
+  'agent:history': SessionSummary[]
+  'agent:load': StoredSession
+  'agent:resume': AgentSessionInfo
   'memory:state': MemoryState
   'memory:saveCore': MemoryState
   'memory:saveDoc': MemoryState

@@ -204,7 +204,8 @@ export const SECTIONS: SectionSpec[] = [
       {
         id: 'general.closeBehavior',
         label: t('When the window is closed'),
-        keywords: 'tray system tray minimize quit',
+        hint: t('In the system tray, Clyde and its agents keep running; quit from the tray icon.'),
+        keywords: 'tray system tray minimize quit background',
         control: ({ s, set }) => (
           <Segmented
             label={t('When the window is closed')}
@@ -401,6 +402,14 @@ export const SECTIONS: SectionSpec[] = [
         hint: t('Removes the folder and the task branch after a successful merge.'),
         control: ({ s, set }) => (
           <Toggle label={t('Delete worktrees once merged')} checked={s.agents.deleteMergedWorktrees} onChange={(v) => set('agents.deleteMergedWorktrees', v)} />
+        )
+      },
+      {
+        id: 'agents.resumeOnStart',
+        label: t('Resume interrupted sessions at startup'),
+        hint: t('Sessions that were working when Clyde closed (within a day) start again and carry on where they stopped.'),
+        control: ({ s, set }) => (
+          <Toggle label={t('Resume interrupted sessions at startup')} checked={s.agents.resumeOnStart} onChange={(v) => set('agents.resumeOnStart', v)} />
         )
       }
     ]

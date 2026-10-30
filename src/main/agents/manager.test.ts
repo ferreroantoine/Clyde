@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import Database from 'better-sqlite3'
@@ -7,7 +7,8 @@ import type { AgentEventEnvelope, AgentSessionInfo } from '@shared/agent'
 import { migrate } from '../services/db/database'
 import { SecretsService } from '../services/secrets'
 import { ProfilesService } from '../services/profiles'
-import { AgentManager, MAX_ACTIVE_SESSIONS, type AgentManagerDeps } from './manager'
+import { AgentManager, MAX_ACTIVE_SESSIONS, withPrefix, type AgentManagerDeps } from './manager'
+import { MetricsService } from '../metrics/metrics'
 import { fakeQuery, sdk, type FakeContext } from './claude-code/fake-query'
 import type { ChatAdapter, ChatRequest } from './api/chat'
 
@@ -53,6 +54,7 @@ function setup(
   const profile = profiles.create({ name: 'Perso', color: '#6366f1', auth: 'subscription', defaultModel: 'sonnet' })
   const events: AgentEventEnvelope[] = []
   const sessions: AgentSessionInfo[] = []
+  const metrics = new MetricsService(db, { profiles: () => profiles.list(), activeSessions: () => [] })
   const { query, calls } = fakeQuery(script as never)
   const mcp = fakeMcp()
   const cliSpawns: Array<{ file: string; args: string[]; env: Record<string, string>; cwd: string }> = []
@@ -83,8 +85,15 @@ function setup(
     claudeCodePath: () => binary,
     workspaceRoot: () => (workspace ? repo : null),
     query: async () => query,
-    onEvent: (e) => events.push(e),
-    onSession: (s) => sessions.push(s),
+    onEvent: (e) => {
+      events.push(e)
+      metrics.onEvent(e)
+    },
+    onSession: (s) => {
+      sessions.push(s)
+      metrics.onSession(s)
+    },
+    store: { saveRequest: (id, request) => metrics.saveRequest(id, request), resumable: (id) => metrics.resumable(id) },
     clientApp: 'clyde/test',
     baseEnv: { PATH: '/usr/bin', ANTHROPIC_API_KEY: 'sk-ant-inherited' },
     log
@@ -95,7 +104,7 @@ function setup(
       .filter((s) => s.id === id)
       .map((s) => s.status)
       .filter((status, i, all) => status !== all[i - 1])
-  return { manager, profile, profiles, events, calls, statuses, repo, mcp, cliSpawns }
+  return { manager, profile, profiles, events, calls, statuses, repo, mcp, cliSpawns, metrics }
 }
 
 async function* idle(ctx: FakeContext) {
@@ -220,6 +229,91 @@ describe('AgentManager', () => {
     expect(info).toMatchObject({ kind: 'codex', status: 'idle' })
     expect(cliSpawns[0]).toEqual({ file: '/bin/codex', args: ['app-server'], env: { PATH: '/usr/bin', CODEX_HOME: profiles.configDir(codex.id) }, cwd: repo })
     manager.stop(info.id)
+  })
+
+  it('marks busy sessions interrupted at shutdown and resumes Claude Code in its own session', async () => {
+    async function* answering(ctx: FakeContext) {
+      yield sdk.init()
+      while (await ctx.nextUser()) {
+        yield sdk.assistant('m1', [{ type: 'text', text: 'working on it' }])
+        // Never ends its turn: Clyde quits while it works.
+        await new Promise(() => undefined)
+      }
+    }
+    const { manager, profile, profiles, calls, events, statuses, metrics } = setup(answering as never)
+    const info = await manager.start({ profileId: profile.id, systemPrompt: 'Be brief.' })
+    manager.send(info.id, 'fix the bug')
+    await vi.waitFor(() => expect(events.some((e) => e.event.type === 'text')).toBe(true))
+    expect(manager.busyCount()).toBe(1)
+
+    manager.shutdown()
+    expect(statuses(info.id).at(-1)).toBe('interrupted')
+    expect(metrics.interruptedSince(0)).toEqual([info.id])
+
+    // Claude Code keeps the session as a file in the profile's folder.
+    const project = join(profiles.configDir(profile.id), 'projects', 'repo')
+    mkdirSync(project, { recursive: true })
+    writeFileSync(join(project, 'sdk-session.jsonl'), '')
+    const lastSeq = events.at(-1)?.seq ?? 0
+    const resumed = await manager.resume(info.id)
+    expect(resumed).toMatchObject({ id: info.id, status: 'idle' })
+    expect(calls[1]).toMatchObject({ resume: 'sdk-session', systemPrompt: { append: 'Be brief.' } })
+    const after = events.filter((e) => e.seq > lastSeq)
+    // One thread: numbering goes on, and the new run's keys cannot clash with the first run's.
+    expect(after[0]?.seq).toBe(lastSeq + 1)
+    expect(after.map((e) => e.event)).toContainEqual({ type: 'session_resumed', fresh: false })
+    manager.send(info.id, 'go on')
+    await vi.waitFor(() => expect(events.filter((e) => e.event.type === 'text')).toHaveLength(2))
+    const keys = events.flatMap((e) => (e.event.type === 'text' ? [e.event.key] : []))
+    expect(keys[0]).not.toBe(keys[1])
+    manager.stop(info.id)
+  })
+
+  it('resumes with the end of the transcript when Claude Code lost its session', async () => {
+    const { manager, profile, calls, events } = setup(idle as never)
+    const info = await manager.start({ profileId: profile.id })
+    manager.send(info.id, 'remember the plan')
+    await vi.waitFor(() => expect(events.some((e) => e.event.type === 'turn_end')).toBe(true))
+    manager.stop(info.id)
+    await manager.resume(info.id)
+    expect(calls[1]).not.toHaveProperty('resume')
+    expect((calls[1]?.systemPrompt as { append?: string }).append).toMatch(/interrupted and resumed[\s\S]*User: remember the plan/)
+    expect(events.map((e) => e.event)).toContainEqual({ type: 'session_resumed', fresh: true })
+  })
+
+  it('rebuilds the history of an API session it resumes', async () => {
+    const requests: ChatRequest[] = []
+    const adapter: ChatAdapter = {
+      async *stream(req) {
+        requests.push(structuredClone({ ...req, signal: undefined }) as unknown as ChatRequest)
+        yield { type: 'done', text: `answer ${requests.length}`, toolCalls: [], stopReason: 'end', usage: { inputTokens: 1, outputTokens: 1 } }
+      },
+      listModels: async () => [{ value: 'qwen3', displayName: 'qwen3', description: '' }]
+    }
+    const { manager, profiles, events } = setup(idle as never, { adapter })
+    const ollama = profiles.create({ kind: 'ollama', name: 'Local', color: '#64748b', auth: 'none' })
+    const info = await manager.start({ profileId: ollama.id })
+    manager.send(info.id, 'first')
+    await vi.waitFor(() => expect(events.filter((e) => e.event.type === 'turn_end')).toHaveLength(1))
+    manager.stop(info.id)
+    await expect(manager.resume('as-unknown')).rejects.toThrow(/cannot be resumed/)
+
+    await manager.resume(info.id)
+    manager.send(info.id, 'second')
+    await vi.waitFor(() => expect(events.filter((e) => e.event.type === 'turn_end')).toHaveLength(2))
+    expect(requests[1]?.messages).toEqual([
+      { role: 'user', text: 'first' },
+      { role: 'assistant', text: 'answer 1', toolCalls: [] },
+      { role: 'user', text: 'second' }
+    ])
+    manager.stop(info.id)
+  })
+
+  it('renames the text keys and tool ids of a resumed run', () => {
+    expect(withPrefix({ type: 'text', key: 't1s0:0', text: 'x' }, 'r9-')).toEqual({ type: 'text', key: 'r9-t1s0:0', text: 'x' })
+    expect(withPrefix({ type: 'tool_call', toolUseId: 'c1', name: 'Read', input: {}, parentToolUseId: null }, 'r9-')).toMatchObject({ toolUseId: 'r9-c1', parentToolUseId: null })
+    expect(withPrefix({ type: 'tool_result', toolUseId: 'c1', content: '', isError: false }, 'r9-')).toMatchObject({ toolUseId: 'r9-c1' })
+    expect(withPrefix({ type: 'user', id: 'u', text: 'hi' }, 'r9-')).toEqual({ type: 'user', id: 'u', text: 'hi' })
   })
 
   it('keeps two Antigravity sessions of one account from using different rules', async () => {

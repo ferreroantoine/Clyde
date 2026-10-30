@@ -1,6 +1,6 @@
 import { t } from '@shared/i18n'
 import { execFile } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { AppError } from '@shared/errors'
@@ -46,6 +46,27 @@ export function buildProfileEnv(
   env['CLAUDE_AGENT_SDK_CLIENT_APP'] = clientApp
   if (runtime.apiKey) env['ANTHROPIC_API_KEY'] = runtime.apiKey
   return env
+}
+
+/**
+ * The transcript file of a Claude Code session in a profile's config folder
+ * (`projects/<encoded cwd>/<id>.jsonl`), or null. The folder name encoding is Claude Code's own,
+ * so every project folder is looked at rather than computing it.
+ */
+export function findClaudeSessionFile(configDir: string, sessionId: string): string | null {
+  if (!/^[\w-]+$/.test(sessionId)) return null
+  const projects = join(configDir, 'projects')
+  let dirs: string[]
+  try {
+    dirs = readdirSync(projects)
+  } catch {
+    return null
+  }
+  for (const dir of dirs) {
+    const file = join(projects, dir, `${sessionId}.jsonl`)
+    if (existsSync(file)) return file
+  }
+  return null
 }
 
 const requireHere = createRequire(__filename)

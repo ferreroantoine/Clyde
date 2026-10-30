@@ -96,7 +96,7 @@ export class MessageTranslator {
       case 'system':
         if (msg.subtype === 'init') {
           return [
-            { type: 'init', model: msg.model, cliVersion: msg.claude_code_version, cwd: msg.cwd, tools: msg.tools }
+            { type: 'init', model: msg.model, cliVersion: msg.claude_code_version, cwd: msg.cwd, tools: msg.tools, resumeId: msg.session_id }
           ]
         }
         if (msg.subtype === 'compact_boundary') return [{ type: 'context_compacted' }]

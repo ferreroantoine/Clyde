@@ -1,5 +1,5 @@
-import type { ContextBreakdown } from '@shared/agent'
-import type { ChatMessage, ToolSpec } from '../agents/api/chat'
+import type { AgentEvent, ContextBreakdown } from '@shared/agent'
+import type { ChatMessage, ToolCall, ToolResult, ToolSpec } from '../agents/api/chat'
 
 /**
  * Keeping the API loop's context small. Pure functions over the vendor-neutral history, so
@@ -142,4 +142,58 @@ export function breakdown(
     toolResults: scale(sizes.toolResults),
     output: outputTokens
   }
+}
+
+/**
+ * Rebuilds the API loop's history from a session's stored events, to resume it after a restart.
+ * Assistant text and the tool calls that follow it form one message; their results the next.
+ * Calls left without a result (the session was cut) get one saying so, as every call needs it.
+ */
+export function historyFromEvents(events: readonly AgentEvent[]): ChatMessage[] {
+  const out: ChatMessage[] = []
+  let assistant: { text: string; toolCalls: ToolCall[] } | null = null
+  let results = new Map<string, ToolResult>()
+  const flush = () => {
+    if (!assistant) return
+    out.push({ role: 'assistant', text: assistant.text, toolCalls: assistant.toolCalls })
+    if (assistant.toolCalls.length) {
+      out.push({
+        role: 'tool',
+        results: assistant.toolCalls.map(
+          (call) => results.get(call.id) ?? { toolCallId: call.id, name: call.name, content: 'No result: the session was interrupted.', isError: true }
+        )
+      })
+    }
+    assistant = null
+    results = new Map()
+  }
+  for (const event of events) {
+    switch (event.type) {
+      case 'user':
+        flush()
+        out.push({ role: 'user', text: event.text })
+        break
+      case 'text':
+        // Text after tool calls starts the next step.
+        if (assistant?.toolCalls.length) flush()
+        assistant ??= { text: '', toolCalls: [] }
+        assistant.text = assistant.text ? `${assistant.text}\n\n${event.text}` : event.text
+        break
+      case 'tool_call':
+        if (event.parentToolUseId) break
+        assistant ??= { text: '', toolCalls: [] }
+        assistant.toolCalls.push({ id: event.toolUseId, name: event.name, input: event.input })
+        break
+      case 'tool_result': {
+        const call = assistant?.toolCalls.find((c) => c.id === event.toolUseId)
+        if (call) results.set(call.id, { toolCallId: call.id, name: call.name, content: event.content, isError: event.isError })
+        break
+      }
+      case 'turn_end':
+        flush()
+        break
+    }
+  }
+  flush()
+  return out
 }

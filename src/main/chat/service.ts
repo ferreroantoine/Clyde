@@ -3,7 +3,7 @@ import { basename, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { t } from '@shared/i18n'
 import { AppError } from '@shared/errors'
-import type { AgentEventEnvelope, AgentSessionInfo, AgentStart, PermissionLevel } from '@shared/agent'
+import { ENDED_STATUSES, type AgentEventEnvelope, type AgentSessionInfo, type AgentStart, type PermissionLevel } from '@shared/agent'
 import {
   IMAGE_MIMES,
   MAX_IMAGE_ATTACHMENT,
@@ -65,7 +65,7 @@ interface Turn {
   error: string | null
 }
 
-const ENDED = new Set(['stopped', 'error'])
+const ENDED: ReadonlySet<string> = ENDED_STATUSES
 const IMAGE_SET = new Set<string>(IMAGE_MIMES)
 /** How much of a conversation "Continue in the project" passes on. */
 const HANDOFF_CHARS = 40_000

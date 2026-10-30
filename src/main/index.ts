@@ -1,8 +1,8 @@
 import { join } from 'node:path'
 import { app, BrowserWindow, dialog, net, Notification } from 'electron'
-import type { AgentEventEnvelope } from '@shared/agent'
+import { isEnded, type AgentEventEnvelope } from '@shared/agent'
 import { resolveLocale, setLocale, t } from '@shared/i18n'
-import { handleClose } from './tray'
+import { handleClose, refreshTray, syncTray } from './tray'
 import { openDatabase, migrate, type Db } from './services/db/database'
 import { SqliteSettingsRepository } from './services/db/settings-repo'
 import { createMainWindow } from './window'
@@ -20,7 +20,7 @@ import { registerProfileHandlers } from './ipc/profiles'
 import { registerAgentHandlers } from './ipc/agents'
 import { SecretsService, safeStorageCipher } from './services/secrets'
 import { ProfilesService } from './services/profiles'
-import { AgentManager } from './agents/manager'
+import { AgentManager, CONTINUE_MESSAGE } from './agents/manager'
 import { createAdapter } from './agents/api/clients'
 import { McpStore } from './mcp/store'
 import { McpHub } from './mcp/hub'
@@ -59,6 +59,9 @@ const userDataOverride = process.env['CLYDE_USER_DATA'] || (portableDir ? join(p
 if (userDataOverride) app.setPath('userData', userDataOverride)
 
 let queryFn: Promise<QueryFn> | null = null
+let mainWindow: BrowserWindow | null = null
+/** Set when the app quits: sessions ending then are not "finished" (no memory proposals). */
+let shuttingDown = false
 const query = () => (queryFn ??= loadQuery())
 
 /** Opens and migrates the app database; on failure the app still starts, with settings kept in memory. */
@@ -101,7 +104,9 @@ if (!app.requestSingleInstanceLock()) {
   app.on('second-instance', () => {
     const [win] = BrowserWindow.getAllWindows()
     if (win) {
+      // It may be hidden in the tray.
       if (win.isMinimized()) win.restore()
+      win.show()
       win.focus()
     }
   })
@@ -209,15 +214,24 @@ if (!app.requestSingleInstanceLock()) {
       onSession: (info) => {
         broadcast('agent:session', info)
         // End of a project session: the agent may propose memory changes, to review in Settings.
-        if (info.status === 'stopped' && !info.chatId && settings.getAll().memory.proposeAtSessionEnd && internal.target()) {
+        if (info.status === 'stopped' && !shuttingDown && !info.chatId && settings.getAll().memory.proposeAtSessionEnd && internal.target()) {
           void memory?.proposeFromSession(info.id).catch((err) => log.warn('memory proposal failed', err))
         }
         metrics.onSession(info)
         tasks.onSession(info)
+        if (mainWindow) refreshTray(mainWindow, background)
+      },
+      store: {
+        saveRequest: (id, request) => metrics.saveRequest(id, request),
+        resumable: (id) => metrics.resumable(id)
       },
       clientApp,
       log: createLogger('agents')
     })
+    const background = {
+      behavior: () => settings.getAll().general.closeBehavior,
+      busy: () => agents.busyCount()
+    }
     limitsSetup = setupLimits({
       db: profileDb,
       profiles,
@@ -228,7 +242,7 @@ if (!app.requestSingleInstanceLock()) {
       log: createLogger('limits')
     })
     registerProfileHandlers({ profiles, ptys, claudeCodePath, codexPath, antigravityPath, cli, query, clientApp, fetch })
-    registerAgentHandlers(agents)
+    registerAgentHandlers(agents, { metrics: { history: (cwd) => metrics.history(cwd), stored: (id) => metrics.stored(id) }, workspaceRoot: () => workspace.current()?.root ?? null })
     registerMcpHandlers(mcp, {
       list: () => mcpStore.presets(),
       save: (serverId, title, description) => mcpStore.savePreset(serverId, title, description),
@@ -315,7 +329,7 @@ if (!app.requestSingleInstanceLock()) {
         agents: definitions,
         mcp,
         metrics,
-        activeSessionIds: () => agents.list().filter((s) => !['stopped', 'error'].includes(s.status)).map((s) => s.id)
+        activeSessionIds: () => agents.list().filter((s) => !isEnded(s.status)).map((s) => s.id)
       }),
       settings
     )
@@ -324,7 +338,9 @@ if (!app.requestSingleInstanceLock()) {
     limitsSetup.poller.start()
 
     app.on('will-quit', () => {
-      agents.stopAll()
+      // Working sessions are marked interrupted, so they can be resumed at the next start.
+      shuttingDown = true
+      agents.shutdown()
       void limitsSetup.dispose()
       void mcp.dispose()
       ptys.killAll()
@@ -339,13 +355,27 @@ if (!app.requestSingleInstanceLock()) {
     }
 
     const win = createMainWindow()
-    handleClose(win, () => settings.getAll().general.closeBehavior)
+    mainWindow = win
+    handleClose(win, background)
     // Settings › Appearance › interface text size scales the whole window, Monaco and xterm included.
     const zoom = () => win.webContents.setZoomFactor(settings.getAll().appearance.uiFontSize / 13)
     win.webContents.on('did-finish-load', zoom)
     settings.onChange((next, previous) => {
       if (next.appearance.uiFontSize !== previous.appearance.uiFontSize) zoom()
+      if (next.general.closeBehavior !== previous.general.closeBehavior) syncTray(win, background)
     })
+
+    // Settings › Agents: sessions the last shutdown cut (within a day) carry on by themselves.
+    if (settings.getAll().agents.resumeOnStart) {
+      for (const id of metrics.interruptedSince(Date.now() - 24 * 60 * 60 * 1000)) {
+        try {
+          await agents.resume(id)
+          agents.send(id, CONTINUE_MESSAGE)
+        } catch (err) {
+          log.warn(`could not resume session ${id}`, err)
+        }
+      }
+    }
 
     /** Desktop notifications for agents, when the window is in the background. */
     function notifyAgent(envelope: AgentEventEnvelope): void {

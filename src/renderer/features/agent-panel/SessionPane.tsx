@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type SetStateAction } from 'react'
 import { intlLocale, t, tk } from '@shared/i18n'
-import { ArrowUp, CircleAlert, FoldVertical, Gauge, Square, StepForward } from 'lucide-react'
+import { ArrowUp, CircleAlert, FoldVertical, Gauge, History, Play, RotateCcw, Square, StepForward } from 'lucide-react'
 import { PERMISSION_LEVEL_LABELS, type AgentStatus } from '@shared/agent'
 import { EFFORT_LABELS, kindLabel } from '@shared/profiles'
 import { Button } from '@/components/ui/button'
@@ -25,7 +25,8 @@ export const STATUS_LABELS: Record<AgentStatus, string> = {
   running: tk('Working'),
   'awaiting-approval': tk('Needs approval'),
   stopped: tk('Stopped'),
-  error: tk('Ended with an error')
+  error: tk('Ended with an error'),
+  interrupted: tk('Interrupted')
 }
 
 export function StatusDot({ status }: { status: AgentStatus }) {
@@ -132,6 +133,8 @@ function Composer({ view }: { view: SessionView }) {
     el.setSelectionRange(el.value.length, el.value.length)
   }, [focusTick])
   const ended = ENDED_STATUSES.has(status)
+  // An ended session that can come back takes messages: sending resumes it first.
+  const closed = ended && !view.resumable
   const busy = status === 'running' || status === 'awaiting-approval'
 
   useLayoutEffect(() => {
@@ -143,7 +146,7 @@ function Composer({ view }: { view: SessionView }) {
 
   const submit = async () => {
     const value = text.trim()
-    if (!value || ended || status === 'starting') return
+    if (!value || closed || status === 'starting') return
     setText('')
     if (!(await send(value))) setText(value)
   }
@@ -155,7 +158,7 @@ function Composer({ view }: { view: SessionView }) {
       className="border-t p-2"
       // Files dragged from the Explorer become @mentions, which Claude Code reads itself.
       onDragOver={(e) => {
-        if (ended || !e.dataTransfer.types.includes(EXPLORER_PATH_TYPE)) return
+        if (closed || !e.dataTransfer.types.includes(EXPLORER_PATH_TYPE)) return
         e.preventDefault()
         e.dataTransfer.dropEffect = 'copy'
         setOver(true)
@@ -182,7 +185,7 @@ function Composer({ view }: { view: SessionView }) {
           ref={area}
           rows={1}
           value={text}
-          disabled={ended}
+          disabled={closed}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -190,7 +193,15 @@ function Composer({ view }: { view: SessionView }) {
               void submit()
             }
           }}
-          placeholder={ended ? t('This session has ended') : busy ? t('Queue a follow-up…') : t('Ask the agent… (Enter to send)')}
+          placeholder={
+            closed
+              ? t('This session has ended')
+              : ended
+                ? t('Write to resume this session… (Enter to send)')
+                : busy
+                  ? t('Queue a follow-up…')
+                  : t('Ask the agent… (Enter to send)')
+          }
           aria-label={t('Message to the agent')}
           className="max-h-[200px] min-h-6 flex-1 resize-none bg-transparent py-0.5 text-[13px] outline-none placeholder:text-muted-foreground"
         />
@@ -200,11 +211,44 @@ function Composer({ view }: { view: SessionView }) {
             <Square className="fill-current" />
           </Button>
         ) : (
-          <Button type="button" size="icon-xs" aria-label={t('Send')} disabled={!text.trim() || ended} onClick={() => void submit()}>
+          <Button type="button" size="icon-xs" aria-label={t('Send')} disabled={!text.trim() || closed} onClick={() => void submit()}>
             <ArrowUp />
           </Button>
         )}
       </div>
+    </div>
+  )
+}
+
+/** An ended session that can come back: why it ended, and the way to resume it. */
+function ResumeBar({ view }: { view: SessionView }) {
+  const resume = useAgents((s) => s.resume)
+  const resuming = useAgents((s) => s.resuming === view.info.id)
+  const status = view.info.status
+  if (!ENDED_STATUSES.has(status) || !view.resumable) return null
+  const interrupted = status === 'interrupted'
+  return (
+    <div
+      className={cn('flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-1.5 text-[11px]', interrupted ? 'bg-warning/10' : 'text-muted-foreground')}
+      data-testid="resume-bar"
+    >
+      <History className="size-3.5 shrink-0" />
+      {/* Narrow panels put the buttons under the text rather than squeezing it. */}
+      <span className="min-w-[12rem] flex-1">
+        {interrupted
+          ? t('Clyde was closed while the agent was working.')
+          : status === 'error'
+            ? t('This session ended with an error. Resume it to go on.')
+            : t('This session has ended. Resume it, or just write to it.')}
+      </span>
+      {interrupted && (
+        <Button size="xs" loading={resuming} onClick={() => void resume(view.info.id, true)}>
+          <Play /> {t('Resume and carry on')}
+        </Button>
+      )}
+      <Button size="xs" variant={interrupted ? 'ghost' : 'outline'} loading={resuming && !interrupted} onClick={() => void resume(view.info.id)}>
+        <RotateCcw /> {t('Resume')}
+      </Button>
     </div>
   )
 }
@@ -329,6 +373,7 @@ export function SessionPane({ view }: { view: SessionView }) {
           <SessionLimitLine usage={planUse ?? []} />
         </div>
       )}
+      <ResumeBar view={view} />
       <ContextBar view={view} />
       <div
         ref={scroller}

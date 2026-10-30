@@ -95,7 +95,38 @@ export const questionAnswerSchema = z.object({
 })
 export type QuestionAnswer = z.input<typeof questionAnswerSchema>
 
-export type AgentStatus = 'starting' | 'idle' | 'running' | 'awaiting-approval' | 'stopped' | 'error'
+/** `interrupted`: Clyde closed (or crashed) while the agent was working; the session can be resumed. */
+export type AgentStatus = 'starting' | 'idle' | 'running' | 'awaiting-approval' | 'stopped' | 'error' | 'interrupted'
+
+/** Statuses of a session that no longer runs; it may still be resumed. */
+export const ENDED_STATUSES: ReadonlySet<AgentStatus> = new Set<AgentStatus>(['stopped', 'error', 'interrupted'])
+export const isEnded = (status: AgentStatus): boolean => ENDED_STATUSES.has(status)
+/** A session that is busy: quitting now cuts its work. */
+export const isBusy = (status: AgentStatus): boolean => status === 'running' || status === 'awaiting-approval' || status === 'starting'
+
+/** A past or live session of the agent panel's list. */
+export interface SessionSummary {
+  id: string
+  profileId: string
+  kind: ProfileKind
+  model: string
+  title: string | null
+  status: AgentStatus
+  cwd: string
+  taskId: string | null
+  startedAt: number
+  endedAt: number | null
+  /** Whether "Resume" can bring it back (Clyde knows how it was started). */
+  resumable: boolean
+}
+
+/** A session from the history, to show it in the panel before resuming it. */
+export interface StoredSession {
+  info: AgentSessionInfo
+  title: string | null
+  resumable: boolean
+  events: AgentEventEnvelope[]
+}
 
 export interface AgentSessionInfo {
   id: string
@@ -135,7 +166,18 @@ export interface ContextBreakdown {
 /** Everything the agent panel renders, pushed from main as `agent:event`. */
 export type AgentEvent =
   | { type: 'status'; status: AgentStatus }
-  | { type: 'init'; model: string; /** Version of the CLI behind the session; empty for API agents. */ cliVersion: string; cwd: string; tools: string[] }
+  | {
+      type: 'init'
+      model: string
+      /** Version of the CLI behind the session; empty for API agents. */
+      cliVersion: string
+      cwd: string
+      tools: string[]
+      /** The CLI's own id for the conversation (Claude Code session, Codex thread, agy conversation), to resume it. */
+      resumeId?: string
+    }
+  /** The session came back after it ended; `fresh` when the agent only got a summary of what came before. */
+  | { type: 'session_resumed'; fresh: boolean }
   | { type: 'user'; id: string; text: string }
   /** Streaming text; `key` identifies one text block of one assistant message. */
   | { type: 'text_delta'; key: string; text: string }

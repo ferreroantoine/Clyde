@@ -154,7 +154,8 @@ describe('TaskService', () => {
     await h.tasks.start(b.id)
     await expect(h.tasks.delete(b.id)).rejects.toThrow(/Merge or abandon/)
     h.tasks.recover()
-    expect(h.tasks.get(b.id)).toMatchObject({ status: 'review', sessionId: null, note: expect.stringMatching(/closed/) })
+    // The task keeps its session, to resume it with change requests.
+    expect(h.tasks.get(b.id)).toMatchObject({ status: 'review', sessionId: expect.any(String), note: expect.stringMatching(/closed/) })
 
     const c = await h.tasks.create({ title: 'C', description: 'c', agentId: h.agent.id })
     await h.tasks.delete(c.id)
