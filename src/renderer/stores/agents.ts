@@ -7,6 +7,7 @@ import { notify } from './notifications'
 import { AgentTerminalFeed } from '@/lib/agent-terminal'
 import { useTerminals } from './terminals'
 import { profileById, useProfiles } from './profiles'
+import { useLayout } from './layout'
 
 interface AgentsState {
   sessions: Record<string, SessionView>
@@ -14,6 +15,15 @@ interface AgentsState {
   order: string[]
   activeId: string | null
   starting: boolean
+  /** Unsent composer text by session id; `''` holds what waits for the next session to start. */
+  drafts: Record<string, string>
+  /** Bumped to move the keyboard focus to the composer. */
+  focusTick: number
+  setDraft: (id: string, text: string) => void
+  /** Appends text to the active session's composer (or the next session's) and focuses it. */
+  addToDraft: (text: string) => void
+  /** Sends at once to the active session; without one, leaves the text in the composer of the next. */
+  sendOrDraft: (text: string) => Promise<void>
   init: () => () => void
   start: (request: AgentStart) => Promise<boolean>
   send: (text: string) => Promise<boolean>
@@ -32,6 +42,13 @@ interface AgentsState {
 export const ENDED_STATUSES = new Set(['stopped', 'error'])
 
 export const useAgents = create<AgentsState>()((set, get) => {
+  /** The active session when it can still take messages. */
+  const live = () => {
+    const id = get().activeId
+    const view = id ? get().sessions[id] : undefined
+    return view && !ENDED_STATUSES.has(view.info.status) ? id : null
+  }
+
   // Each agent's shell commands also show in a read-only terminal tab named after its account.
   const terminalFeed = new AgentTerminalFeed((sessionId, data) => {
     const info = get().sessions[sessionId]?.info
@@ -55,6 +72,25 @@ export const useAgents = create<AgentsState>()((set, get) => {
     order: [],
     activeId: null,
     starting: false,
+    drafts: {},
+    focusTick: 0,
+
+    setDraft: (id, text) => set({ drafts: { ...get().drafts, [id]: text } }),
+
+    addToDraft: (text) => {
+      const id = live() ?? ''
+      const current = get().drafts[id] ?? ''
+      const joined = !current ? text : /\s$/.test(current) ? current + text : `${current} ${text}`
+      set({ drafts: { ...get().drafts, [id]: joined }, focusTick: get().focusTick + 1 })
+      if (!id) set({ activeId: null })
+      useLayout.getState().setAgentPanelOpen(true)
+    },
+
+    sendOrDraft: async (text) => {
+      useLayout.getState().setAgentPanelOpen(true)
+      if (live() && (await get().send(text))) return
+      get().addToDraft(text)
+    },
 
     init: () => {
       const offs = [
@@ -77,7 +113,9 @@ export const useAgents = create<AgentsState>()((set, get) => {
       try {
         const info = await invoke('agent:start', request)
         upsertSession(info)
-        set({ activeId: info.id })
+        // The text prepared before the session existed moves to its composer.
+        const { ['']: waiting, ...drafts } = get().drafts
+        set({ activeId: info.id, drafts: waiting ? { ...drafts, [info.id]: waiting } : drafts })
         return true
       } catch (err) {
         notify.error(t('Could not start the agent'), err)

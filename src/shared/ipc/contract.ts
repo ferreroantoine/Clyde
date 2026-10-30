@@ -67,6 +67,12 @@ export const requestSchemas = {
   'fs:list': z.object({ path: relPath }),
   'fs:read': z.object({ path: relPath }),
   'fs:write': z.object({ path: relPath, content: z.string() }),
+  'fs:createFile': z.object({ path: relPath }),
+  'fs:createDir': z.object({ path: relPath }),
+  'fs:rename': z.object({ from: relPath, to: relPath }),
+  'fs:duplicate': z.object({ path: relPath }),
+  'fs:trash': z.object({ path: relPath }),
+  'fs:reveal': z.object({ path: relPath }),
   'search:text': z.object({
     query: z.string().min(1).max(500),
     caseSensitive: z.boolean().default(false),
@@ -183,6 +189,12 @@ export interface InvokeResponses {
   'fs:list': DirEntry[]
   'fs:read': FileContent
   'fs:write': { mtimeMs: number }
+  'fs:createFile': DirEntry
+  'fs:createDir': DirEntry
+  'fs:rename': DirEntry
+  'fs:duplicate': DirEntry
+  'fs:trash': null
+  'fs:reveal': null
   'search:text': SearchResult
   'pty:create': PtyInfo
   'pty:write': null

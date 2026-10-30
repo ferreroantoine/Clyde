@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type SetStateAction } from 'react'
 import { intlLocale, t, tk } from '@shared/i18n'
 import { ArrowUp, CircleAlert, FoldVertical, Gauge, Square, StepForward } from 'lucide-react'
 import { PERMISSION_LEVEL_LABELS, type AgentStatus } from '@shared/agent'
@@ -14,6 +14,8 @@ import { RichText } from './RichText'
 import { SessionLimitLine } from '@/features/limits/LimitGauge'
 import { useLimits } from '@/stores/limits'
 import { ToolCard } from './ToolCard'
+import { EXPLORER_PATH_TYPE } from '@/features/explorer/FileTree'
+import { mention } from '@/features/explorer/mention'
 import { Appear } from '@/components/Appear'
 import { useSettings } from '@/stores/settings'
 
@@ -111,9 +113,24 @@ export function itemKey(item: TranscriptItem): string {
 function Composer({ view }: { view: SessionView }) {
   const send = useAgents((s) => s.send)
   const interrupt = useAgents((s) => s.interrupt)
-  const [text, setText] = useState('')
+  const id = view.info.id
+  const text = useAgents((s) => s.drafts[id] ?? '')
+  const storeDraft = useAgents((s) => s.setDraft)
+  const setText = useCallback((value: SetStateAction<string>) => {
+    const current = useAgents.getState().drafts[id] ?? ''
+    storeDraft(id, typeof value === 'function' ? value(current) : value)
+  }, [id, storeDraft])
+  const focusTick = useAgents((s) => s.focusTick)
   const area = useRef<HTMLTextAreaElement>(null)
   const status = view.info.status
+
+  // Text added from elsewhere (the explorer) gets the focus, the caret at its end.
+  useEffect(() => {
+    const el = area.current
+    if (!focusTick || !el) return
+    el.focus()
+    el.setSelectionRange(el.value.length, el.value.length)
+  }, [focusTick])
   const ended = ENDED_STATUSES.has(status)
   const busy = status === 'running' || status === 'awaiting-approval'
 
@@ -131,9 +148,36 @@ function Composer({ view }: { view: SessionView }) {
     if (!(await send(value))) setText(value)
   }
 
+  const [over, setOver] = useState(false)
+
   return (
-    <div className="border-t p-2">
-      <div className="flex items-end gap-1.5 rounded-lg border bg-background px-2 py-1.5 focus-within:ring-2 focus-within:ring-ring">
+    <div
+      className="border-t p-2"
+      // Files dragged from the Explorer become @mentions, which Claude Code reads itself.
+      onDragOver={(e) => {
+        if (ended || !e.dataTransfer.types.includes(EXPLORER_PATH_TYPE)) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'copy'
+        setOver(true)
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false)
+      }}
+      onDrop={(e) => {
+        setOver(false)
+        const path = e.dataTransfer.getData(EXPLORER_PATH_TYPE)
+        if (!path) return
+        e.preventDefault()
+        setText((current) => (current && !/\s$/.test(current) ? `${current} ` : current) + mention(path))
+        area.current?.focus()
+      }}
+    >
+      <div
+        className={cn(
+          'flex items-end gap-1.5 rounded-lg border bg-background px-2 py-1.5 focus-within:ring-2 focus-within:ring-ring',
+          over && 'border-primary ring-2 ring-primary/30'
+        )}
+      >
         <textarea
           ref={area}
           rows={1}

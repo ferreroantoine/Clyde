@@ -4,11 +4,16 @@ import type { DirEntry, FsChange } from '@shared/types'
 import { invoke } from '@/lib/ipc'
 import { notify } from './notifications'
 
+/** A name being typed in the tree: renaming an entry, or a new file or folder inside `parent`. */
+export type TreeEdit = { mode: 'rename'; path: string } | { mode: 'file' | 'dir'; parent: string }
+
 interface ExplorerState {
   /** Loaded directory listings keyed by relative path ('' is the root). */
   children: Record<string, DirEntry[]>
   expanded: Record<string, boolean>
   selected: string | null
+  editing: TreeEdit | null
+  setEditing: (edit: TreeEdit | null) => void
   reset: () => void
   loadDir: (path: string) => Promise<void>
   toggle: (path: string) => void
@@ -34,8 +39,15 @@ export const useExplorer = create<ExplorerState>()((set, get) => ({
   children: {},
   expanded: {},
   selected: null,
+  editing: null,
 
-  reset: () => set({ children: {}, expanded: {}, selected: null }),
+  setEditing: (editing) => {
+    // A new entry is typed inside its folder, so the folder opens.
+    if (editing && editing.mode !== 'rename' && editing.parent) get().reveal([editing.parent])
+    set({ editing })
+  },
+
+  reset: () => set({ children: {}, expanded: {}, selected: null, editing: null }),
 
   loadDir: async (path) => {
     try {

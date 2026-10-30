@@ -1,5 +1,7 @@
 /** French. Keys are the English strings; see ./index.ts. */
 export const fr: Record<string, string> = {
+  // main/services/files.ts
+  'Already exists: {rel}': 'Existe déjà : {rel}',
   // main/agents/antigravity/runtime.ts
   'Not connected': 'Non connecté',
   'Antigravity did not start: {message}': 'Antigravity n’a pas démarré : {message}',
@@ -473,6 +475,36 @@ export const fr: Record<string, string> = {
   // renderer/features/explorer/Sidebar.tsx
   'Refresh': 'Actualiser',
   'Collapse all': 'Tout replier',
+  // renderer/features/explorer/FileTree.tsx
+  'New file…': 'Nouveau fichier…',
+  'New folder…': 'Nouveau dossier…',
+  'Add to agent session': 'Ajouter à la session agent',
+  'Explain this folder': 'Expliquer ce dossier',
+  'Explain this file': 'Expliquer ce fichier',
+  'Edit this file with the agent…': 'Modifier ce fichier avec l’agent…',
+  'Create an agent task…': 'Créer une tâche agent…',
+  'Rename…': 'Renommer…',
+  'Duplicate': 'Dupliquer',
+  'Del': 'Suppr',
+  'Copy path': 'Copier le chemin',
+  'Copy relative path': 'Copier le chemin relatif',
+  'Show in File Explorer': 'Afficher dans l’Explorateur',
+  'Open in terminal': 'Ouvrir dans le terminal',
+  // renderer/features/explorer/actions.ts
+  'A name is required': 'Un nom est requis',
+  'This name is not allowed': 'Ce nom n’est pas autorisé',
+  'Could not rename {name}': 'Impossible de renommer {name}',
+  'Could not create {name}': 'Impossible de créer {name}',
+  'Could not duplicate {name}': 'Impossible de dupliquer {name}',
+  'Move the folder {name} and its contents to the Recycle Bin?': 'Placer le dossier {name} et son contenu dans la corbeille ?',
+  'Move {name} to the Recycle Bin?': 'Placer {name} dans la corbeille ?',
+  'Could not delete {name}': 'Impossible de supprimer {name}',
+  'Could not copy': 'Impossible de copier',
+  'Could not show {name}': 'Impossible d’afficher {name}',
+  'Explain what the folder {path} contains and how its parts fit together.': 'Explique ce que contient le dossier {path} et comment ses parties s’articulent.',
+  'Explain what {path} does and how it fits in the project.': 'Explique ce que fait {path} et sa place dans le projet.',
+  // renderer/features/agent-panel/NewSession.tsx
+  'Waiting for the session: {text}': 'En attente de la session : {text}',
   // renderer/features/limits/LimitGauge.tsx
   'Official': 'Officiel',
   'Estimated': 'Estimé',

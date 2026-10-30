@@ -13,6 +13,7 @@ import type {
 import { invoke, on } from '@/lib/ipc'
 import { notify } from './notifications'
 import { useWorkspace } from './workspace'
+import { useLayout } from './layout'
 
 interface Review {
   taskId: string
@@ -43,6 +44,10 @@ interface BoardState {
   openReview: (taskId: string) => Promise<void>
   selectFile: (path: string) => Promise<void>
   closeReview: () => void
+  /** Description the next New task dialog opens with, e.g. a file sent from the explorer. */
+  taskDraft: { id: number; description: string } | null
+  /** Opens the New task dialog with this description. */
+  draftTask: (description: string) => void
 }
 
 export const useBoard = create<BoardState>()((set, get) => {
@@ -180,6 +185,12 @@ export const useBoard = create<BoardState>()((set, get) => {
       }
     },
 
-    closeReview: () => set({ review: null })
+    closeReview: () => set({ review: null }),
+
+    taskDraft: null,
+    draftTask: (description) => {
+      set({ taskDraft: { id: (get().taskDraft?.id ?? 0) + 1, description } })
+      useLayout.getState().request('new-task')
+    }
   }
 })
